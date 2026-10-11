@@ -1,5 +1,5 @@
+import { grantOf } from '../app/modes.js';
 import type { AlertView } from '@rp/contracts';
-import { grantOf } from '@rp/domain';
 import { alertAge, describeAlert } from '@rp/ordering';
 import {
   Badge,

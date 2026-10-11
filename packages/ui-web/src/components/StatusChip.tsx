@@ -11,6 +11,7 @@ export const ORDER_ITEM_STATE_STYLES: Readonly<
   Record<OrderItemState, { readonly tone: Tone; readonly icon: IconName }>
 > = {
   PENDING_APPROVAL: { tone: 'warning', icon: 'clock' },
+  HELD: { tone: 'neutral', icon: 'clock' },
   SENT: { tone: 'info', icon: 'send' },
   PREPARING: { tone: 'info', icon: 'flame' },
   READY: { tone: 'success', icon: 'check' },

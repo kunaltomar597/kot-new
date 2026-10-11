@@ -13,6 +13,7 @@ import { PrismaService } from '../database/prisma.service.js';
 import { CpError } from '../errors/cp-error.js';
 import { ed25519PublicKey, sha256Hex, verifyEd25519 } from './ed25519.js';
 import { NonceStore } from './nonce-store.js';
+import { VENDOR_ROUTE } from '../vendor/vendor.guard.js';
 import { PUBLIC_ROUTE } from './public.decorator.js';
 
 /** The installation a signed request came from. */
@@ -69,6 +70,12 @@ export class InstallationGuard implements CanActivate {
       context.getClass(),
     ]);
     if (isPublic === true) return true;
+    // Vendor staff endpoints are the vendor guard's (P7-02).
+    const vendor = this.reflector.getAllAndOverride<string | undefined>(VENDOR_ROUTE, [
+      context.getHandler(),
+      context.getClass(),
+    ]);
+    if (vendor !== undefined) return true;
     const request = context.switchToHttp().getRequest<InstallationRequest>();
     request.installation = await this.authenticate(request);
     return true;

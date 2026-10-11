@@ -46,6 +46,47 @@ export type CloseWithoutBillRequest = z.infer<typeof CloseWithoutBillRequest>;
 export const MoveTableRequest = z.strictObject({ toTableId: Id });
 export type MoveTableRequest = z.infer<typeof MoveTableRequest>;
 
+/**
+ * TBL-006: the guests at this table join another open table, for one bill. Their orders, tickets
+ * and open requests go with them; this table's session closes.
+ */
+export const MergeTablesRequest = z.strictObject({ intoTableSessionId: Id });
+export type MergeTablesRequest = z.infer<typeof MergeTablesRequest>;
+
+/**
+ * TBL-006: dishes go to another open table's bill: whole lines (a combo with its parts), not yet
+ * on a printed bill.
+ */
+export const TransferItemsRequest = z.strictObject({
+  toTableSessionId: Id,
+  orderItemIds: z.array(Id).min(1).max(100),
+  reason: z.string().trim().min(3).max(200).optional(),
+});
+export type TransferItemsRequest = z.infer<typeof TransferItemsRequest>;
+
+export const TransferItemsResponse = z.object({
+  from: TableSessionView,
+  to: TableSessionView,
+  /** The lines moved, combo parts included. */
+  orderItemIds: z.array(Id),
+});
+export type TransferItemsResponse = z.infer<typeof TransferItemsResponse>;
+
+/** A table's bill printed from the waiter app (WTR-008): issued, and printed if it could be. */
+export const PrintTableBillResponse = z.object({
+  invoiceId: Id,
+  invoiceNumber: z.string(),
+  grandTotal: Paise,
+  printed: z.boolean(),
+  /** Why it did not print, in plain words; the bill is issued all the same. */
+  error: z.string().nullable(),
+});
+export type PrintTableBillResponse = z.infer<typeof PrintTableBillResponse>;
+
+/** A table's state after it was marked clean (TBL-004). */
+export const TableStateView = z.object({ tableId: Id, state: TableState });
+export type TableStateView = z.infer<typeof TableStateView>;
+
 /** TBL-002: another waiter looks after this session. */
 export const AssignSessionWaiterRequest = z.strictObject({
   waiterId: Id,
@@ -80,5 +121,12 @@ export const TableOverviewEntry = z.object({
 });
 export type TableOverviewEntry = z.infer<typeof TableOverviewEntry>;
 
-export const TableOverviewResponse = z.object({ tables: z.array(TableOverviewEntry) });
+export const TableOverviewResponse = z.object({
+  tables: z.array(TableOverviewEntry),
+  /**
+   * Whether the person asking may print a table's bill (WTR-008): the POS roles always; waiters,
+   * for their own tables, only when the restaurant allows it (`bills.waiterMayPrint`).
+   */
+  mayPrintBill: z.boolean().default(false),
+});
 export type TableOverviewResponse = z.infer<typeof TableOverviewResponse>;

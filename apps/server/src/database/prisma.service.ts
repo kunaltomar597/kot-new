@@ -1,5 +1,6 @@
 import { Inject, Injectable, type OnModuleDestroy } from '@nestjs/common';
 import { PrismaPg } from '@prisma/adapter-pg';
+import { UTC_SESSION } from './utc-session.js';
 import { APP_CONFIG, type AppConfig } from '../config/app-config.js';
 import { type Prisma, PrismaClient } from '../generated/prisma/client.js';
 
@@ -24,10 +25,17 @@ export interface DatabasePing {
  */
 @Injectable()
 export class PrismaService extends PrismaClient implements OnModuleDestroy {
+  /** Steps each open transaction runs after its work, before it commits. */
+  private readonly endings = new WeakMap<TransactionClient, (() => Promise<void>)[]>();
+
   constructor(@Inject(APP_CONFIG) config: AppConfig) {
     super({
       adapter: new PrismaPg({
         connectionString: config.databaseUrl,
+        // Every session in UTC: the pg adapter sends and reads timestamps without an offset, so
+        // a database that defaults to the PC's zone (India time on a restaurant PC) would store
+        // every instant shifted, and times PostgreSQL itself writes (now()) would read wrong.
+        options: UTC_SESSION,
         max: 10,
         idleTimeoutMillis: 30_000,
         connectionTimeoutMillis: 5_000,
@@ -47,11 +55,31 @@ export class PrismaService extends PrismaClient implements OnModuleDestroy {
     work: (tx: TransactionClient) => Promise<T>,
     options: TransactionOptions = {},
   ): Promise<T> {
-    return this.$transaction(work, {
-      maxWait: options.maxWait ?? 5_000,
-      timeout: options.timeout ?? 15_000,
-      ...(options.isolationLevel !== undefined && { isolationLevel: options.isolationLevel }),
-    });
+    return this.$transaction(
+      async (tx) => {
+        const steps: (() => Promise<void>)[] = [];
+        this.endings.set(tx, steps);
+        const result = await work(tx);
+        for (const step of steps) await step();
+        return result;
+      },
+      {
+        maxWait: options.maxWait ?? 5_000,
+        timeout: options.timeout ?? 15_000,
+        ...(options.isolationLevel !== undefined && { isolationLevel: options.isolationLevel }),
+      },
+    );
+  }
+
+  /**
+   * Runs `step` at the end of `tx`, after its work and before it commits, in the order asked
+   * (the audit entries). False when `tx` is not one of this service's open transactions.
+   */
+  beforeCommit(tx: TransactionClient, step: () => Promise<void>): boolean {
+    const steps = this.endings.get(tx);
+    if (steps === undefined) return false;
+    steps.push(step);
+    return true;
   }
 
   /** Checks the database answers, for the health endpoint. Never throws. */

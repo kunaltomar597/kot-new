@@ -1,4 +1,4 @@
-import type { Role, RoleCustomisation } from '@rp/domain';
+import type { Capability, Role } from '@rp/domain';
 import type { Request } from 'express';
 import type { AppError } from '../errors/app-error.js';
 import type { AuthenticatedDevice } from './device.js';
@@ -6,14 +6,17 @@ import type { AuthenticatedDevice } from './device.js';
 /** The signed-in staff member behind a request, on the device that proved itself (AUTH-005). */
 export interface Principal {
   readonly staffId: string;
-  /** The base role; a custom role's changes are in `customRole` (P4-02e). Check with `grantOf`. */
   readonly role: Role;
-  readonly customRole?: RoleCustomisation | null;
   readonly restaurantId: string;
   readonly deviceId: string;
   readonly sessionId: string;
   /** When the Owner last confirmed password + second factor in this session (AUTH-006). */
   readonly secondFactorAt: Date | null;
+  /**
+   * What the person's custom role adds to `role` (AUTH-012), already limited to what may be added;
+   * empty for a built-in role. Use `@rp/domain` `actorGrant` with it, never `grantFor` alone.
+   */
+  readonly capabilities: readonly Capability[];
 }
 
 /**
@@ -26,6 +29,8 @@ export interface StationActor {
   readonly deviceId: string;
   /** The station the screen shows; null shows every station. */
   readonly stationId: string | null;
+  /** Every station the screen shows; empty for all of them (KDS-002). */
+  readonly stationIds: readonly string[];
 }
 
 /** Whoever performs a kitchen or floor step: a signed-in person or a kitchen screen. */
@@ -35,10 +40,12 @@ export interface Actor {
   /** Null in station mode. */
   readonly staffId: string | null;
   readonly role: Role;
-  /** A signed-in person's custom role (P4-02e); check with `grantOf`. */
-  readonly customRole?: RoleCustomisation | null;
+  /** A person's custom-role capabilities (AUTH-012); none in station mode. */
+  readonly capabilities?: readonly Capability[];
   /** Set in station mode when the screen is bound to one station. */
   readonly stationId?: string | null;
+  /** In station mode, every station the screen shows; empty or absent for all (KDS-002). */
+  readonly stationIds?: readonly string[];
 }
 
 /** A manager's approval consumed for this request (AUTH-011). */

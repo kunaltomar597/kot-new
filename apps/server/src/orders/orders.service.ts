@@ -3,9 +3,9 @@ import { Injectable } from '@nestjs/common';
 import type {
   DomainEvent,
   MenuSnapshot,
-  OrderLineRequest,
   OrderListResponse,
   OrderView,
+  RejectedLine,
   SubmitOrderRequest,
   SubmitOrderResponse,
 } from '@rp/contracts';
@@ -17,10 +17,15 @@ import {
   splitIntoKots,
   tableMachine,
   transition,
-  unitPriceOf,
-  validateSelection,
   type KotItemInput,
 } from '@rp/domain';
+import {
+  isRejectedLine,
+  rejectLine,
+  resolveOrderLine,
+  type ResolvedOrderLine,
+  type SalesChannel,
+} from '@rp/ordering';
 import { AuditService } from '../audit/audit.service.js';
 import { currentBusinessDate, dbDate, isoDateOf } from '../common/business-dates.js';
 import { newId } from '../common/ids.js';
@@ -29,16 +34,19 @@ import { PrismaService, type TransactionClient } from '../database/prisma.servic
 import { AppError } from '../errors/app-error.js';
 import type { Prisma } from '../generated/prisma/client.js';
 import { appendEvent, type EventAudience } from '../events/outbox.js';
-import { comboOnNow } from '../menu/menu-content.js';
 import { MenuPublishService } from '../menu/menu-publish.service.js';
+import { LicenceAgentService } from '../licensing/licence-agent.service.js';
 import { SettingsService } from '../settings/settings.service.js';
 
-type MenuItem = MenuSnapshot['items'][number];
-type RejectedLine = Extract<
-  SubmitOrderResponse,
-  { status: 'PARTIALLY_REJECTED' }
->['rejectedLines'][number];
 type Accepted = Extract<SubmitOrderResponse, { status: 'ACCEPTED' }>;
+
+/** What only a QR order carries (P5-03b). */
+export interface SubmitOptions {
+  /** The table, when it has no open session to name (QR-010). */
+  readonly tableId?: string;
+  /** The relay order this one came from (INT-005). */
+  readonly externalRef?: string;
+}
 
 /** Who submits an order: a signed-in person on a device, or (later) a tablet or the QR relay. */
 export interface OrderActor {
@@ -48,19 +56,11 @@ export interface OrderActor {
 }
 
 /** A priced, validated line, ready to be written. */
-interface ResolvedLine {
-  readonly request: OrderLineRequest;
-  readonly item: MenuItem;
-  readonly variantName: string | null;
-  readonly modifiers: readonly { optionId: string; name: string; priceDelta: number }[];
-  readonly unitPrice: number;
-  /** Combo parts with their per-combo quantity (MENU-005). */
-  readonly components: readonly { item: MenuItem; quantity: number }[];
-}
+type ResolvedLine = ResolvedOrderLine;
 
 const IDEMPOTENCY_SCOPE = 'orders.submit';
 const IDEMPOTENCY_DAYS = 7;
-const CHANNEL_OF: Readonly<Record<OrderSource, MenuItem['channels'][number]>> = {
+const CHANNEL_OF: Readonly<Record<OrderSource, SalesChannel>> = {
   POS: 'POS',
   WAITER_APP: 'WAITER_APP',
   TABLE_TABLET: 'TABLE_TABLET',
@@ -69,10 +69,6 @@ const CHANNEL_OF: Readonly<Record<OrderSource, MenuItem['channels'][number]>> = 
 
 function sha256(text: string): string {
   return createHash('sha256').update(text).digest('hex');
-}
-
-function reject(line: OrderLineRequest, code: RejectedLine['code'], message: string): RejectedLine {
-  return { clientLineId: line.clientLineId, code, message };
 }
 
 /**
@@ -84,12 +80,12 @@ function reject(line: OrderLineRequest, code: RejectedLine['code'], message: str
  * deductions. Staff orders go straight to the kitchen as per-station KOTs; customer orders wait
  * for approval (P3-03).
  */
-const ORDER_VIEW_INCLUDE = {
+export const ORDER_VIEW_INCLUDE = {
   items: { orderBy: { id: 'asc' }, include: { modifiers: { orderBy: { id: 'asc' } } } },
   kots: { orderBy: { kotNumber: 'asc' }, include: { station: { select: { name: true } } } },
 } as const satisfies Prisma.OrderInclude;
 
-function orderView(
+export function orderView(
   order: Prisma.OrderGetPayload<{ include: typeof ORDER_VIEW_INCLUDE }>,
 ): OrderView {
   return {
@@ -123,6 +119,7 @@ function orderView(
       stationId: item.stationId,
       state: item.state,
       instructions: item.instructions,
+      endReason: item.endReason,
     })),
     kots: order.kots.map(({ id, kotNumber, stationId, station, kind, printStatus }) => ({
       id,
@@ -142,9 +139,18 @@ export class OrdersService {
     private readonly audit: AuditService,
     private readonly menu: MenuPublishService,
     private readonly settings: SettingsService,
+    private readonly licence: LicenceAgentService,
   ) {}
 
-  async submit(actor: OrderActor, request: SubmitOrderRequest): Promise<SubmitOrderResponse> {
+  /**
+   * `options` are for orders from outside the restaurant's own screens: a QR order names its
+   * table, which may not be open (QR-010), and the relay order it came from (INT-005).
+   */
+  async submit(
+    actor: OrderActor,
+    request: SubmitOrderRequest,
+    options: SubmitOptions = {},
+  ): Promise<SubmitOrderResponse> {
     const requestHash = sha256(canonicalJson(request));
     const [menu, settings, restaurant] = await Promise.all([
       this.menu.current(actor.restaurantId),
@@ -155,6 +161,15 @@ export class OrdersService {
       }),
     ]);
     const maxLength = settings.get('orders.specialInstructionsMaxLength');
+    // ORD-016: staff may hold lines for later, where the restaurant allows it.
+    if (request.lines.some((line) => line.hold === true)) {
+      if (initialOrderItemState(request.source) !== 'SENT') {
+        throw new AppError(422, 'HOLD_NOT_ALLOWED', 'Only staff orders can hold items.');
+      }
+      if (!settings.get('orders.holdAndFire')) {
+        throw new AppError(422, 'HOLD_NOT_ALLOWED', 'Holding items is turned off here.');
+      }
+    }
     if ((request.orderNote?.length ?? 0) > maxLength) {
       throw new AppError(
         422,
@@ -185,20 +200,20 @@ export class OrdersService {
         }
         return { ...(previous.response as Accepted), replayed: true };
       }
+      // LIC-005: a restricted licence takes no new orders (a retry above still gets its answer).
+      await this.licence.assert('createOrders');
 
       const now = new Date();
       const rejected: RejectedLine[] = [];
       const lines: ResolvedLine[] = [];
       for (const line of request.lines) {
-        const resolved = this.resolve(
-          line,
-          menu,
-          request.source,
-          maxLength,
+        const resolved = resolveOrderLine(menu, line, {
+          channel: CHANNEL_OF[request.source],
+          instructionMaxLength: maxLength,
           now,
-          restaurant.timeZone,
-        );
-        if ('code' in resolved) rejected.push(resolved);
+          timeZone: restaurant.timeZone,
+        });
+        if (isRejectedLine(resolved)) rejected.push(resolved);
         else lines.push(resolved);
       }
       const itemState = initialOrderItemState(request.source);
@@ -206,18 +221,21 @@ export class OrdersService {
       for (const line of lines) {
         const ids = [line.item.id, ...line.components.map((component) => component.item.id)];
         if (ids.some((id) => stockProblems.has(id))) {
-          rejected.push(reject(line.request, 'OUT_OF_STOCK', `${line.item.name} is out of stock.`));
+          rejected.push(
+            rejectLine(line.request, 'OUT_OF_STOCK', `${line.item.name} is out of stock.`),
+          );
         }
       }
       if (rejected.length > 0) return { status: 'PARTIALLY_REJECTED', rejectedLines: rejected };
 
       const businessDate = await currentBusinessDate(tx, actor.restaurantId, now);
-      const table = await this.prepareTable(tx, actor.restaurantId, request, itemState);
+      const table = await this.prepareTable(tx, actor.restaurantId, request, itemState, options);
       const response = await this.create(tx, actor, request, lines, {
         businessDate,
         itemState,
         menu,
         tableId: table?.tableId ?? null,
+        externalRef: options.externalRef ?? null,
       });
 
       if (table?.newState !== undefined) {
@@ -283,106 +301,6 @@ export class OrdersService {
     return { orders: orders.map(orderView) };
   }
 
-  /** Prices and checks one line against the published menu; a rejection says why (ORD-017). */
-  private resolve(
-    line: OrderLineRequest,
-    menu: MenuSnapshot,
-    source: OrderSource,
-    maxLength: number,
-    now: Date,
-    timeZone: string,
-  ): ResolvedLine | RejectedLine {
-    const items = new Map(menu.items.map((item) => [item.id, item]));
-    const item = items.get(line.itemId);
-    if (item === undefined) return reject(line, 'ARCHIVED', 'This item is no longer on the menu.');
-    if (!item.available) {
-      return item.stockCount === 0
-        ? reject(line, 'OUT_OF_STOCK', `${item.name} is out of stock.`)
-        : reject(line, 'NOT_AVAILABLE_NOW', `${item.name} is not available right now.`);
-    }
-    if (!item.channels.includes(CHANNEL_OF[source])) {
-      return reject(line, 'NOT_ON_CHANNEL', `${item.name} cannot be ordered here.`);
-    }
-    if ((line.instructions?.length ?? 0) > maxLength) {
-      return reject(
-        line,
-        'INVALID_SELECTION',
-        `Instructions are limited to ${String(maxLength)} characters.`,
-      );
-    }
-
-    const groups = new Map(menu.modifierGroups.map((group) => [group.id, group]));
-    const definition = {
-      id: item.id,
-      basePrice: item.basePrice,
-      variants: item.variants,
-      modifierGroups: item.modifierGroupIds.flatMap((id) => {
-        const group = groups.get(id);
-        return group === undefined ? [] : [group];
-      }),
-    };
-    const selection = {
-      ...(line.variantId !== undefined && { variantId: line.variantId }),
-      modifiers: line.modifiers,
-    };
-    const issues = validateSelection(definition, selection);
-    if (issues.length > 0) {
-      return reject(line, 'INVALID_SELECTION', issues.map((issue) => issue.message).join('; '));
-    }
-
-    const components: { item: MenuItem; quantity: number }[] = [];
-    const combo = menu.combos.find((entry) => entry.itemId === item.id);
-    if (combo !== undefined) {
-      if (!comboOnNow(combo, now, timeZone)) {
-        return reject(line, 'NOT_AVAILABLE_NOW', `${item.name} is not offered at this time.`);
-      }
-      const choices = [...(line.comboChoices ?? [])];
-      const slots = combo.components.filter((component) => component.kind === 'CHOICE');
-      if (choices.length !== slots.length) {
-        return reject(line, 'INVALID_SELECTION', `Choose one item for each part of ${item.name}.`);
-      }
-      for (const component of combo.components) {
-        const chosen = component.kind === 'FIXED' ? component.itemId : choices.shift();
-        if (
-          component.kind === 'CHOICE' &&
-          (chosen === undefined || !component.itemIds.includes(chosen))
-        ) {
-          return reject(
-            line,
-            'INVALID_SELECTION',
-            `That is not one of the choices for ${component.label}.`,
-          );
-        }
-        const part = items.get(chosen ?? '');
-        if (part?.available !== true) {
-          return reject(line, 'OUT_OF_STOCK', `Part of ${item.name} is out of stock.`);
-        }
-        components.push({ item: part, quantity: component.quantity });
-      }
-    } else if ((line.comboChoices ?? []).length > 0) {
-      return reject(line, 'INVALID_SELECTION', `${item.name} is not a combo.`);
-    }
-
-    const chosen = new Set(line.modifiers.flatMap((modifier) => modifier.optionIds));
-    const modifiers = definition.modifierGroups.flatMap((group) =>
-      group.options
-        .filter((option) => chosen.has(option.id))
-        .map((option) => ({
-          optionId: option.id,
-          name: option.name,
-          priceDelta: option.priceDelta,
-        })),
-    );
-    return {
-      request: line,
-      item,
-      variantName: item.variants.find((variant) => variant.id === line.variantId)?.name ?? null,
-      modifiers,
-      unitPrice: unitPriceOf(definition, selection),
-      components,
-    };
-  }
-
   /** Items whose counted stock is short, checked under the item row locks (MENU-006). */
   private async checkStock(
     tx: TransactionClient,
@@ -416,8 +334,21 @@ export class OrdersService {
     restaurantId: string,
     request: SubmitOrderRequest,
     itemState: OrderItemState,
+    options: SubmitOptions,
   ): Promise<{ tableId: string; newState?: 'OCCUPIED' } | null> {
-    if (request.orderType !== 'DINE_IN' || request.tableSessionId === undefined) return null;
+    if (request.orderType !== 'DINE_IN') return null;
+    if (request.tableSessionId === undefined) {
+      if (options.tableId === undefined) return null;
+      // QR-010: a diner's order for a table that is not open waits for a waiter to approve it,
+      // which opens the table.
+      const table = await tx.diningTable.findFirst({
+        where: { id: options.tableId, restaurantId, archivedAt: null },
+        select: { id: true },
+      });
+      if (table === null) throw new AppError(404, 'TABLE_NOT_FOUND', 'There is no such table.');
+      await tx.$queryRaw`SELECT 1 AS locked FROM tables WHERE id = ${table.id}::uuid FOR UPDATE`;
+      return { tableId: table.id };
+    }
     const found = await tx.tableSession.findFirst({
       where: { id: request.tableSessionId, restaurantId },
       select: { tableId: true },
@@ -456,6 +387,7 @@ export class OrdersService {
       itemState: OrderItemState;
       menu: MenuSnapshot;
       tableId: string | null;
+      externalRef: string | null;
     },
   ): Promise<Accepted> {
     const { businessDate, itemState, menu } = context;
@@ -485,6 +417,7 @@ export class OrdersService {
         customerName: request.customerName ?? null,
         customerPhone: request.customerPhone ?? null,
         notes: request.orderNote ?? null,
+        externalRef: context.externalRef,
       },
     });
 
@@ -494,15 +427,17 @@ export class OrdersService {
     const partIds = new Map<string, string>();
     for (const line of lines) {
       const { item, request: lineRequest } = line;
+      // ORD-016: a held line waits for the waiter to fire it; it gets no ticket yet.
+      const held = itemState === 'SENT' && lineRequest.hold === true;
       const base = {
         restaurantId,
         orderId: order.id,
         businessDate: date,
         taxGroupId: item.taxGroupId,
         taxRates: taxRates.get(item.taxGroupId) ?? [],
-        state: itemState,
+        state: held ? ('HELD' as const) : itemState,
         createdById: actor.staffId,
-        sentAt,
+        sentAt: held ? null : sentAt,
       };
       const parent = await tx.orderItem.create({
         data: {
@@ -510,6 +445,7 @@ export class OrdersService {
           id: newId(),
           itemId: item.id,
           variantId: lineRequest.variantId ?? null,
+          clientLineId: lineRequest.clientLineId,
           name: item.name,
           variantName: line.variantName,
           quantity: lineRequest.quantity,
@@ -546,6 +482,7 @@ export class OrdersService {
         });
         partIds.set(`${parent.id}:${component.item.id}`, part.id);
       }
+      if (held) continue;
       kotInputs.push({
         orderItemId: parent.id,
         itemId: item.id,
@@ -609,6 +546,8 @@ export class OrdersService {
           orderNumber,
           source: request.source,
           ...(order.tableSessionId !== null && { tableSessionId: order.tableSessionId }),
+          ...(order.tableSessionId === null &&
+            order.tableId !== null && { tableId: order.tableId }),
           needsApproval: itemState === 'PENDING_APPROVAL',
         },
       },
@@ -616,8 +555,19 @@ export class OrdersService {
     );
 
     // Staff orders go to the kitchen now: one ticket per station, stock taken off (ORD-007).
+    // Held lines take their stock now too (they are ordered), but no ticket until fired.
     if (itemState === 'SENT') {
-      await this.sendToKitchen(tx, restaurantId, businessDate, order.id, kotInputs, partIds, menu);
+      if (kotInputs.length > 0) {
+        await this.sendToKitchen(
+          tx,
+          restaurantId,
+          businessDate,
+          order.id,
+          kotInputs,
+          partIds,
+          menu,
+        );
+      }
       for (const line of lines) {
         if (line.components.length === 0) {
           await this.menu.decrementStock(tx, restaurantId, line.item.id, line.request.quantity);
@@ -632,11 +582,21 @@ export class OrdersService {
         }
       }
     }
-    return { status: 'ACCEPTED', orderId: order.id, orderNumber, replayed: false, itemState };
+    const allHeld = itemState === 'SENT' && kotInputs.length === 0;
+    return {
+      status: 'ACCEPTED',
+      orderId: order.id,
+      orderNumber,
+      replayed: false,
+      itemState: allHeld ? 'HELD' : itemState,
+    };
   }
 
-  /** Per-station KOTs with their day numbers (ORD-007, ORD-008); combos exploded into parts. */
-  private async sendToKitchen(
+  /**
+   * Per-station KOTs with their day numbers (ORD-007, ORD-008); combos exploded into parts. Also
+   * used when a diner's order is approved (P3-03a).
+   */
+  async sendToKitchen(
     tx: TransactionClient,
     restaurantId: string,
     businessDate: string,

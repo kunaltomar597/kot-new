@@ -107,9 +107,7 @@ export function LoginScreen() {
                   }}
                 >
                   <span className="console-tile__name">{person.displayName}</span>
-                  <span className="console-tile__role">
-                    {person.customRoleName ?? t(`roles.${person.role}`)}
-                  </span>
+                  <span className="console-tile__role">{t(`roles.${person.role}`)}</span>
                 </button>
               </li>
             ))}

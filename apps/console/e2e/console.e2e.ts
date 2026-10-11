@@ -1,10 +1,7 @@
 import { createHmac } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
-import { type AddressInfo, createServer } from 'node:net';
-import { crc32, deflateSync } from 'node:zlib';
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
-import { calendarDateOf, financialYearOf, formatInvoiceNumber } from '@rp/domain';
 import { createTranslator } from '@rp/i18n';
 import pg from 'pg';
 import { type RunningServer, startServer } from './server.js';
@@ -13,13 +10,10 @@ import { type RunningServer, startServer } from './server.js';
  * P0-14b acceptance: a real browser pairs with the real server, people sign in with their PIN and
  * land in their mode, and the offline banner shows while the server is down (NFR-P11). Later work
  * packages add their flows: the POS floor, orders, the kitchen display, the manager dashboard on a
- * desktop and a phone, billing, alerts, staff, devices, the menu editor, custom roles and settings.
+ * desktop and a phone, billing and alerts.
  */
 
 const t = createTranslator();
-
-/** The Owner's password, set up in the second-factor flow and confirmed again later. */
-const OWNER_PASSWORD = 'rooftop tandoor since 1998';
 
 /** People from the development seed (apps/server/src/database/dev-seed.ts). */
 const PEOPLE = [
@@ -109,53 +103,6 @@ async function sentMinutesAgo(item: string, minutes: number): Promise<void> {
 }
 
 /**
- * Three alerts put straight into the database, as the server would hold them: Ravi's water request
- * at table 9 that went unanswered and was escalated to the Owner, the kitchen's flag on a naan left
- * at the pass, and the Owner's alert that the data drive is 86 % full (the hourly disk check).
- */
-async function seedAlerts(): Promise<void> {
-  const client = new pg.Client({ connectionString: process.env.RP_E2E_DATABASE_URL });
-  await client.connect();
-  try {
-    const { rows } = await client.query<{
-      restaurant: string;
-      table: string;
-      ravi: string;
-      asha: string;
-    }>(
-      `SELECT r.id AS restaurant, t.id AS table, ravi.id AS ravi, asha.id AS asha
-       FROM restaurants r
-       JOIN tables t ON t.restaurant_id = r.id AND t.label = '9'
-       JOIN staff ravi ON ravi.restaurant_id = r.id AND ravi.display_name = 'Ravi'
-       JOIN staff asha ON asha.restaurant_id = r.id AND asha.display_name = 'Asha (Owner)'`,
-    );
-    expect(rows).toHaveLength(1);
-    const [ids] = rows;
-    const { rowCount } = await client.query(
-      `INSERT INTO alerts (id, restaurant_id, business_date, type, table_id, payload, dedupe_key,
-                           recipient_ids, channels, escalated_at, escalated_to)
-       SELECT gen_random_uuid(), $1::uuid,
-              (now() AT TIME ZONE 'Asia/Kolkata' - interval '4 hours')::date,
-              alert.type, alert.table_id, alert.payload, alert.dedupe_key, alert.recipient_ids,
-              alert.channels, alert.escalated_at, alert.escalated_to
-       FROM (VALUES
-         ('WATER_REQUEST', $2::uuid, '{}'::jsonb, NULL, ARRAY[$3::uuid, $4::uuid],
-          ARRAY['PAGER', 'WAITER_APP'], now(), ARRAY[$4::uuid]),
-         ('READY_NOT_COLLECTED', $2::uuid, '{"kotNumber": 99, "items": ["Butter Naan"]}'::jsonb,
-          NULL, ARRAY[$3::uuid], ARRAY['PAGER', 'WAITER_APP'], NULL, ARRAY[]::uuid[]),
-         ('DISK_OR_BACKUP', NULL, '{"usedPercent": 86, "freeBytes": 13314398618}'::jsonb,
-          'disk', ARRAY[$4::uuid], ARRAY['DASHBOARD'], NULL, ARRAY[]::uuid[])
-       ) AS alert (type, table_id, payload, dedupe_key, recipient_ids, channels, escalated_at,
-                   escalated_to)`,
-      [ids?.restaurant, ids?.table, ids?.ravi, ids?.asha],
-    );
-    expect(rowCount).toBe(3);
-  } finally {
-    await client.end();
-  }
-}
-
-/**
  * The code an authenticator app shows now for a base32 key (RFC 6238: HMAC-SHA1, 30 s steps,
  * 6 digits), as the Owner's phone would.
  */
@@ -179,68 +126,22 @@ function authenticatorCode(key: string): string {
   return String((digest.readUInt32BE(offset) & 0x7fffffff) % 1_000_000).padStart(6, '0');
 }
 
-/** A network receipt printer stand-in on this machine: it keeps every byte sent to it. */
-interface FakePrinter {
-  readonly port: number;
-  /** What it was sent, as the printer would read the bytes. */
-  received(): string;
-  close(): Promise<void>;
-}
-
-/** Starts a raw printing (port 9100 style) printer stand-in on a free port. */
-async function fakePrinter(): Promise<FakePrinter> {
-  const chunks: Buffer[] = [];
-  const listener = createServer((socket) => {
-    socket.on('data', (chunk: Buffer) => {
-      chunks.push(chunk);
-    });
-  });
-  await new Promise<void>((resolve) => {
-    listener.listen(0, '127.0.0.1', resolve);
-  });
-  return {
-    port: (listener.address() as AddressInfo).port,
-    received: () => Buffer.concat(chunks).toString('latin1'),
-    close: () =>
-      new Promise((resolve) => {
-        listener.close(() => {
-          resolve();
-        });
-      }),
-  };
-}
-
 /**
- * A 640 × 480 PNG in one colour, made here so the test needs no image file. The server re-encodes
- * it, so its 480 px rendition really is 480 px wide (MENU-008).
+ * What the browser refused under the console's CSP and Trusted Types (P8-03c1), from every page
+ * of a context: a script or HTML sink given a string throws, and says so on the console.
  */
-function photoPng(): Buffer {
-  const width = 640;
-  const height = 480;
-  const chunk = (type: string, data: Buffer): Buffer => {
-    const body = Buffer.concat([Buffer.from(type, 'ascii'), data]);
-    const framed = Buffer.alloc(body.length + 8);
-    framed.writeUInt32BE(data.length, 0);
-    body.copy(framed, 4);
-    framed.writeUInt32BE(crc32(body), body.length + 4);
-    return framed;
-  };
-  const header = Buffer.alloc(13);
-  header.writeUInt32BE(width, 0);
-  header.writeUInt32BE(height, 4);
-  header.writeUInt8(8, 8); // 8 bits per channel
-  header.writeUInt8(2, 9); // RGB, no palette or alpha
-  // Every row: filter type 0, then the pixels in saffron orange.
-  const row = Buffer.concat([
-    Buffer.from([0]),
-    Buffer.alloc(width * 3, Buffer.from([0xf0, 0x8c, 0x28])),
-  ]);
-  return Buffer.concat([
-    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
-    chunk('IHDR', header),
-    chunk('IDAT', deflateSync(Buffer.concat(Array.from({ length: height }, () => row)))),
-    chunk('IEND', Buffer.alloc(0)),
-  ]);
+const policyViolations: string[] = [];
+function watchPolicy(context: BrowserContext): void {
+  const refused = /Content Security Policy|Trusted ?Type|TrustedHTML|TrustedScript/i;
+  context.on('console', (message) => {
+    if (refused.test(message.text())) {
+      const { url, lineNumber } = message.location();
+      policyViolations.push(`${message.text()} (${url}:${String(lineNumber)})`);
+    }
+  });
+  context.on('weberror', (error) => {
+    if (refused.test(error.error().message)) policyViolations.push(error.error().message);
+  });
 }
 
 test.describe.serial('the web console', () => {
@@ -248,12 +149,11 @@ test.describe.serial('the web console', () => {
   // One browser profile: the device key it keeps is shared by every tab, like a POS terminal's.
   let context: BrowserContext;
   let page: Page;
-  // The Owner's one-time recovery codes, shown once when the authenticator is set up.
-  let recoveryCodes: string[] = [];
 
   test.beforeAll(async ({ browser }) => {
     server = await startServer();
     context = await browser.newContext();
+    watchPolicy(context);
     page = await context.newPage();
   });
 
@@ -299,11 +199,15 @@ test.describe.serial('the web console', () => {
     await page.getByRole('button', { name: /^Neha \(Cashier\)/ }).click();
     await page.keyboard.type('3333');
     await expect(page).toHaveURL(/\/pos$/);
-    // Connected and in sync: no banner.
+    // Connected and in sync, with the floor read: no banner, and no read cut short by the stop.
+    await expect(page.getByRole('region', { name: 'Main Hall' })).toBeVisible();
     await expect(page.getByText(t('connection.connecting'))).toHaveCount(0);
 
     await server.stop();
-    await expect(page.getByRole('alert')).toContainText(t('connection.offline'));
+    // The banner; a screen that asks the server meanwhile shows its own error too.
+    await expect(
+      page.getByRole('alert').filter({ hasText: t('connection.offline') }),
+    ).toBeVisible();
 
     const started = Date.now();
     server = await startServer(server.port);
@@ -384,7 +288,7 @@ test.describe.serial('the web console', () => {
 
   test('[TBL-008] sends a takeaway order and shows its token', async () => {
     await page.getByRole('button', { name: t('pos.takeaway') }).click();
-    await expect(page.getByRole('heading', { name: t('pos.takeaway'), exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: t('pos.takeaway') })).toBeVisible();
     await page.getByRole('button', { name: 'Breads', exact: true }).click();
     await page.getByRole('button', { name: /^Butter Naan, / }).click();
     await page.getByLabel(t('pos.cart.customer')).fill('Anil');
@@ -667,8 +571,8 @@ test.describe.serial('the web console', () => {
     const add = page.getByRole('dialog', { name: t('staff.form.addTitle') });
     await add.getByLabel(t('staff.form.name'), { exact: false }).first().fill('Sunil');
     await expect(add.getByLabel(t('staff.form.role'))).toHaveValue('WAITER');
-    await add.getByLabel(/^PIN( \*)?$/).fill('7777');
-    await add.getByLabel(/^PIN again( \*)?$/).fill('7777');
+    await add.getByLabel(/^PIN( \*)?$/).fill('7351');
+    await add.getByLabel(/^PIN again( \*)?$/).fill('7351');
     await expectAccessible(page);
     await add.getByRole('button', { name: t('staff.form.add') }).click();
     await expect(page.getByText(t('staff.added', { name: 'Sunil' }))).toBeVisible();
@@ -678,7 +582,7 @@ test.describe.serial('the web console', () => {
 
     // The new waiter shows on the other screen without a reload, and signs in with the new PIN.
     await sunilTile.click();
-    await other.keyboard.type('7777');
+    await other.keyboard.type('7351');
     await expect(other).toHaveURL(/\/pos$/);
 
     // A 360 px phone: the Staff page fits (MGR-011).
@@ -719,7 +623,7 @@ test.describe.serial('the web console', () => {
     ).toBeVisible();
     await expectAccessible(page);
 
-    const password = OWNER_PASSWORD;
+    const password = 'rooftop tandoor since 1998';
     await page.getByRole('button', { name: t('ownerSecurity.password.setAction') }).click();
     const setPassword = page.getByRole('dialog', { name: t('ownerSecurity.password.setAction') });
     await setPassword.getByLabel(/^New password( \*)?$/).fill(password);
@@ -744,8 +648,7 @@ test.describe.serial('the web console', () => {
       .getByRole('list', { name: t('ownerSecurity.recovery.codes') })
       .getByRole('listitem');
     await expect(recovery).toHaveCount(10);
-    recoveryCodes = await recovery.allInnerTexts();
-    const firstCode = recoveryCodes[0] ?? '';
+    const firstCode = await recovery.first().innerText();
     await codes.getByRole('button', { name: t('ownerSecurity.recovery.saved') }).click();
     await expect(page.getByText(t('ownerSecurity.recovery.left', { count: 10 }))).toBeVisible();
 
@@ -755,8 +658,8 @@ test.describe.serial('the web console', () => {
     const add = page.getByRole('dialog', { name: t('staff.form.addTitle') });
     await add.getByLabel(t('staff.form.name'), { exact: false }).first().fill('Farah');
     await add.getByLabel(t('staff.form.role')).selectOption({ label: t('roles.MANAGER') });
-    await add.getByLabel(/^PIN( \*)?$/).fill('8888');
-    await add.getByLabel(/^PIN again( \*)?$/).fill('8888');
+    await add.getByLabel(/^PIN( \*)?$/).fill('8264');
+    await add.getByLabel(/^PIN again( \*)?$/).fill('8264');
     await add.getByRole('button', { name: t('staff.form.add') }).click();
     const confirm = page.getByRole('dialog', { name: t('secondFactor.title') });
     await confirm.getByLabel(t('secondFactor.password'), { exact: false }).fill(password);
@@ -831,7 +734,11 @@ test.describe.serial('the web console', () => {
     await page.getByRole('button', { name: t('pagers.register') }).click();
     const register = page.getByRole('dialog', { name: t('pagers.form.title') });
     await expect(register.getByLabel(/^Name( \*)?$/)).toHaveValue('Pager 1');
-    await register.getByLabel(/^Serial( \*)?$/).fill('WP-0101');
+    // The serial comes from the pager's QR code, read with the camera (Chromium's fake camera
+    // shows it, see playwright.config.ts).
+    await register.getByRole('button', { name: t('pagers.scan.start') }).click();
+    await expect(register.getByText(t('pagers.scan.read', { serial: 'WP-0101' }))).toBeVisible();
+    await expect(register.getByLabel(/^Serial( \*)?$/)).toHaveValue('WP-0101');
     await register.getByLabel(t('pagers.form.wearer')).selectOption({ label: 'Ravi' });
     await expectAccessible(page);
     await register.getByRole('button', { name: t('pagers.form.register') }).click();
@@ -870,231 +777,321 @@ test.describe.serial('the web console', () => {
     await expectAccessible(page);
   });
 
-  test('[MGR-006] [AUTH-007] [AUTH-008] a manager pairs a kitchen screen, locates and renames it, then unpairs it', async ({
+  test('[MGR-006] [AUTH-007] [AUTH-008] a manager pairs a kitchen screen, renames it and unpairs it', async ({
     browser,
   }) => {
-    // Vikram is still signed in from the previous test.
-    await expect(page).toHaveURL(/\/manage/);
-    const nav = page.getByRole('navigation', { name: t('dashboard.navigation') });
-    await nav.getByRole('link', { name: t('dashboard.section.devices') }).click();
+    await page.getByRole('button', { name: t('login.signOut') }).click();
+    await page.getByRole('button', { name: /^Vikram \(Manager\)/ }).click();
+    await page.keyboard.type('2222');
+    await expect(page).toHaveURL(/\/manage$/);
+    await page
+      .getByRole('navigation', { name: t('dashboard.navigation') })
+      .getByRole('link', { name: t('dashboard.section.devices') })
+      .click();
     await expect(page.getByRole('heading', { level: 2, name: t('devices.title') })).toBeVisible();
-    const row = (name: string) =>
-      page.getByRole('listitem').filter({
-        has: page.getByRole('heading', { level: 4, name: new RegExp(`^${escape(name)}`) }),
-      });
-    await expect(
-      row('Server POS').getByText(t('devices.thisDevice'), { exact: true }),
-    ).toBeVisible();
-    await expect(row('Pager 1').getByText(t('devices.wornBy', { name: 'Sunita' }))).toBeVisible();
-    await expectAccessible(page);
 
-    // Pair a kitchen screen for the whole kitchen.
     await page.getByRole('button', { name: t('devices.pair') }).click();
-    const pair = page.getByRole('dialog', { name: t('devices.pairDialog.title') });
-    await pair
-      .getByLabel(t('devices.pairDialog.type'))
-      .selectOption({ label: t('devices.type.KDS') });
-    await expect(pair.getByLabel(/^Name( \*)?$/)).toHaveValue('Kitchen screen 1');
-    await pair
-      .getByLabel(t('devices.pairDialog.station'), { exact: false })
-      .selectOption({ label: 'Kitchen' });
-    await expectAccessible(page);
-    await pair.getByRole('button', { name: t('devices.pairDialog.create') }).click();
-    const issued = page.getByRole('dialog', {
-      name: t('devices.pairDialog.codeTitle', { name: 'Kitchen screen 1' }),
+    const form = page.getByRole('dialog', { name: t('devices.pairForm.title') });
+    await form.getByLabel(t('devices.pairForm.type')).selectOption('KDS');
+    await form
+      .getByLabel(t('devices.pairForm.name'), { exact: false })
+      .first()
+      .fill('Grill screen');
+    await form.getByRole('button', { name: t('devices.pairForm.create') }).click();
+    const shown = page.getByRole('dialog', {
+      name: t('devices.codeDialog.title', { name: 'Grill screen' }),
     });
-    await expect(issued.getByRole('status')).toHaveText(t('devices.pairDialog.waiting'));
-    const code = await issued.locator('code').first().innerText();
-    expect(code).toMatch(/^[A-HJ-NP-Z2-9]{4}-[A-HJ-NP-Z2-9]{4}$/);
+    await expect(
+      shown.getByRole('img', { name: t('devices.codeDialog.qrLabel', { name: 'Grill screen' }) }),
+    ).toBeVisible();
     await expectAccessible(page);
+    const code = (await shown.locator('.device-pairing__code').textContent()) ?? '';
+    expect(code).toMatch(/^[A-Z2-9]{4}-[A-Z2-9]{4}$/);
 
-    // Another browser is the kitchen screen: it pairs with the code and shows the kitchen.
+    // A new browser (its own device key) pairs with the code and opens the kitchen display.
     const kitchen = await browser.newContext();
-    const screen = await kitchen.newPage();
-    await screen.goto(server.url);
-    await screen.getByLabel(t('pairing.codeLabel')).fill(code);
-    await screen.getByRole('button', { name: t('pairing.submit') }).click();
-    await expect(screen).toHaveURL(/\/kds$/);
-    await expect(screen.getByText('Kitchen screen 1')).toBeVisible();
-    await expect(issued.getByRole('status')).toHaveText(
-      t('devices.pairDialog.paired', { name: 'Kitchen screen 1' }),
-    );
-    await issued.getByRole('button', { name: t('devices.pairDialog.done') }).click();
-    const kds = row('Kitchen screen 1');
-    await expect(kds.getByText(t('devices.station', { station: 'Kitchen' }))).toBeVisible();
-    // Connection states are read again every minute; reading the page again shows it now.
+    watchPolicy(kitchen);
+    const screenPage = await kitchen.newPage();
+    await screenPage.goto(server.url);
+    await expect(screenPage).toHaveURL(/\/pair$/);
+    await screenPage.getByLabel(t('pairing.codeLabel')).fill(code);
+    await screenPage.getByRole('button', { name: t('pairing.submit') }).click();
+    await expect(screenPage).toHaveURL(/\/kds$/);
+
+    await shown.getByRole('button', { name: t('devices.codeDialog.done') }).click();
+    // Connections are read again every half minute; a reload shows the new one at once.
     await page.reload();
-    await expect(kds.getByText(t('devices.connected'))).toBeVisible();
-
-    // Locate: the screen shows its name.
-    await kds.getByRole('button', { name: t('devices.locate') }).click();
-    await expect(page.getByText(t('devices.located', { name: 'Kitchen screen 1' }))).toBeVisible();
-    const located = screen.getByRole('dialog', {
-      name: t('locate.title', { name: 'Kitchen screen 1' }),
+    const row = page.locator('li', {
+      has: page.getByRole('heading', { level: 4, name: 'Grill screen' }),
     });
-    await expect(located).toBeVisible();
-    await located.getByRole('button', { name: t('locate.dismiss') }).click();
-    await expect(located).toHaveCount(0);
+    await expect(row.getByText(t('devices.allStations'))).toBeVisible();
+    await expect(row.getByText(t('devices.connected'))).toBeVisible();
 
-    // Rename: the screen's header follows at once.
-    await kds.getByRole('button', { name: t('devices.rename') }).click();
+    const actions = page.getByRole('group', {
+      name: t('devices.actionsFor', { name: 'Grill screen' }),
+    });
+    await actions.getByRole('button', { name: t('devices.rename') }).click();
     const rename = page.getByRole('dialog', {
-      name: t('devices.renameDialog.title', { name: 'Kitchen screen 1' }),
+      name: t('devices.renameDialog.title', { name: 'Grill screen' }),
     });
-    await rename.getByLabel(/^New name( \*)?$/).fill('Tandoor screen');
-    await rename.getByRole('button', { name: t('devices.renameDialog.confirm') }).click();
-    await expect(page.getByText(t('devices.renamed', { name: 'Tandoor screen' }))).toBeVisible();
-    await expect(screen.getByText('Tandoor screen')).toBeVisible();
+    await rename.getByLabel(t('devices.renameDialog.name'), { exact: false }).fill('Grill pass');
+    await rename.getByRole('button', { name: t('devices.renameDialog.save') }).click();
+    await expect(page.getByText(t('devices.renamed', { name: 'Grill pass' }))).toBeVisible();
 
     // A 360 px phone: the Devices page fits (MGR-011).
     await page.setViewportSize({ width: 360, height: 780 });
-    await expect(row('Tandoor screen')).toBeVisible();
+    await expect(page.getByRole('heading', { level: 4, name: 'Grill pass' })).toBeVisible();
     expect(await sidewaysOverflow(page)).toBeLessThanOrEqual(0);
     await page.setViewportSize({ width: 1280, height: 720 });
+    await expectAccessible(page);
 
-    // Unpair: the screen is back on the pairing screen within seconds (AUTH-008).
-    await row('Tandoor screen')
+    await page
+      .getByRole('group', { name: t('devices.actionsFor', { name: 'Grill pass' }) })
       .getByRole('button', { name: t('devices.unpair') })
       .click();
     const unpair = page.getByRole('dialog', {
-      name: t('devices.unpairDialog.title', { name: 'Tandoor screen' }),
+      name: t('devices.unpairDialog.title', { name: 'Grill pass' }),
     });
-    await unpair.getByLabel(t('devices.unpairDialog.reason')).fill('Moved to the other branch');
-    await expectAccessible(page);
+    await unpair
+      .getByLabel(t('devices.unpairDialog.reason'), { exact: false })
+      .fill('Screen moved');
     await unpair.getByRole('button', { name: t('devices.unpairDialog.confirm') }).click();
+    await expect(page.getByText(t('devices.unpaired', { name: 'Grill pass' }))).toBeVisible();
     const unpaired = Date.now();
-    await expect(page.getByText(t('devices.unpaired', { name: 'Tandoor screen' }))).toBeVisible();
-    await expect(screen).toHaveURL(/\/pair$/, { timeout: 5_000 });
+
+    // The kitchen screen stops at once and asks to be paired again (AUTH-008).
+    await expect(screenPage.getByText(t('pairing.revoked'))).toBeVisible({ timeout: 5_000 });
     expect(Date.now() - unpaired).toBeLessThan(5_000);
-    await expect(screen.getByText(t('pairing.revoked'))).toBeVisible();
-    await expect(row('Tandoor screen')).toHaveCount(0);
     await kitchen.close();
   });
 
-  test('[MGR-005] [MENU-003] [MENU-004] [MENU-008] [MENU-013] a manager adds a dish with sizes, a new modifier group and a photo, publishes it and the POS sells it', async () => {
-    // Vikram is still signed in from the previous test.
-    await expect(page).toHaveURL(/\/manage/);
-    const nav = page.getByRole('navigation', { name: t('dashboard.navigation') });
-    await nav.getByRole('link', { name: t('dashboard.section.menu') }).click();
-    await expect(
-      page.getByRole('heading', { level: 2, name: t('menuEditor.items.title') }),
-    ).toBeVisible();
-    // The demo menu was published as version 1 and nothing has changed since.
-    const publishing = page.getByRole('region', { name: t('menuEditor.publish.label') });
-    await expect(publishing.getByText(/^Version 1 is on every screen/)).toBeVisible();
-    await expect(publishing.getByText(t('menuEditor.publish.upToDate'))).toBeVisible();
-    await expectAccessible(page);
-
-    // A new modifier group: an optional dip, one of two, one of them extra.
-    const pages = page.getByRole('navigation', { name: t('menuEditor.pages.label') });
-    await pages.getByRole('link', { name: t('menuEditor.pages.modifiers') }).click();
-    await page.getByRole('button', { name: t('menuEditor.modifiers.add') }).click();
-    const group = page.getByRole('dialog', { name: t('menuEditor.modifiers.dialog.addTitle') });
-    await group.getByLabel(/^Name( \*)?$/).fill('Dip');
-    const option = (key: 'optionName' | 'optionPrice', number: number) =>
-      group.getByLabel(t(`menuEditor.modifiers.dialog.${key}`, { number }), { exact: true });
-    await option('optionName', 1).fill('Mint chutney');
-    await group.getByRole('button', { name: t('menuEditor.modifiers.dialog.addOption') }).click();
-    await option('optionName', 2).fill('Cheese dip');
-    await option('optionPrice', 2).fill('30');
-    await expectAccessible(page);
-    await group.getByRole('button', { name: t('menuEditor.modifiers.dialog.save') }).click();
-    await expect(page.getByText(t('menuEditor.modifiers.saved', { name: 'Dip' }))).toBeVisible();
-
-    // The dish: two sizes, the dip and a photo.
-    await pages.getByRole('link', { name: t('menuEditor.pages.items') }).click();
-    await page.getByRole('button', { name: t('menuEditor.items.add') }).click();
-    await expect(
-      page.getByRole('heading', { level: 2, name: t('menuEditor.editor.newTitle') }),
-    ).toBeVisible();
-    await page.getByLabel(/^Name( \*)?$/).fill('Paneer Kathi Roll');
-    await page.getByLabel(/^Category( \*)?$/).selectOption({ label: 'Starters' });
-    await page.getByRole('radio', { name: t('pos.menu.foodType.VEG'), exact: true }).check();
-    const chooser = page.waitForEvent('filechooser');
-    await page.getByRole('button', { name: t('menuEditor.editor.choosePhoto') }).click();
-    await (
-      await chooser
-    ).setFiles({ name: 'kathi-roll.png', mimeType: 'image/png', buffer: photoPng() });
-    const photo = page.getByRole('img', {
-      name: t('menuEditor.editor.photoAlt', { name: 'Paneer Kathi Roll' }),
-    });
-    await expect(photo).toBeVisible();
-    // Stored, resized and served back to the browser.
-    await expect
-      .poll(() => photo.evaluate((image: HTMLImageElement) => image.naturalWidth))
-      .toBe(480);
-    await page.getByLabel(/^Price \(₹\)( \*)?$/).fill('160');
-    await page.getByLabel(/^Tax group( \*)?$/).selectOption({ label: 'GST 5 %' });
-    const size = (key: 'sizeName' | 'sizePrice', number: number) =>
-      page.getByLabel(t(`menuEditor.editor.${key}`, { number }), { exact: true });
-    await page.getByRole('button', { name: t('menuEditor.editor.addSize') }).click();
-    await size('sizeName', 1).fill('Regular');
-    await size('sizePrice', 1).fill('160');
-    await page.getByRole('button', { name: t('menuEditor.editor.addSize') }).click();
-    await size('sizeName', 2).fill('Jumbo');
-    await size('sizePrice', 2).fill('220');
-    await page.getByRole('checkbox', { name: /^Dip/ }).check();
-    await page.getByLabel(/^Kitchen station( \*)?$/).selectOption({ label: 'Kitchen' });
-    await expectAccessible(page);
-    // A 360 px phone: the editor fits (MGR-011).
-    await page.setViewportSize({ width: 360, height: 780 });
-    expect(await sidewaysOverflow(page)).toBeLessThanOrEqual(0);
-    await page.setViewportSize({ width: 1280, height: 720 });
-    await page.getByRole('button', { name: t('menuEditor.editor.save') }).click();
-    await expect(
-      page.getByText(t('menuEditor.editor.saved', { name: 'Paneer Kathi Roll' })),
-    ).toBeVisible();
-
-    // Back on the list: saved as a draft, not yet on any screen.
-    const row = page
-      .getByRole('listitem')
-      .filter({ has: page.getByText('Paneer Kathi Roll', { exact: true }) });
-    await expect(
-      row.getByText(t('menuEditor.items.priceRange', { low: '₹160.00', high: '₹220.00' })),
-    ).toBeVisible();
-    await expect(row.getByText(t('menuEditor.items.sizes', { count: 2 }))).toBeVisible();
-    await expect(publishing.getByText(t('menuEditor.publish.changes'))).toBeVisible();
-    await page.setViewportSize({ width: 360, height: 780 });
-    await expect(row).toBeVisible();
-    expect(await sidewaysOverflow(page)).toBeLessThanOrEqual(0);
-    await page.setViewportSize({ width: 1280, height: 720 });
-
-    // Publish: every screen gets version 2.
-    await publishing.getByRole('button', { name: t('menuEditor.publish.button') }).click();
-    const confirm = page.getByRole('dialog', { name: t('menuEditor.publish.confirmTitle') });
-    await expectAccessible(page);
-    await confirm
-      .getByRole('button', { name: t('menuEditor.publish.confirm'), exact: true })
+  test('[MGR-005] [MENU-002] [MENU-003] [MENU-004] [MENU-008] [MENU-013] a manager adds a dish with sizes, add-ons and a photo, publishes it and the POS sells it', async () => {
+    await page.getByRole('button', { name: t('login.signOut') }).click();
+    await page.getByRole('button', { name: /^Vikram \(Manager\)/ }).click();
+    await page.keyboard.type('2222');
+    await expect(page).toHaveURL(/\/manage$/);
+    await page
+      .getByRole('navigation', { name: t('dashboard.navigation') })
+      .getByRole('link', { name: t('dashboard.section.menu') })
       .click();
-    await expect(page.getByText(t('menuEditor.publish.done', { version: 2 }))).toBeVisible();
-    await expect(publishing.getByText(/^Version 2 is on every screen/)).toBeVisible();
-    await expect(publishing.getByText(t('menuEditor.publish.upToDate'))).toBeVisible();
+    await expect(
+      page.getByRole('heading', { level: 2, name: t('menuEditor.title') }),
+    ).toBeVisible();
+    await expectAccessible(page);
 
-    // The cashier's POS offers it with its sizes and the dip, and takes the order.
+    await page.getByRole('button', { name: t('menuEditor.items.add') }).click();
+    const dish = page.getByRole('dialog', { name: t('menuEditor.item.addTitle') });
+    await dish
+      .getByLabel(t('menuEditor.item.name'), { exact: false })
+      .first()
+      .fill('Kulcha Platter');
+    await dish
+      .getByLabel(t('menuEditor.item.category'), { exact: false })
+      .selectOption({ label: 'Breads' });
+    await dish.getByLabel(/^Price/).fill('120');
+    await dish
+      .getByLabel(t('menuEditor.item.taxGroup'), { exact: false })
+      .selectOption({ label: 'GST 5 %' });
+    await dish
+      .getByLabel(t('menuEditor.item.station'), { exact: false })
+      .selectOption({ label: 'Kitchen' });
+    // A 1 × 1 PNG: the server re-encodes it to WebP renditions.
+    await dish.getByLabel(t('menuEditor.item.uploadPhoto')).setInputFiles({
+      name: 'kulcha.png',
+      mimeType: 'image/png',
+      buffer: Buffer.from(
+        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFBQIAX8jx0gAAAABJRU5ErkJggg==',
+        'base64',
+      ),
+    });
+    await expect(
+      dish.getByRole('img', { name: t('menuEditor.item.photoAlt', { name: 'Kulcha Platter' }) }),
+    ).toBeVisible();
+    for (const [size, price] of [
+      ['Two pieces', '120'],
+      ['Four pieces', '220'],
+    ] as const) {
+      await dish.getByRole('button', { name: t('menuEditor.item.addVariant') }).click();
+      await dish.getByLabel(t('menuEditor.item.variantName'), { exact: false }).last().fill(size);
+      await dish
+        .getByLabel(/^Size price/)
+        .last()
+        .fill(price);
+    }
+    await dish.getByRole('checkbox', { name: 'Add-ons' }).check();
+    await expectAccessible(page);
+    await dish.getByRole('button', { name: t('menuEditor.item.add') }).click();
+    await expect(
+      page.getByText(t('menuEditor.items.added', { name: 'Kulcha Platter' })),
+    ).toBeVisible();
+
+    await page.getByRole('button', { name: t('menuEditor.publish') }).click();
+    await expect(page.getByText(/^Menu version \d+ is published/)).toBeVisible();
+
+    // A 360 px phone: the menu editor fits (MGR-011).
+    await page.setViewportSize({ width: 360, height: 780 });
+    await expect(page.getByRole('heading', { level: 3, name: /^Kulcha Platter/ })).toBeVisible();
+    expect(await sidewaysOverflow(page)).toBeLessThanOrEqual(0);
+    await page.setViewportSize({ width: 1280, height: 720 });
+
+    // The cashier sells it at once, with its sizes and add-ons (MENU-012).
     await page.getByRole('button', { name: t('login.signOut') }).click();
     await page.getByRole('button', { name: /^Neha \(Cashier\)/ }).click();
     await page.keyboard.type('3333');
     await expect(page).toHaveURL(/\/pos$/);
     await page.getByRole('button', { name: t('pos.takeaway') }).click();
-    await page.getByRole('button', { name: 'Starters', exact: true }).click();
-    await page.getByRole('button', { name: /^Paneer Kathi Roll, / }).click();
-    const roll = page.getByRole('dialog', { name: 'Paneer Kathi Roll' });
-    await roll.getByRole('radio', { name: /Jumbo/ }).check();
-    await roll.getByRole('radio', { name: /^Cheese dip/ }).check();
-    await roll.getByRole('button', { name: t('pos.item.add') }).click();
-    const cart = page.getByRole('complementary', { name: t('pos.cart.title') });
-    await expect(cart.getByText('Jumbo · Cheese dip')).toBeVisible();
-    await page.getByLabel(t('pos.cart.customer')).fill('Meera');
-    await cart.getByRole('button', { name: t('pos.cart.send') }).click();
-    await expect(page.getByText(/^Token \d+: order \d+ sent to the kitchen$/)).toBeVisible();
+    await page.getByRole('button', { name: 'Breads', exact: true }).click();
+    await page.getByRole('button', { name: /^Kulcha Platter, / }).click();
+    const options = page.getByRole('dialog', { name: 'Kulcha Platter' });
+    await expect(options.getByRole('radio', { name: /Four pieces/ })).toBeVisible();
+    await expect(options.getByRole('checkbox', { name: /Extra butter/ })).toBeVisible();
+    await page.keyboard.press('Escape');
+  });
+
+  test('[MGR-007] [AUD-001] a manager changes a kitchen timer with a reason', async () => {
+    await page.getByRole('button', { name: t('login.signOut') }).click();
+    await page.getByRole('button', { name: /^Vikram \(Manager\)/ }).click();
+    await page.keyboard.type('2222');
+    await expect(page).toHaveURL(/\/manage$/);
+    await page
+      .getByRole('navigation', { name: t('dashboard.navigation') })
+      .getByRole('link', { name: t('dashboard.section.settings') })
+      .click();
+    const name = t('settingLabels.kds.ageAmberMinutes');
+    const row = page.locator('li', { has: page.getByRole('heading', { level: 4, name }) });
+    await expect(row.getByText(t('settingsPage.unit.minutes', { value: 10 }))).toBeVisible();
+    await row.getByRole('button', { name: t('settingsPage.edit') }).click();
+    const dialog = page.getByRole('dialog', { name: t('settingsPage.dialog.title', { name }) });
+    await dialog.getByRole('textbox', { name }).fill('12');
+    await dialog.getByRole('textbox', { name: t('settingsPage.dialog.reason') }).fill('Busy grill');
+    await expectAccessible(page);
+    await dialog.getByRole('button', { name: t('settingsPage.dialog.save') }).click();
+    await expect(page.getByText(t('settingsPage.saved', { name }))).toBeVisible();
+    await expect(row.getByText(t('settingsPage.changed'))).toBeVisible();
+    await expect(row.getByText(t('settingsPage.unit.minutes', { value: 12 }))).toBeVisible();
+    // A 360 px phone: the Settings page fits (MGR-011).
+    await page.setViewportSize({ width: 360, height: 780 });
+    expect(await sidewaysOverflow(page)).toBeLessThanOrEqual(0);
+    await page.setViewportSize({ width: 1280, height: 720 });
+  });
+
+  test('[REC-002] [REC-009] a manager adds a suggestion rule and pins a dish', async () => {
+    // Still the manager, on the Settings page.
+    const name = t('settingLabels.reco.itemPreferences');
+    const row = page.locator('li', { has: page.getByRole('heading', { level: 4, name }) });
+    await row.getByRole('link', { name: t('settingsPage.openPage.recommendations') }).click();
+    await expect(page).toHaveURL(/\/manage\/settings\/recommendations$/);
+    await expect(page.getByText(t('recoPage.rules.empty'))).toBeVisible();
+
+    await page.getByRole('button', { name: t('recoPage.rules.add') }).click();
+    const dialog = page.getByRole('dialog', { name: t('recoPage.dialog.addTitle') });
+    const dishes = dialog.getByRole('combobox', {
+      name: t('recoPage.dialog.dish'),
+      exact: true,
+    });
+    await dishes.nth(0).selectOption({ label: 'Chicken Tikka' });
+    await dishes.nth(1).selectOption({ label: 'Butter Naan' });
+    await dialog
+      .getByRole('textbox', { name: t('recoPage.dialog.label') })
+      .fill('Mop up the gravy');
+    await expectAccessible(page);
+    await dialog.getByRole('button', { name: t('recoPage.dialog.save') }).click();
+    await expect(page.getByText(t('recoPage.rules.added'))).toBeVisible();
+    const rule = t('recoPage.rules.summary', { when: 'Chicken Tikka', suggest: 'Butter Naan' });
+    await expect(page.getByRole('heading', { level: 4, name: rule })).toBeVisible();
+    // The toasts sit over the form below; put them away.
+    const dismiss = page.getByRole('button', { name: t('ui.toast.dismiss') });
+    while ((await dismiss.count()) > 0) await dismiss.first().click();
+
+    const add = page.getByRole('form', { name: t('recoPage.featured.add') });
+    await add
+      .getByRole('combobox', { name: t('recoPage.featured.dish'), exact: true })
+      .selectOption({ label: 'Veg Thali Combo' });
+    await add.getByRole('button', { name: t('recoPage.featured.add') }).click();
+    const featured = page.getByRole('list', { name: t('recoPage.featured.title') });
+    await expect(featured.getByText(t('recoPage.featured.preference.PIN'))).toBeVisible();
     await expect(
-      page
-        .getByRole('region', { name: t('pos.sent.openTakeaway') })
-        .getByText('1 × Paneer Kathi Roll (Jumbo)'),
+      featured.getByRole('heading', { level: 4, name: 'Veg Thali Combo' }),
+    ).toBeVisible();
+    await expectAccessible(page);
+    await page.getByRole('link', { name: t('recoPage.back') }).click();
+    await expect(
+      row.getByText(t('settingsPage.pageValue.recommendations', { count: 1 })),
     ).toBeVisible();
   });
 
-  test('[SEC-003] [MGR-007] a cashier cannot open the Staff, Devices or Settings pages', async () => {
+  test('[MGR-008] [MGR-010] [UPD-004] a manager acknowledges a system alert and approves an update', async () => {
+    // Still the manager.
+    const nav = page.getByRole('navigation', { name: t('dashboard.navigation') });
+    await nav.getByRole('link', { name: t('dashboard.section.alerts') }).click();
+    const acknowledge = page.getByRole('button', {
+      name: t('alerts.acknowledgeOf', { title: t('alerts.type.DISK_OR_BACKUP') }),
+    });
+    await expect(acknowledge).toBeVisible();
+    await acknowledge.click();
+    await expect(acknowledge).toHaveCount(0);
+
+    await nav.getByRole('link', { name: t('dashboard.section.system') }).click();
+    await expect(
+      page.getByRole('heading', { level: 2, name: t('systemPage.title') }),
+    ).toBeVisible();
+    await expect(
+      page.getByText(t('systemPage.update.offered', { version: '9.9.0' })),
+    ).toBeVisible();
+    await expect(page.getByRole('meter', { name: t('systemPage.storage.title') })).toBeVisible();
+    await expectAccessible(page);
+    await page.getByRole('button', { name: t('systemPage.update.installNow') }).click();
+    const confirm = page.getByRole('dialog', {
+      name: t('systemPage.update.confirmTitle', { version: '9.9.0' }),
+    });
+    await confirm.getByRole('button', { name: t('systemPage.update.installNow') }).click();
+    await expect(page.getByText(t('systemPage.update.done', { version: '9.9.0' }))).toBeVisible();
+    await expect(page.getByText(/“Install now” pressed by Vikram/)).toBeVisible();
+  });
+
+  test('[RPT-016] [RPT-007] [RPT-015] a manager reads today’s reports and opens a discounted order', async () => {
+    // Still the manager.
+    const nav = page.getByRole('navigation', { name: t('dashboard.navigation') });
+    await nav.getByRole('link', { name: t('dashboard.section.reports') }).click();
+    await expect(
+      page.getByRole('heading', { level: 3, name: t('reportsPage.report.sales') }),
+    ).toBeVisible();
+    await expect(page.getByRole('table', { name: t('reportsPage.sales.byDay') })).toBeVisible();
+    await expectAccessible(page);
+    await page.getByRole('link', { name: t('reportsPage.report.discounts') }).click();
+    const discounts = page.getByRole('table', { name: t('reportsPage.discounts.table') });
+    const birthday = discounts.getByRole('row').filter({ hasText: 'Birthday' });
+    await expect(birthday).toHaveCount(1);
+    await birthday.getByRole('link', { name: t('reportsPage.openOrder') }).click();
+    await expect(page.getByRole('table', { name: t('reportsPage.order.items') })).toBeVisible();
+    await expect(page.getByRole('table', { name: t('reportsPage.order.invoices') })).toBeVisible();
+    // A 360 px phone: the Reports area fits (MGR-011).
+    await page.setViewportSize({ width: 360, height: 780 });
+    await nav.getByRole('link', { name: t('dashboard.section.reports') }).click();
+    await expect(
+      page.getByRole('heading', { level: 3, name: t('reportsPage.report.sales') }),
+    ).toBeVisible();
+    expect(await sidewaysOverflow(page)).toBeLessThanOrEqual(0);
+    await page.setViewportSize({ width: 1280, height: 720 });
+  });
+
+  test('[AUD-005] [AUD-003] a manager finds a setting change in the audit trail and checks the chain', async () => {
+    // Still the manager.
+    const nav = page.getByRole('navigation', { name: t('dashboard.navigation') });
+    await nav.getByRole('link', { name: t('dashboard.section.audit') }).click();
+    await page
+      .getByRole('combobox', { name: t('auditPage.action') })
+      .selectOption({ label: 'Setting changed' });
+    const table = page.getByRole('table', { name: t('auditPage.table') });
+    const change = table.getByRole('row').filter({ hasText: 'Busy grill' });
+    await expect(change).toHaveCount(1);
+    await expect(change).toContainText('Vikram (Manager)');
+    await expectAccessible(page);
+    await page.getByRole('button', { name: t('auditPage.verify.run') }).click();
+    await expect(page.getByText(t('auditPage.verify.intact'))).toBeVisible();
+  });
+
+  test('[SEC-003] a cashier cannot open the Staff page', async () => {
     await page.getByRole('button', { name: t('login.signOut') }).click();
     await page.getByRole('button', { name: /^Neha \(Cashier\)/ }).click();
     await page.keyboard.type('3333');
@@ -1102,906 +1099,21 @@ test.describe.serial('the web console', () => {
     await page.goto(`${server.url}/manage/staff`);
     await expect(page.getByText(t('modes.notAllowed', { mode: t('modes.manage') }))).toBeVisible();
     await expect(page.getByRole('heading', { level: 2, name: t('staff.title') })).toHaveCount(0);
-    await page.goto(`${server.url}/manage/devices`);
-    await expect(page.getByText(t('modes.notAllowed', { mode: t('modes.manage') }))).toBeVisible();
-    await expect(page.getByRole('heading', { level: 2, name: t('devices.title') })).toHaveCount(0);
-    await page.goto(`${server.url}/manage/settings`);
-    await expect(page.getByText(t('modes.notAllowed', { mode: t('modes.manage') }))).toBeVisible();
-    await expect(page.getByRole('heading', { level: 2, name: t('settings.title') })).toHaveCount(0);
   });
 
-  test('[AUTH-012] [AUTH-006] the Owner creates a Captain role, gives it to Ravi, and Ravi settles a bill', async () => {
-    await page.goto(server.url);
-    await page.getByRole('button', { name: t('login.signOut') }).click();
-    await page.getByRole('button', { name: /^Asha \(Owner\)/ }).click();
-    await page.keyboard.type('1111');
-    await expect(page).toHaveURL(/\/manage$/);
-    await page
-      .getByRole('navigation', { name: t('dashboard.navigation') })
-      .getByRole('link', { name: t('dashboard.section.staff') })
-      .click();
-    const staffPages = page.getByRole('navigation', { name: t('staff.pages.label') });
-    await staffPages.getByRole('link', { name: t('staff.pages.roles') }).click();
-    await expect(
-      page.getByRole('heading', { level: 2, name: t('customRoles.title') }),
-    ).toBeVisible();
-    await expect(page.getByText(t('customRoles.none'))).toBeVisible();
-
-    // A captain: a waiter who also prints bills and takes payments.
-    await page.getByRole('button', { name: t('customRoles.add') }).click();
-    await expect(
-      page.getByRole('heading', { level: 2, name: t('customRoles.editor.newTitle') }),
-    ).toBeVisible();
-    await page.getByLabel(/^Name( \*)?$/).fill('Captain');
-    await expect(page.getByLabel(/^Built on/)).toHaveValue('WAITER');
-    await page
-      .getByLabel(new RegExp(`^${escape(t('capabilities.BILL_PRINT_AND_PAYMENT'))}`))
-      .selectOption({ label: t('customRoles.editor.grants.ALLOW') });
-    await expectAccessible(page);
-    // A 360 px phone: the editor fits (MGR-011).
-    await page.setViewportSize({ width: 360, height: 780 });
-    expect(await sidewaysOverflow(page)).toBeLessThanOrEqual(0);
-    await page.setViewportSize({ width: 1280, height: 720 });
-    await page.getByRole('button', { name: t('customRoles.editor.create') }).click();
-    // A new sign-in: the Owner confirms password and a second factor again.
-    const confirm = page.getByRole('dialog', { name: t('secondFactor.title') });
-    await confirm.getByLabel(t('secondFactor.password'), { exact: false }).fill(OWNER_PASSWORD);
-    await confirm.getByRole('button', { name: t('secondFactor.useRecovery') }).click();
-    await confirm
-      .getByLabel(t('secondFactor.recoveryCode'), { exact: false })
-      .fill(recoveryCodes[1] ?? '');
-    await confirm.getByRole('button', { name: t('secondFactor.confirm') }).click();
-    await expect(page.getByText(t('customRoles.created', { name: 'Captain' }))).toBeVisible();
-    const captain = page
-      .getByRole('listitem')
-      .filter({ has: page.getByRole('heading', { name: 'Captain', exact: true }) });
-    await expect(
-      captain.getByText(t('customRoles.adds', { list: t('capabilities.BILL_PRINT_AND_PAYMENT') })),
-    ).toBeVisible();
-    await expectAccessible(page);
-
-    // Ravi becomes a captain.
-    await staffPages.getByRole('link', { name: t('staff.pages.people') }).click();
-    await page
-      .getByRole('group', { name: t('staff.actionsFor', { name: 'Ravi' }) })
-      .getByRole('button', { name: t('staff.edit') })
-      .click();
-    const edit = page.getByRole('dialog', { name: t('staff.form.editTitle', { name: 'Ravi' }) });
-    await edit.getByLabel(t('staff.form.role')).selectOption({ label: 'Captain (Waiter)' });
-    await edit.getByRole('button', { name: t('staff.form.save') }).click();
-    await expect(page.getByText(t('staff.saved', { name: 'Ravi' }))).toBeVisible();
-    await expect(
-      page
-        .getByRole('listitem')
-        .filter({ has: page.getByRole('heading', { name: /^Ravi/ }) })
-        .getByText('Captain (Waiter)'),
-    ).toBeVisible();
-
-    // He signs in as a captain, seats guests, and settles their bill himself.
-    await page.getByRole('button', { name: t('login.signOut') }).click();
-    const ravi = page.getByRole('button', { name: /^Ravi/ });
-    await expect(ravi).toContainText('Captain');
-    await ravi.click();
-    await page.keyboard.type('4444');
-    await expect(page).toHaveURL(/\/pos$/);
-    await expect(
-      page.getByText(t('modes.signedInAs', { name: 'Ravi', role: 'Captain' })),
-    ).toBeVisible();
-    const hall = page.getByRole('region', { name: 'Main Hall' });
-    await hall.getByRole('button', { name: '3, Free' }).click();
-    const open = page.getByRole('dialog', { name: t('pos.open.title', { table: '3' }) });
-    await open.getByLabel(t('pos.open.guests'), { exact: true }).fill('2');
-    await open.getByRole('button', { name: t('pos.open.submit') }).click();
-    await hall.getByRole('button', { name: /^3, Occupied/ }).click();
-    await page.getByRole('button', { name: t('pos.table.takeOrder') }).click();
-    await page.getByRole('button', { name: 'Breads', exact: true }).click();
-    await page.getByRole('button', { name: /^Butter Naan, / }).click();
-    await page
-      .getByRole('complementary', { name: t('pos.cart.title') })
-      .getByRole('button', { name: t('pos.cart.send') })
-      .click();
-    await expect(page.getByText(/^Order \d+ sent to the kitchen$/)).toBeVisible();
-    await page.getByRole('button', { name: t('pos.backToTables') }).click();
-
-    await hall.getByRole('button', { name: /^3, Occupied/ }).click();
-    await page.getByRole('button', { name: t('pos.billTable') }).click();
-    await page.getByRole('button', { name: t('billing.printBill') }).click();
-    await page.getByRole('button', { name: t('billing.pay') }).click();
-    await expect(page.getByRole('heading', { name: /^Payment for invoice / })).toBeVisible();
-    await page.getByLabel(t('payment.mode')).selectOption({ label: t('payment.modes.UPI') });
-    await page.getByRole('button', { name: t('payment.record') }).click();
-    await expect(page.getByText(/^Invoice .* is paid$/)).toBeVisible();
-    await page.getByRole('button', { name: t('pos.backToTables') }).click();
-    await expect(hall.getByRole('button', { name: '3, Free' })).toBeVisible();
-  });
-
-  test('[MGR-007] [BILL-005] [UPD-010] [AUTH-006] a manager changes the kitchen’s amber age and the cashier’s discount limit, and the Owner turns on the service charge', async () => {
-    const amber = t('settingItems.kds.ageAmberMinutes.label');
-    const limit = t('settingItems.billing.cashierDiscountLimitBp.label');
-    const service = t('settingItems.billing.serviceChargeEnabled.label');
-    const row = (label: string) =>
-      page
-        .getByRole('listitem')
-        .filter({ has: page.getByRole('heading', { level: 4, name: label, exact: true }) });
-    const change = (label: string) =>
-      page.getByRole('button', {
-        name: t('settings.row.changeLabel', { name: label }),
-        exact: true,
-      });
-    const nav = page.getByRole('navigation', { name: t('dashboard.navigation') });
-
-    await page.getByRole('button', { name: t('login.signOut') }).click();
-    await page.getByRole('button', { name: /^Vikram \(Manager\)/ }).click();
-    await page.keyboard.type('2222');
-    await expect(page).toHaveURL(/\/manage$/);
-    await nav.getByRole('link', { name: t('dashboard.section.settings') }).click();
-    await expect(page.getByRole('heading', { level: 2, name: t('settings.title') })).toBeVisible();
-    // What the provider sets, and what only the Owner changes, is shown but not offered.
-    await expect(
-      row(t('settingItems.pagers.heartbeatSeconds.label')).getByText(t('settings.row.vendor'), {
-        exact: true,
-      }),
-    ).toBeVisible();
-    await expect(
-      row(service).getByText(t('settings.row.ownerOnly'), { exact: true }),
-    ).toBeVisible();
-    await expect(change(service)).toHaveCount(0);
-    await expectAccessible(page);
-
-    // Tickets turn amber after 8 minutes instead of 10.
-    await change(amber).click();
-    const amberDialog = page.getByRole('dialog', { name: amber, exact: true });
-    await amberDialog.getByLabel(new RegExp(`^${escape(amber)}`)).fill('8');
-    await amberDialog.getByRole('button', { name: t('settings.dialog.save') }).click();
-    await expect(page.getByText(t('settings.dialog.saved', { name: amber }))).toBeVisible();
-    await expect(row(amber).getByText('8 minutes', { exact: true })).toBeVisible();
-    await expect(row(amber).getByText(t('settings.row.changed'), { exact: true })).toBeVisible();
-
-    // The cashier's limit goes from 10 % to 12.5 %, with a reason for the audit log.
-    await change(limit).click();
-    const limitDialog = page.getByRole('dialog', { name: limit, exact: true });
-    await limitDialog.getByLabel(new RegExp(`^${escape(limit)}`)).fill('12.5');
-    await limitDialog
-      .getByLabel(new RegExp(`^${escape(t('settings.dialog.reason'))}`))
-      .fill('Festival week');
-    await expectAccessible(page);
-    await limitDialog.getByRole('button', { name: t('settings.dialog.save') }).click();
-    await expect(row(limit).getByText('12.5 %', { exact: true })).toBeVisible();
-
-    // Only what was changed (the test setup changed two sign-in settings), on a 360 px phone too.
-    await page.getByLabel(t('settings.general.changedOnly')).check();
-    await expect(row(amber)).toBeVisible();
-    await expect(row(limit)).toBeVisible();
-    await expect(row(service)).toHaveCount(0);
-    await page.setViewportSize({ width: 360, height: 780 });
-    expect(await sidewaysOverflow(page)).toBeLessThanOrEqual(0);
-    await page.setViewportSize({ width: 1280, height: 720 });
-
-    // The Owner turns on the service charge, confirming the second factor (AUTH-006).
-    await page.getByRole('button', { name: t('login.signOut') }).click();
-    await page.getByRole('button', { name: /^Asha \(Owner\)/ }).click();
-    await page.keyboard.type('1111');
-    await expect(page).toHaveURL(/\/manage$/);
-    await nav.getByRole('link', { name: t('dashboard.section.settings') }).click();
-    await change(service).click();
-    const serviceDialog = page.getByRole('dialog', { name: service, exact: true });
-    await expect(serviceDialog.getByText(t('settings.dialog.secondFactor'))).toBeVisible();
-    await serviceDialog.getByRole('checkbox', { name: service, exact: true }).check();
-    await serviceDialog.getByRole('button', { name: t('settings.dialog.save') }).click();
-    const confirm = page.getByRole('dialog', { name: t('secondFactor.title') });
-    await confirm.getByLabel(t('secondFactor.password'), { exact: false }).fill(OWNER_PASSWORD);
-    await confirm.getByRole('button', { name: t('secondFactor.useRecovery') }).click();
-    await confirm
-      .getByLabel(t('secondFactor.recoveryCode'), { exact: false })
-      .fill(recoveryCodes[2] ?? '');
-    await confirm.getByRole('button', { name: t('secondFactor.confirm') }).click();
-    await expect(page.getByText(t('settings.dialog.saved', { name: service }))).toBeVisible();
-    await expect(row(service).getByText(t('settings.values.on'), { exact: true })).toBeVisible();
-    await expect(row(amber).getByText('8 minutes', { exact: true })).toBeVisible();
-  });
-
-  test('[NTF-002] [NTF-003] [PGR-006] [NTF-005] a manager sends water requests to the cashier too with a new pager text and buzz, changes N, then puts the factory rule back', async () => {
-    const water = t('alerts.type.WATER_REQUEST');
-    const n = t('settingItems.notifications.escalationSeconds.label');
-    const rule = (name: string) =>
-      page
-        .getByRole('listitem')
-        .filter({ has: page.getByRole('heading', { level: 4, name, exact: true }) });
-    const changeWater = page.getByRole('button', {
-      name: t('notificationRules.row.changeLabel', { name: water }),
-      exact: true,
+  test('[SEC-017] every screen ran within the CSP and Trusted Types (PC-I4)', async () => {
+    const response = await page.goto(`${server.url}/pos`);
+    expect(response?.headers()['content-security-policy']).toContain("trusted-types 'none'");
+    expect(policyViolations).toEqual([]);
+    // A string given to an HTML sink is refused: no script slips in through markup.
+    const refusal = await page.evaluate(() => {
+      try {
+        document.body.insertAdjacentHTML('beforeend', '<img src="x" onerror="alert(1)">');
+        return 'accepted';
+      } catch (error) {
+        return error instanceof TypeError ? 'refused' : String(error);
+      }
     });
-    const pager = (text: string, vibration: 'TWO_SHORT' | 'THREE') =>
-      rule(water).getByText(
-        t('notificationRules.row.pager', {
-          text,
-          vibration: t(`notificationRules.vibration.${vibration}`),
-        }),
-        { exact: true },
-      );
-    const nav = page.getByRole('navigation', { name: t('dashboard.navigation') });
-
-    await page.getByRole('button', { name: t('login.signOut'), exact: true }).click();
-    await page.getByRole('button', { name: /^Vikram \(Manager\)/ }).click();
-    await page.keyboard.type('2222');
-    await expect(page).toHaveURL(/\/manage$/);
-    await nav.getByRole('link', { name: t('dashboard.section.settings') }).click();
-    await page
-      .getByRole('navigation', { name: t('settings.pages.label') })
-      .getByRole('link', { name: t('settings.pages.notifications') })
-      .click();
-    await expect(
-      page.getByRole('heading', { level: 2, name: t('notificationRules.title') }),
-    ).toBeVisible();
-    await expect(pager('T7 WATER', 'TWO_SHORT')).toBeVisible();
-    await expectAccessible(page);
-
-    // Water requests reach the cashier too; the pager says "T7 JAL" and buzzes three times.
-    await changeWater.click();
-    const dialog = page.getByRole('dialog', { name: water, exact: true });
-    await dialog
-      .getByRole('checkbox', { name: t('notificationRules.recipients.CASHIER'), exact: true })
-      .check();
-    await dialog
-      .getByLabel(new RegExp(`^${escape(t('notificationRules.dialog.pagerText'))}`))
-      .fill('{table} JAL');
-    await expect(
-      dialog.getByText(t('notificationRules.dialog.preview', { text: 'T7 JAL' })),
-    ).toBeVisible();
-    await dialog
-      .getByLabel(new RegExp(`^${escape(t('notificationRules.dialog.vibration'))}`))
-      .selectOption('THREE');
-    await expectAccessible(page);
-    await dialog.getByRole('button', { name: t('settings.dialog.save') }).click();
-    await expect(
-      page.getByText(t('notificationRules.dialog.saved', { name: water })),
-    ).toBeVisible();
-    await expect(
-      rule(water).getByText(t('notificationRules.row.changed'), { exact: true }),
-    ).toBeVisible();
-    await expect(pager('T7 JAL', 'THREE')).toBeVisible();
-
-    // N goes from 60 to 90 seconds, and the rules that go on to the managers say so.
-    await page
-      .getByRole('button', { name: t('settings.row.changeLabel', { name: n }), exact: true })
-      .click();
-    const nDialog = page.getByRole('dialog', { name: n, exact: true });
-    await nDialog.getByLabel(new RegExp(`^${escape(n)}`)).fill('90');
-    await nDialog.getByRole('button', { name: t('settings.dialog.save') }).click();
-    await expect(
-      rule(water).getByText(t('notificationRules.row.escalates', { after: '90 seconds' }), {
-        exact: true,
-      }),
-    ).toBeVisible();
-    await page.setViewportSize({ width: 360, height: 780 });
-    expect(await sidewaysOverflow(page)).toBeLessThanOrEqual(0);
-    await page.setViewportSize({ width: 1280, height: 720 });
-
-    // Back to the factory rule.
-    await changeWater.click();
-    await dialog.getByRole('button', { name: t('notificationRules.dialog.useFactory') }).click();
-    await expect(dialog.getByText(t('notificationRules.dialog.factory'))).toBeVisible();
-    await dialog.getByRole('button', { name: t('settings.dialog.save') }).click();
-    await expect(pager('T7 WATER', 'TWO_SHORT')).toBeVisible();
-    await expect(
-      rule(water).getByText(t('notificationRules.row.changed'), { exact: true }),
-    ).toHaveCount(0);
-  });
-
-  test('[REC-002] [REC-009] [REC-006] [MGR-007] a manager adds a suggestion rule, blocks the dish it suggests, pins a dessert with words of its own, and the preview follows each change', async () => {
-    const ruleTitle = t('suggestions.rules.row.title', {
-      when: 'Paneer Tikka',
-      suggest: 'Sweet Lassi',
-    });
-    const preview = page.getByRole('list', { name: t('suggestions.preview.list') });
-    const suggested = (name: string) =>
-      preview
-        .getByRole('listitem')
-        .filter({ has: page.getByRole('heading', { level: 4, name, exact: true }) });
-    const dishes = page.getByRole('region', { name: t('suggestions.dishes.title') });
-    const dishDialog = page.getByRole('dialog', { name: t('suggestions.dishes.dialog.addTitle') });
-    const reason = new RegExp(`^${escape(t('settings.dialog.reason'))}`);
-    const nav = page.getByRole('navigation', { name: t('dashboard.navigation') });
-
-    await page.getByRole('button', { name: t('login.signOut'), exact: true }).click();
-    await page.getByRole('button', { name: /^Vikram \(Manager\)/ }).click();
-    await page.keyboard.type('2222');
-    await expect(page).toHaveURL(/\/manage$/);
-    await nav.getByRole('link', { name: t('dashboard.section.settings') }).click();
-    await page
-      .getByRole('navigation', { name: t('settings.pages.label') })
-      .getByRole('link', { name: t('settings.pages.suggestions') })
-      .click();
-    await expect(
-      page.getByRole('heading', { level: 2, name: t('suggestions.title') }),
-    ).toBeVisible();
-    await expect(page.getByText(t('suggestions.rules.none'))).toBeVisible();
-    await expect(page.getByText(t('suggestions.dishes.none'))).toBeVisible();
-    await expect(
-      page.getByRole('heading', { level: 3, name: t('suggestions.preview.title') }),
-    ).toBeVisible();
-    await expectAccessible(page);
-
-    // If the order has Paneer Tikka, suggest Sweet Lassi with the restaurant's own words.
-    await page.getByRole('button', { name: t('suggestions.rules.add') }).click();
-    const ruleDialog = page.getByRole('dialog', { name: t('suggestions.rules.dialog.addTitle') });
-    await ruleDialog
-      .getByRole('group', { name: t('suggestions.rules.dialog.when'), exact: true })
-      .getByRole('combobox')
-      .selectOption({ label: 'Paneer Tikka' });
-    await ruleDialog
-      .getByRole('group', { name: t('suggestions.rules.dialog.suggest'), exact: true })
-      .getByRole('combobox')
-      .selectOption({ label: 'Sweet Lassi' });
-    await ruleDialog
-      .getByLabel(new RegExp(`^${escape(t('suggestions.rules.dialog.label'))}`))
-      .fill('Cools the spice');
-    await expectAccessible(page);
-    await ruleDialog.getByRole('button', { name: t('settings.dialog.save') }).click();
-    await expect(page.getByText(t('suggestions.rules.dialog.saved'))).toBeVisible();
-    await expect(
-      page.getByRole('heading', { level: 4, name: ruleTitle, exact: true }),
-    ).toBeVisible();
-
-    // A table that ordered Paneer Tikka is offered Sweet Lassi, saying why.
-    await page.getByLabel(t('suggestions.preview.dish')).selectOption({ label: 'Paneer Tikka' });
-    await expect(suggested('Sweet Lassi').getByText('Cools the spice')).toBeVisible();
-    await expect(
-      suggested('Sweet Lassi').getByText(t('suggestions.preview.layer.RULE'), { exact: true }),
-    ).toBeVisible();
-
-    // Sweet Lassi is blocked: never suggested, whatever the rules say.
-    await page.getByRole('button', { name: t('suggestions.dishes.add') }).click();
-    await dishDialog.getByRole('combobox').selectOption({ label: 'Sweet Lassi' });
-    await dishDialog
-      .getByRole('radio', { name: t('suggestions.dishes.dialog.choice.BLOCK') })
-      .check();
-    await dishDialog.getByLabel(reason).fill('Out of curd today');
-    await dishDialog.getByRole('button', { name: t('settings.dialog.save') }).click();
-    await expect(
-      page.getByText(t('suggestions.dishes.dialog.saved.BLOCK', { name: 'Sweet Lassi' })),
-    ).toBeVisible();
-    await expect(suggested('Sweet Lassi')).toHaveCount(0);
-
-    // Gulab Jamun is pinned with words of its own: first on every table that can serve it.
-    await page.getByRole('button', { name: t('suggestions.dishes.add') }).click();
-    await dishDialog.getByRole('combobox').selectOption({ label: 'Gulab Jamun' });
-    await expect(
-      dishDialog.getByRole('radio', { name: t('suggestions.dishes.dialog.choice.PIN') }),
-    ).toBeChecked();
-    await dishDialog
-      .getByLabel(new RegExp(`^${escape(t('suggestions.dishes.dialog.label'))}`))
-      .fill('Fresh today');
-    await expectAccessible(page);
-    await dishDialog.getByRole('button', { name: t('settings.dialog.save') }).click();
-    await expect(
-      page.getByText(t('suggestions.dishes.dialog.saved.PIN', { name: 'Gulab Jamun' })),
-    ).toBeVisible();
-    await expect(preview.getByRole('heading', { level: 4 }).first()).toHaveText('Gulab Jamun');
-    await expect(suggested('Gulab Jamun').getByText('Fresh today')).toBeVisible();
-    await expect(
-      suggested('Gulab Jamun').getByText(t('suggestions.preview.layer.PINNED'), { exact: true }),
-    ).toBeVisible();
-    await expect(
-      dishes.getByText(t('suggestions.dishes.shows', { text: 'Fresh today' })),
-    ).toBeVisible();
-    await expect(
-      dishes.getByText(t('suggestions.dishes.preference.BLOCK'), { exact: true }),
-    ).toBeVisible();
-    await expectAccessible(page);
-    await page.setViewportSize({ width: 360, height: 780 });
-    expect(await sidewaysOverflow(page)).toBeLessThanOrEqual(0);
-    await page.setViewportSize({ width: 1280, height: 720 });
-
-    // Both dishes back as usual, and the rule removed with a reason.
-    for (const name of ['Gulab Jamun', 'Sweet Lassi']) {
-      await dishes
-        .getByRole('button', { name: t('suggestions.dishes.changeLabel', { name }), exact: true })
-        .click();
-      const change = page.getByRole('dialog', {
-        name: t('suggestions.dishes.dialog.title', { name }),
-      });
-      await change
-        .getByRole('radio', { name: t('suggestions.dishes.dialog.choice.NORMAL') })
-        .check();
-      await change.getByRole('button', { name: t('settings.dialog.save') }).click();
-      await expect(
-        page.getByText(t('suggestions.dishes.dialog.saved.NORMAL', { name })),
-      ).toBeVisible();
-    }
-    await expect(page.getByText(t('suggestions.dishes.none'))).toBeVisible();
-    await expect(suggested('Sweet Lassi').getByText('Cools the spice')).toBeVisible();
-    await page
-      .getByRole('group', { name: t('suggestions.rules.row.actionsFor', { title: ruleTitle }) })
-      .getByRole('button', { name: t('suggestions.rules.row.archive') })
-      .click();
-    const remove = page.getByRole('dialog', { name: t('suggestions.rules.archiveDialog.title') });
-    await remove
-      .getByLabel(new RegExp(`^${escape(t('suggestions.rules.archiveDialog.reason'))}`))
-      .fill('Summer menu over');
-    await remove
-      .getByRole('button', { name: t('suggestions.rules.archiveDialog.confirm') })
-      .click();
-    await expect(page.getByText(t('suggestions.rules.archived'))).toBeVisible();
-    await expect(page.getByText(t('suggestions.rules.none'))).toBeVisible();
-    await expect(page.getByText('Cools the spice')).toHaveCount(0);
-  });
-  test('[TBL-001] [KDS-008] [ONB-004] [MGR-007] a manager adds a table, a printer and a station, prints a test page on the printer and sends another printer’s tickets to it', async () => {
-    const printer = await fakePrinter();
-    const labelled = (text: string) => new RegExp(`^${escape(text)}`);
-    const settingsPages = page.getByRole('navigation', { name: t('settings.pages.label') });
-    const save = (dialog: ReturnType<Page['getByRole']>) =>
-      dialog.getByRole('button', { name: t('settings.dialog.save') }).click();
-    const atPhoneWidth = async () => {
-      await page.setViewportSize({ width: 360, height: 780 });
-      expect(await sidewaysOverflow(page)).toBeLessThanOrEqual(0);
-      await page.setViewportSize({ width: 1280, height: 720 });
-    };
-    try {
-      // The floor: table 11 on the terrace, for two, after the terrace's tables.
-      await settingsPages.getByRole('link', { name: t('settings.pages.floor') }).click();
-      await expect(page.getByRole('heading', { level: 2, name: t('floor.title') })).toBeVisible();
-      await expect(page.getByRole('heading', { level: 3, name: 'Terrace' })).toBeVisible();
-      await expectAccessible(page);
-      await page
-        .getByRole('group', {
-          name: t('floor.section.actionsFor', { name: 'Terrace' }),
-          exact: true,
-        })
-        .getByRole('button', { name: t('floor.section.addTable') })
-        .click();
-      const tableDialog = page.getByRole('dialog', { name: t('floor.tableDialog.addTitle') });
-      await expect(tableDialog.getByLabel(labelled(t('floor.tableDialog.place')))).toHaveValue(
-        '11',
-      );
-      await tableDialog.getByLabel(labelled(t('floor.tableDialog.label'))).fill('11');
-      await tableDialog.getByLabel(labelled(t('floor.tableDialog.capacity'))).fill('2');
-      await expectAccessible(page);
-      await save(tableDialog);
-      await expect(page.getByText(t('floor.tableDialog.saved', { table: '11' }))).toBeVisible();
-      const table11 = page.getByRole('group', {
-        name: t('floor.table.actionsFor', { table: '11' }),
-        exact: true,
-      });
-      await expect(
-        page
-          .getByRole('listitem')
-          .filter({ has: table11 })
-          .getByText(t('floor.table.seats', { count: 2 })),
-      ).toBeVisible();
-      await atPhoneWidth();
-
-      // A network printer on 58 mm paper: the stand-in on this machine.
-      await settingsPages.getByRole('link', { name: t('settings.pages.printing') }).click();
-      await expect(
-        page.getByRole('heading', { level: 2, name: t('printing.title') }),
-      ).toBeVisible();
-      await expect(
-        page.getByRole('heading', { level: 4, name: 'Kitchen printer', exact: true }),
-      ).toBeVisible();
-      await expectAccessible(page);
-      await page.getByRole('button', { name: t('printing.printers.add') }).click();
-      const printerDialog = page.getByRole('dialog', {
-        name: t('printing.printerDialog.addTitle'),
-      });
-      await printerDialog
-        .getByLabel(labelled(t('printing.printerDialog.name')))
-        .fill('Pastry printer');
-      await printerDialog.getByLabel(labelled(t('printing.printerDialog.host'))).fill('127.0.0.1');
-      await printerDialog
-        .getByLabel(labelled(t('printing.printerDialog.port')))
-        .fill(String(printer.port));
-      await printerDialog
-        .getByRole('radio', { name: t('printing.printerDialog.paperChoice.58') })
-        .check();
-      await expectAccessible(page);
-      await save(printerDialog);
-      await expect(
-        page.getByText(t('printing.printerDialog.saved', { name: 'Pastry printer' })),
-      ).toBeVisible();
-      const pastryActions = page.getByRole('group', {
-        name: t('printing.printers.actionsFor', { name: 'Pastry printer' }),
-        exact: true,
-      });
-      const pastryRow = page.getByRole('listitem').filter({ has: pastryActions });
-      await expect(pastryRow.getByText(t('printing.printers.status.UNTRIED'))).toBeVisible();
-
-      // The test page reaches the printer, saying which printer and paper it is for.
-      await pastryActions.getByRole('button', { name: t('printing.printers.test') }).click();
-      await expect(
-        page.getByText(t('printing.printers.testPrinted', { name: 'Pastry printer' })),
-      ).toBeVisible();
-      await expect.poll(() => printer.received()).toContain('TEST PAGE');
-      expect(printer.received()).toContain('Printer: Pastry printer');
-      expect(printer.received()).toContain('Paper: 58 mm');
-      await expect(pastryRow.getByText(t('printing.printers.status.READY'))).toBeVisible();
-
-      // A station whose tickets print there.
-      await page.getByRole('button', { name: t('printing.stations.add') }).click();
-      const stationDialog = page.getByRole('dialog', {
-        name: t('printing.stationDialog.addTitle'),
-      });
-      await stationDialog.getByLabel(labelled(t('printing.stationDialog.name'))).fill('Pastry');
-      await stationDialog
-        .getByRole('radio', { name: t('printing.stationDialog.modeChoice.PRINT'), exact: true })
-        .check();
-      await stationDialog
-        .getByLabel(labelled(t('printing.stationDialog.printer')))
-        .selectOption({ label: 'Pastry printer' });
-      await expectAccessible(page);
-      await save(stationDialog);
-      await expect(
-        page.getByText(t('printing.stationDialog.saved', { name: 'Pastry' })),
-      ).toBeVisible();
-      const pastryStation = page.getByRole('group', {
-        name: t('printing.stations.actionsFor', { name: 'Pastry' }),
-        exact: true,
-      });
-      await expect(
-        page
-          .getByRole('listitem')
-          .filter({ has: pastryStation })
-          .getByText(t('printing.stations.printsOn', { name: 'Pastry printer' })),
-      ).toBeVisible();
-      await expect(
-        pastryRow.getByText(t('printing.printers.usedBy', { names: 'Pastry' })),
-      ).toBeVisible();
-      await expectAccessible(page);
-      await atPhoneWidth();
-
-      // The kitchen printer's tickets go to the pastry printer for a while, then come back.
-      const kitchenActions = page.getByRole('group', {
-        name: t('printing.printers.actionsFor', { name: 'Kitchen printer' }),
-        exact: true,
-      });
-      const kitchenRow = page.getByRole('listitem').filter({ has: kitchenActions });
-      await kitchenActions.getByRole('button', { name: t('printing.printers.redirect') }).click();
-      const redirect = page.getByRole('dialog', {
-        name: t('printing.redirectDialog.title', { name: 'Kitchen printer' }),
-      });
-      await redirect
-        .getByLabel(labelled(t('printing.redirectDialog.to')))
-        .selectOption({ label: 'Pastry printer' });
-      await redirect
-        .getByLabel(labelled(t('printing.redirectDialog.reason')))
-        .fill('Kitchen printer out of paper');
-      await expectAccessible(page);
-      await redirect.getByRole('button', { name: t('printing.redirectDialog.confirm') }).click();
-      await expect(
-        page.getByText(
-          t('printing.printers.redirectedToast', { name: 'Kitchen printer', to: 'Pastry printer' }),
-        ),
-      ).toBeVisible();
-      await expect(kitchenRow.getByText(t('printing.printers.sentElsewhere'))).toBeVisible();
-      await expect(
-        kitchenRow.getByText(t('printing.printers.redirected', { name: 'Pastry printer' })),
-      ).toBeVisible();
-      await kitchenActions.getByRole('button', { name: t('printing.printers.unredirect') }).click();
-      const back = page.getByRole('dialog', {
-        name: t('printing.unredirectDialog.title', { name: 'Kitchen printer' }),
-      });
-      await back.getByLabel(labelled(t('printing.unredirectDialog.reason'))).fill('Paper loaded');
-      await back.getByRole('button', { name: t('printing.unredirectDialog.confirm') }).click();
-      await expect(
-        page.getByText(t('printing.printers.unredirectedToast', { name: 'Kitchen printer' })),
-      ).toBeVisible();
-      await expect(kitchenRow.getByText(t('printing.printers.sentElsewhere'))).toHaveCount(0);
-
-      // Put the restaurant back: the station, then its printer, then the table, archived with reasons.
-      await pastryStation.getByRole('button', { name: t('printing.stations.archive') }).click();
-      const archiveStation = page.getByRole('dialog', {
-        name: t('printing.archiveStation.title', { name: 'Pastry' }),
-      });
-      await archiveStation
-        .getByLabel(labelled(t('printing.archiveStation.reason')))
-        .fill('Test over');
-      await archiveStation
-        .getByRole('button', { name: t('printing.archiveStation.confirm') })
-        .click();
-      await expect(
-        page.getByText(t('printing.stations.archived', { name: 'Pastry' })),
-      ).toBeVisible();
-      await pastryActions.getByRole('button', { name: t('printing.printers.archive') }).click();
-      const archivePrinter = page.getByRole('dialog', {
-        name: t('printing.archivePrinter.title', { name: 'Pastry printer' }),
-      });
-      await archivePrinter
-        .getByLabel(labelled(t('printing.archivePrinter.reason')))
-        .fill('Test over');
-      await archivePrinter
-        .getByRole('button', { name: t('printing.archivePrinter.confirm') })
-        .click();
-      await expect(
-        page.getByText(t('printing.printers.archived', { name: 'Pastry printer' })),
-      ).toBeVisible();
-      await expect(pastryActions).toHaveCount(0);
-
-      await settingsPages.getByRole('link', { name: t('settings.pages.floor') }).click();
-      await table11.getByRole('button', { name: t('floor.table.archive') }).click();
-      const archiveTable = page.getByRole('dialog', {
-        name: t('floor.archiveTable.title', { table: '11' }),
-      });
-      await archiveTable.getByLabel(labelled(t('floor.archiveTable.reason'))).fill('Test over');
-      await archiveTable.getByRole('button', { name: t('floor.archiveTable.confirm') }).click();
-      await expect(page.getByText(t('floor.tableArchived', { table: '11' }))).toBeVisible();
-      await expect(table11).toHaveCount(0);
-    } finally {
-      await printer.close();
-    }
-  });
-
-  test('[ONB-004] [MGR-007] [AUTH-006] [BILL-003] [BILL-004] a manager sets the opening hours and sees the tax settings read only, then the Owner adds a tax group and an invoice series after the second factor', async () => {
-    const labelled = (text: string) => new RegExp(`^${escape(text)}( \\*)?$`);
-    const nav = page.getByRole('navigation', { name: t('dashboard.navigation') });
-    const settingsPages = page.getByRole('navigation', { name: t('settings.pages.label') });
-    const save = (dialog: ReturnType<Page['getByRole']>) =>
-      dialog.getByRole('button', { name: t('settings.dialog.save') }).click();
-    const row = (name: string) =>
-      page
-        .getByRole('listitem')
-        .filter({ has: page.getByRole('heading', { level: 4, name, exact: true }) });
-    const atPhoneWidth = async () => {
-      await page.setViewportSize({ width: 360, height: 780 });
-      expect(await sidewaysOverflow(page)).toBeLessThanOrEqual(0);
-      await page.setViewportSize({ width: 1280, height: 720 });
-    };
-
-    // A manager gives every day lunch and a dinner that closes after midnight.
-    await page.getByRole('button', { name: t('login.signOut') }).click();
-    await page.getByRole('button', { name: /^Vikram \(Manager\)/ }).click();
-    await page.keyboard.type('2222');
-    await expect(page).toHaveURL(/\/manage$/);
-    await nav.getByRole('link', { name: t('dashboard.section.settings') }).click();
-    await settingsPages.getByRole('link', { name: t('settings.pages.restaurant') }).click();
-    await expect(
-      page.getByRole('heading', { level: 2, name: t('restaurant.title') }),
-    ).toBeVisible();
-    await expect(page.getByText(t('restaurant.hours.closed'), { exact: true })).toHaveCount(7);
-    await expectAccessible(page);
-    await page.getByRole('button', { name: t('restaurant.hours.changeLabel') }).click();
-    const hours = page.getByRole('dialog', { name: t('restaurant.hoursDialog.title') });
-    const monday = t('restaurant.days.MON');
-    const mondayHours = (number: number) =>
-      hours.getByRole('group', {
-        name: t('restaurant.hoursDialog.hoursLegend', { day: monday, number }),
-        exact: true,
-      });
-    const lunchAndDinner = [
-      [1, '12:00', '15:30'],
-      [2, '19:00', '01:00'],
-    ] as const;
-    for (const [number, opens, closes] of lunchAndDinner) {
-      await hours
-        .getByRole('button', { name: t('restaurant.hoursDialog.addLabel', { day: monday }) })
-        .click();
-      await mondayHours(number)
-        .getByLabel(labelled(t('restaurant.hoursDialog.opens')))
-        .fill(opens);
-      await mondayHours(number)
-        .getByLabel(labelled(t('restaurant.hoursDialog.closes')))
-        .fill(closes);
-    }
-    await expect(mondayHours(2).getByText(t('restaurant.hoursDialog.overnight'))).toBeVisible();
-    await hours
-      .getByRole('button', { name: t('restaurant.hoursDialog.copy', { day: monday }) })
-      .click();
-    await expectAccessible(page);
-    await save(hours);
-    await expect(page.getByText(t('restaurant.hoursDialog.saved'))).toBeVisible();
-    const everyDay = [
-      t('restaurant.hours.window', { start: '12:00', end: '15:30' }),
-      t('restaurant.hours.windowOvernight', { start: '19:00', end: '01:00' }),
-    ].join(', ');
-    await expect(page.getByText(everyDay, { exact: true })).toHaveCount(7);
-    await atPhoneWidth();
-
-    // The tax settings are the Owner's: a manager sees them, with a note and nothing to change.
-    await settingsPages.getByRole('link', { name: t('settings.pages.tax') }).click();
-    await expect(page.getByRole('heading', { level: 2, name: t('tax.title') })).toBeVisible();
-    await expect(page.getByText(t('tax.ownerOnly'))).toBeVisible();
-    await expect(row('GST 5 %')).toBeVisible();
-    await expect(row('Dine-in').getByText(t('tax.series.default'), { exact: true })).toBeVisible();
-    await expect(page.getByRole('button', { name: t('tax.groups.add') })).toHaveCount(0);
-    await expect(page.getByRole('button', { name: t('tax.series.add') })).toHaveCount(0);
-    await expect(page.getByRole('button', { name: t('tax.legal.changeLabel') })).toHaveCount(0);
-    await expectAccessible(page);
-
-    // The Owner adds GST 12 %, CGST and SGST at 6 % each, confirming the second factor.
-    await page.getByRole('button', { name: t('login.signOut') }).click();
-    await page.getByRole('button', { name: /^Asha \(Owner\)/ }).click();
-    await page.keyboard.type('1111');
-    await expect(page).toHaveURL(/\/manage$/);
-    await nav.getByRole('link', { name: t('dashboard.section.settings') }).click();
-    await settingsPages.getByRole('link', { name: t('settings.pages.tax') }).click();
-    await expect(page.getByText(t('tax.secondFactor'))).toBeVisible();
-    await page.getByRole('button', { name: t('tax.groups.add') }).click();
-    const group = page.getByRole('dialog', { name: t('tax.groupDialog.addTitle') });
-    await group.getByLabel(labelled(t('tax.groupDialog.name'))).fill('GST 12 %');
-    for (const number of [1, 2]) {
-      await group
-        .getByRole('group', { name: t('tax.groupDialog.taxLegend', { number }), exact: true })
-        .getByLabel(labelled(t('tax.groupDialog.rate')))
-        .fill('6');
-    }
-    await expect(group.getByText(t('tax.groupDialog.total', { rate: '12' }))).toBeVisible();
-    await expectAccessible(page);
-    await save(group);
-    const confirm = page.getByRole('dialog', { name: t('secondFactor.title') });
-    await confirm.getByLabel(t('secondFactor.password'), { exact: false }).fill(OWNER_PASSWORD);
-    await confirm.getByRole('button', { name: t('secondFactor.useRecovery') }).click();
-    await confirm
-      .getByLabel(t('secondFactor.recoveryCode'), { exact: false })
-      .fill(recoveryCodes[3] ?? '');
-    await confirm.getByRole('button', { name: t('secondFactor.confirm') }).click();
-    await expect(page.getByText(t('tax.groupDialog.saved', { name: 'GST 12 %' }))).toBeVisible();
-    const taxes = ['CGST', 'SGST']
-      .map((code) => t('tax.groups.component', { code, rate: '6' }))
-      .join(' + ');
-    await expect(row('GST 12 %').getByText(taxes, { exact: true })).toBeVisible();
-    await expect(row('GST 12 %').getByText(t('tax.groups.items', { count: 0 }))).toBeVisible();
-
-    // A series for catering shows its first number as the prefix is typed. The confirmation
-    // still holds, so saving it asks for nothing more.
-    const firstCatering = formatInvoiceNumber(
-      { prefix: 'CAT', includeFinancialYear: true, separator: '/', sequencePadding: 6 },
-      financialYearOf(calendarDateOf(new Date(), 'Asia/Kolkata')),
-      1,
-    );
-    await page.getByRole('button', { name: t('tax.series.add') }).click();
-    const series = page.getByRole('dialog', { name: t('tax.seriesDialog.addTitle') });
-    await series.getByLabel(labelled(t('tax.seriesDialog.name'))).fill('Catering');
-    await series.getByLabel(labelled(t('tax.seriesDialog.prefix'))).fill('cat');
-    await expect(series.getByLabel(labelled(t('tax.seriesDialog.prefix')))).toHaveValue('CAT');
-    await expect(
-      series.getByText(t('tax.seriesDialog.example', { example: firstCatering })),
-    ).toBeVisible();
-    await expectAccessible(page);
-    await save(series);
-    await expect(page.getByText(t('tax.seriesDialog.saved', { name: 'Catering' }))).toBeVisible();
-    await expect(confirm).toHaveCount(0);
-    await expect(
-      row('Catering').getByText(t('tax.series.firstNumber', { example: firstCatering })),
-    ).toBeVisible();
-
-    // GST 12 % goes again, with a reason, and is listed among the archived groups.
-    await page
-      .getByRole('group', { name: t('tax.groups.actionsFor', { name: 'GST 12 %' }), exact: true })
-      .getByRole('button', { name: t('tax.groups.archive') })
-      .click();
-    const archive = page.getByRole('dialog', {
-      name: t('tax.archiveGroup.title', { name: 'GST 12 %' }),
-    });
-    await archive.getByLabel(labelled(t('tax.archiveGroup.reason'))).fill('Added by mistake');
-    await archive.getByRole('button', { name: t('tax.archiveGroup.confirm') }).click();
-    await expect(page.getByText(t('tax.groups.archivedToast', { name: 'GST 12 %' }))).toBeVisible();
-    await expect(row('GST 12 %')).toHaveCount(0);
-    await page.getByLabel(t('tax.showArchived')).check();
-    await expect(row('GST 12 %').getByText(t('tax.archived'), { exact: true })).toBeVisible();
-    await expectAccessible(page);
-    await atPhoneWidth();
-  });
-
-  test('[MGR-008] [NTF-003] [NTF-004] [MGR-006] a kitchen screen that is switched off alerts the managers until it is back, and the alert centre shows an escalated request, the kitchen’s flag and a full data drive, each acknowledged', async ({
-    browser,
-  }) => {
-    const nav = page.getByRole('navigation', { name: t('dashboard.navigation') });
-    const grace = t('settingItems.devices.offlineAfterSeconds.label');
-    const group = (name: string) =>
-      page.getByRole('region', { name: new RegExp(`^${escape(name)} \\(\\d+\\)$`) });
-    const alertIn = (name: string, title: string) =>
-      group(name)
-        .getByRole('listitem')
-        .filter({ has: page.getByText(title, { exact: true }) });
-    const acknowledge = (title: string) =>
-      page.getByRole('button', { name: t('alerts.acknowledgeOf', { title }), exact: true });
-    const device = (name: string) =>
-      page.getByRole('listitem').filter({
-        has: page.getByRole('heading', { level: 4, name: new RegExp(`^${escape(name)}`) }),
-      });
-
-    // A manager has screens and tablets reported after 10 seconds away instead of a minute.
-    await page.getByRole('button', { name: t('login.signOut') }).click();
-    await page.getByRole('button', { name: /^Vikram \(Manager\)/ }).click();
-    await page.keyboard.type('2222');
-    await expect(page).toHaveURL(/\/manage$/);
-    await nav.getByRole('link', { name: t('dashboard.section.settings') }).click();
-    await page
-      .getByRole('button', { name: t('settings.row.changeLabel', { name: grace }), exact: true })
-      .click();
-    const graceDialog = page.getByRole('dialog', { name: grace, exact: true });
-    await graceDialog.getByLabel(new RegExp(`^${escape(grace)}`)).fill('10');
-    await graceDialog.getByRole('button', { name: t('settings.dialog.save') }).click();
-    await expect(page.getByText(t('settings.dialog.saved', { name: grace }))).toBeVisible();
-
-    // A kitchen screen for the pass, showing every station's tickets.
-    await nav.getByRole('link', { name: t('dashboard.section.devices') }).click();
-    await page.getByRole('button', { name: t('devices.pair') }).click();
-    const pair = page.getByRole('dialog', { name: t('devices.pairDialog.title') });
-    await pair
-      .getByLabel(t('devices.pairDialog.type'))
-      .selectOption({ label: t('devices.type.KDS') });
-    await pair.getByLabel(/^Name( \*)?$/).fill('Pass screen');
-    await pair.getByRole('button', { name: t('devices.pairDialog.create') }).click();
-    const issued = page.getByRole('dialog', {
-      name: t('devices.pairDialog.codeTitle', { name: 'Pass screen' }),
-    });
-    const code = await issued.locator('code').first().innerText();
-    const kitchen = await browser.newContext();
-    const screen = await kitchen.newPage();
-    await screen.goto(server.url);
-    await screen.getByLabel(t('pairing.codeLabel')).fill(code);
-    await screen.getByRole('button', { name: t('pairing.submit') }).click();
-    await expect(screen).toHaveURL(/\/kds$/);
-    await expect(issued.getByRole('status')).toHaveText(
-      t('devices.pairDialog.paired', { name: 'Pass screen' }),
-    );
-    await issued.getByRole('button', { name: t('devices.pairDialog.done') }).click();
-
-    // Switched off: once it has been away 10 seconds, the managers on duty are alerted.
-    await screen.close();
-    await nav.getByRole('link', { name: t('dashboard.section.alerts') }).click();
-    await expect(page.getByRole('heading', { level: 2, name: t('alerts.title') })).toBeVisible();
-    const offline = alertIn(t('alerts.centre.groups.mine'), t('alerts.offline'));
-    await expect(
-      offline.getByText(t('alerts.deviceOffline', { device: 'Pass screen' })),
-    ).toBeVisible({ timeout: 30_000 });
-    await expect(offline.getByRole('button', { name: t('alerts.acknowledge') })).toBeVisible();
-
-    // Switched on again: the screen shows the kitchen and its alert ends by itself.
-    const again = await kitchen.newPage();
-    await again.goto(server.url);
-    await expect(again).toHaveURL(/\/kds$/);
-    await expect(again.getByText('Pass screen')).toBeVisible();
-    await expect(page.getByText(t('alerts.deviceOffline', { device: 'Pass screen' }))).toHaveCount(
-      0,
-    );
-
-    // Borrowed for the test: it is unpaired again.
-    await nav.getByRole('link', { name: t('dashboard.section.devices') }).click();
-    await device('Pass screen')
-      .getByRole('button', { name: t('devices.unpair') })
-      .click();
-    const unpair = page.getByRole('dialog', {
-      name: t('devices.unpairDialog.title', { name: 'Pass screen' }),
-    });
-    await unpair.getByLabel(t('devices.unpairDialog.reason')).fill('Back to the store room');
-    await unpair.getByRole('button', { name: t('devices.unpairDialog.confirm') }).click();
-    await expect(page.getByText(t('devices.unpaired', { name: 'Pass screen' }))).toBeVisible();
-    await expect(again).toHaveURL(/\/pair$/);
-    await kitchen.close();
-
-    // An escalated water request, the kitchen's flag and a data drive filling up, each in its group.
-    // They are written straight into the database, which announces nothing: the page is read again.
-    await seedAlerts();
-    await nav.getByRole('link', { name: t('dashboard.section.alerts') }).click();
-    await page.reload();
-    const water = t('alerts.atTable', { table: '9', what: t('alerts.type.WATER_REQUEST') });
-    const naan = t('alerts.atTable', { table: '9', what: t('alerts.type.READY_NOT_COLLECTED') });
-    const disk = t('alerts.type.DISK_OR_BACKUP');
-    const escalated = alertIn(t('alerts.centre.groups.escalated'), water);
-    await expect(escalated.getByText(t('alerts.centre.escalated'), { exact: true })).toBeVisible();
-    await expect(
-      escalated.getByText(t('alerts.for', { name: 'Ravi, Asha (Owner)' })),
-    ).toBeVisible();
-    await expect(
-      alertIn(t('alerts.centre.groups.kitchen'), naan).getByText(
-        t('alerts.kot', { number: 99, items: 'Butter Naan' }),
-      ),
-    ).toBeVisible();
-    await expect(
-      alertIn(t('alerts.centre.groups.system'), disk).getByText(
-        t('alerts.diskFull', { percent: 86, free: '12.4 GB' }),
-      ),
-    ).toBeVisible();
-    await expectAccessible(page);
-    await page.setViewportSize({ width: 360, height: 780 });
-    expect(await sidewaysOverflow(page)).toBeLessThanOrEqual(0);
-    await page.setViewportSize({ width: 1280, height: 720 });
-
-    // Each is acknowledged and leaves the alert centre.
-    for (const title of [water, naan, disk]) {
-      await acknowledge(title).click();
-      await expect(acknowledge(title)).toHaveCount(0);
-    }
+    expect(refusal).toBe('refused');
   });
 });

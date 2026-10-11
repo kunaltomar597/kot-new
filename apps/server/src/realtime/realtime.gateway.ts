@@ -1,5 +1,6 @@
 import { Server as HttpServer } from 'node:http';
 import { Server as HttpsServer } from 'node:https';
+import type { Socket as NetSocket } from 'node:net';
 import {
   Inject,
   Injectable,
@@ -21,18 +22,20 @@ import {
   RealtimeResyncRequest,
   type RealtimeSync,
 } from '@rp/contracts';
-import { businessDateOf } from '@rp/domain';
+import { businessDateOf, clientCompatibility, parseClientIdentity } from '@rp/domain';
 import { type Namespace, Server, type Socket } from 'socket.io';
 import { authErrors } from '../auth/auth-errors.js';
-import { permissionKey } from '../auth/custom-roles.js';
 import type { AuthenticatedDevice } from '../auth/device.js';
 import { DeviceTokenAuthenticator } from '../auth/device-token.authenticator.js';
 import type { Principal } from '../auth/principal.js';
+import { RateLimiter } from '../auth/rate-limiter.js';
+import { ThrottledLog } from '../common/flood-limits.js';
 import { SessionService } from '../auth/session.service.js';
 import { PrismaService } from '../database/prisma.service.js';
 import type { AppError } from '../errors/app-error.js';
 import { EventBus, type PublishedEvent } from '../events/event-bus.js';
-import { isLiveOnly, reaches, rooms, roomsForConnection, roomsForEvent } from './rooms.js';
+import { clientTooOld, SERVER_CLIENT_API } from '../http/client-version.js';
+import { reaches, rooms, roomsForConnection, roomsForEvent } from './rooms.js';
 
 export const REALTIME_OPTIONS = Symbol('REALTIME_OPTIONS');
 
@@ -47,6 +50,16 @@ export interface RealtimeOptions {
   readonly pingTimeoutMs: number;
   /** Resync requests allowed per connection per minute; more get a full-refresh answer. */
   readonly resyncsPerMinute: number;
+  /** Live connections of one device at once (PC-D3); more are refused until some close. */
+  readonly maxConnectionsPerDevice: number;
+  /** Handshakes of one device per minute (PC-D3): each may replay events under the publish lock. */
+  readonly handshakesPerMinutePerDevice: number;
+  /**
+   * Messages waiting for a connection that stopped reading (PC-D3): past this at two sweeps in a
+   * row with nothing sent to it in between, or past ten times this, the sweep cuts it off; the
+   * app reconnects and resyncs when it reads again.
+   */
+  readonly maxUnsentPerConnection: number;
 }
 
 export const DEFAULT_REALTIME_OPTIONS: RealtimeOptions = {
@@ -58,10 +71,24 @@ export const DEFAULT_REALTIME_OPTIONS: RealtimeOptions = {
   pingIntervalMs: 10_000,
   pingTimeoutMs: 10_000,
   resyncsPerMinute: 10,
+  // An app has one; a browser tab each; a few more while dead ones wait for the ping timeout.
+  maxConnectionsPerDevice: 16,
+  // An app reconnects at most every second or so, even on Wi-Fi that drops and comes back.
+  handshakesPerMinutePerDevice: 60,
+  // A reconnecting app's replay goes out in one flush; a reading app empties this at once.
+  maxUnsentPerConnection: 1_000,
 };
+
+/** Refusals of a device's connections are logged once a minute per device, with their count. */
+const REFUSAL_LOG_PERIOD_MS = 60_000;
 
 const REPLAY_BATCH = 500;
 const MAX_CLIENT_MESSAGE_BYTES = 16 * 1024;
+
+/** Bytes the operating system has taken from a connection (`bytesWritten` counts queued ones). */
+function bytesSent(tcp: NetSocket): number {
+  return tcp.bytesWritten - tcp.writableLength;
+}
 
 interface ServerToClient {
   [REALTIME_MESSAGES.event]: (message: RealtimeEvent) => void;
@@ -81,6 +108,12 @@ interface ConnectionData {
   rooms: readonly string[];
   resume: { lastSequence?: number | undefined; streamId?: string | undefined };
   resyncs: number[];
+  /** Messages made for the connection and not yet handed to its transport (PC-D3). */
+  unsent: number;
+  /** Bytes the operating system had taken from the connection at the last sweep. */
+  sent: number;
+  /** Sweeps in a row that found it over the limit with nothing sent since the one before. */
+  stalls: number;
 }
 
 type RealtimeServer = Server<ClientToServer, ServerToClient, Record<string, never>, ConnectionData>;
@@ -91,9 +124,6 @@ type RealtimeNamespace = Namespace<
   ConnectionData
 >;
 type RealtimeSocket = Socket<ClientToServer, ServerToClient, Record<string, never>, ConnectionData>;
-
-/** Told when a device's live connection opens, and when its last one closes (P4-04a). */
-export type ConnectionListener = (device: AuthenticatedDevice, connected: boolean) => void;
 
 /** A refused handshake; the client's `connect_error` carries `message` = code and `data`. */
 class ConnectRefusal extends Error {
@@ -124,8 +154,22 @@ export class RealtimeGateway implements OnApplicationBootstrap, OnModuleDestroy 
   private namespace: RealtimeNamespace | undefined;
   private unsubscribe: (() => void) | undefined;
   private readonly timers: NodeJS.Timeout[] = [];
-  private readonly connectionListeners = new Set<ConnectionListener>();
   private sweeping: Promise<void> | undefined;
+  /** Each device's live connections, and its handshakes in progress (PC-D3). */
+  private readonly liveByDevice = new Map<string, number>();
+  private readonly admittingByDevice = new Map<string, number>();
+  private readonly handshakes = new RateLimiter();
+  private readonly refusals = new ThrottledLog(
+    REFUSAL_LOG_PERIOD_MS,
+    (key, count) => {
+      const [reason, deviceId] = key.split('|') as [string, string];
+      this.logger.warn(
+        { reason, deviceId, count },
+        'Refused or closed a device’s live connections',
+      );
+    },
+    () => performance.now(),
+  );
 
   constructor(
     private readonly adapterHost: HttpAdapterHost,
@@ -196,15 +240,14 @@ export class RealtimeGateway implements OnApplicationBootstrap, OnModuleDestroy 
     io?.engine.close();
   }
 
-  /**
-   * Tells `listener` when a device connects and when its last live connection closes, so a
-   * screen's or tablet's absence can be noticed (P4-04a, NTF-003). Returns the way to stop.
-   */
-  onConnectionChange(listener: ConnectionListener): () => void {
-    this.connectionListeners.add(listener);
-    return () => {
-      this.connectionListeners.delete(listener);
-    };
+  /** Devices of the restaurant with at least one live connection now (MGR-006). */
+  connectedDeviceIds(restaurantId: string): ReadonlySet<string> {
+    const ids = new Set<string>();
+    for (const socket of this.namespace?.sockets.values() ?? []) {
+      const { device } = socket.data;
+      if (device.restaurantId === restaurantId) ids.add(device.deviceId);
+    }
+    return ids;
   }
 
   /**
@@ -239,39 +282,86 @@ export class RealtimeGateway implements OnApplicationBootstrap, OnModuleDestroy 
         'Connect with the device token in the connection auth.',
       );
     }
-    const device = await this.devices.authenticateToken(handshake.data.deviceToken);
-    if (device === undefined) throw ConnectRefusal.from(authErrors.deviceNotRecognised());
-    if (device.type === 'PAGER') {
+    // N-1 (UPD-006): an app older than the server serves is told to update, as over REST.
+    const client = parseClientIdentity(handshake.data.client);
+    if (client !== undefined && clientCompatibility(SERVER_CLIENT_API, client.api) === 'TOO_OLD') {
+      throw ConnectRefusal.from(clientTooOld(client));
+    }
+    let reserved: string | undefined;
+    try {
+      const device = await this.devices.authenticateToken(
+        handshake.data.deviceToken,
+        ({ deviceId }) => {
+          // Before the database is asked: a device's handshakes and connections are limited.
+          this.reserve(deviceId);
+          reserved = deviceId;
+        },
+      );
+      if (device === undefined) throw ConnectRefusal.from(authErrors.deviceNotRecognised());
+      if (device.type === 'PAGER') {
+        throw new ConnectRefusal(
+          REALTIME_CONNECT_ERRORS.deviceNotAllowed,
+          'Pagers receive their alerts over MQTT, not this connection.',
+        );
+      }
+      // Always checked; without a token it simply fails and the device connects on its own
+      // (CWE-807). A token that is sent must be valid.
+      const accessToken = handshake.data.accessToken ?? '';
+      // A (re)connection is the app's doing, not the person's: it keeps no idle session alive.
+      const session = await this.sessions.authenticate(
+        accessToken,
+        device,
+        Number.POSITIVE_INFINITY,
+      );
+      let principal: Principal | undefined;
+      if ('principal' in session) principal = session.principal;
+      else if (accessToken !== '') throw ConnectRefusal.from(session.failure);
+
+      socket.data = {
+        device,
+        principal,
+        rooms: roomsForConnection({
+          device,
+          ...(principal !== undefined && {
+            person: { staffId: principal.staffId, role: principal.role },
+            sectionIds: await this.sectionsOf(principal),
+          }),
+        }),
+        resume: { lastSequence: handshake.data.lastSequence, streamId: handshake.data.streamId },
+        resyncs: [],
+        unsent: 0,
+        sent: 0,
+        stalls: 0,
+      };
+    } finally {
+      if (reserved !== undefined) this.release(this.admittingByDevice, reserved);
+    }
+  }
+
+  /**
+   * Counts a handshake of the device, or refuses it (PC-D3): too many live connections now (the
+   * ones in progress included), or too many handshakes in the last minute.
+   */
+  private reserve(deviceId: string): void {
+    const now =
+      (this.liveByDevice.get(deviceId) ?? 0) + (this.admittingByDevice.get(deviceId) ?? 0);
+    if (
+      now >= this.options.maxConnectionsPerDevice ||
+      !this.handshakes.attempt(deviceId, this.options.handshakesPerMinutePerDevice, 60_000)
+    ) {
+      this.refusals.note(`too-many-connections|${deviceId}`);
       throw new ConnectRefusal(
-        REALTIME_CONNECT_ERRORS.deviceNotAllowed,
-        'Pagers receive their alerts over MQTT, not this connection.',
+        REALTIME_CONNECT_ERRORS.tooManyConnections,
+        'This device has too many live connections. The app will retry.',
       );
     }
-    // Always checked; without a token it simply fails and the device connects on its own
-    // (CWE-807). A token that is sent must be valid.
-    const accessToken = handshake.data.accessToken ?? '';
-    const session = await this.sessions.authenticate(accessToken, device);
-    let principal: Principal | undefined;
-    if ('principal' in session) principal = session.principal;
-    else if (accessToken !== '') throw ConnectRefusal.from(session.failure);
+    this.admittingByDevice.set(deviceId, (this.admittingByDevice.get(deviceId) ?? 0) + 1);
+  }
 
-    socket.data = {
-      device,
-      principal,
-      rooms: roomsForConnection({
-        device,
-        ...(principal !== undefined && {
-          person: {
-            staffId: principal.staffId,
-            role: principal.role,
-            customRole: principal.customRole ?? null,
-          },
-          sectionIds: await this.sectionsOf(principal),
-        }),
-      }),
-      resume: { lastSequence: handshake.data.lastSequence, streamId: handshake.data.streamId },
-      resyncs: [],
-    };
+  private release(counts: Map<string, number>, deviceId: string): void {
+    const left = (counts.get(deviceId) ?? 1) - 1;
+    if (left <= 0) counts.delete(deviceId);
+    else counts.set(deviceId, left);
   }
 
   private refusal(error: unknown): ConnectRefusal {
@@ -310,16 +400,21 @@ export class RealtimeGateway implements OnApplicationBootstrap, OnModuleDestroy 
    * is being published, so it neither misses nor reorders an event.
    */
   private async start(socket: RealtimeSocket): Promise<void> {
+    const { deviceId } = socket.data.device;
+    this.liveByDevice.set(deviceId, (this.liveByDevice.get(deviceId) ?? 0) + 1);
+    socket.once('disconnect', () => {
+      this.release(this.liveByDevice, deviceId);
+    });
+    // Engine.io holds messages back while the transport is still writing earlier ones; a
+    // connection that stops reading makes them pile up here (PC-D3).
+    socket.conn.on('packetCreate', () => {
+      socket.data.unsent += 1;
+    });
+    socket.conn.on('flush', (written: readonly unknown[]) => {
+      socket.data.unsent -= written.length;
+    });
     socket.on(REALTIME_MESSAGES.resync, (request: unknown, ack: unknown) => {
       void this.resync(socket, request, ack);
-    });
-    socket.on('disconnect', () => {
-      const { device } = socket.data;
-      this.seen(device);
-      // Socket.io has taken it out of its rooms by now: another tab may still hold the device.
-      if (!this.isDeviceConnected(device.restaurantId, device.deviceId)) {
-        this.connectionChanged(device, false);
-      }
     });
     try {
       await this.bus.withPublishLock(async () => {
@@ -328,39 +423,11 @@ export class RealtimeGateway implements OnApplicationBootstrap, OnModuleDestroy 
         await socket.join([...socket.data.rooms]);
         socket.emit(REALTIME_MESSAGES.sync, sync);
       });
-      if (socket.connected) this.connectionChanged(socket.data.device, true);
     } catch (error) {
       this.logger.error({ err: error }, 'Could not start a live connection');
       // Transport-level close: the client reconnects and tries again.
       socket.conn.close();
     }
-  }
-
-  private connectionChanged(device: AuthenticatedDevice, connected: boolean): void {
-    for (const listener of this.connectionListeners) {
-      try {
-        listener(device, connected);
-      } catch (error) {
-        this.logger.error({ err: error }, 'A connection listener failed');
-      }
-    }
-  }
-
-  /**
-   * When an app or screen was last connected (MGR-006 "last seen"): the handshake and its requests
-   * record it (`DeviceTokenAuthenticator`), and this records when it left, so a screen that was
-   * connected all day is not shown as last seen in the morning. While connected, the device list
-   * says so instead.
-   */
-  private seen(device: AuthenticatedDevice): void {
-    this.prisma.device
-      .updateMany({
-        where: { id: device.deviceId, status: 'ACTIVE' },
-        data: { lastSeenAt: new Date() },
-      })
-      .catch((error: unknown) => {
-        this.logger.warn({ err: error }, 'Could not record when a device was last seen');
-      });
   }
 
   private async resync(socket: RealtimeSocket, request: unknown, ack: unknown): Promise<void> {
@@ -414,7 +481,7 @@ export class RealtimeGateway implements OnApplicationBootstrap, OnModuleDestroy 
         limit: REPLAY_BATCH,
       });
       for (const { sequence, event, audience } of events) {
-        if (isLiveOnly(event) || !reaches(roomsForEvent(event, audience), joined)) continue;
+        if (!reaches(roomsForEvent(event, audience), joined)) continue;
         socket.emit(REALTIME_MESSAGES.event, { sequence, event });
         replayed += 1;
       }
@@ -434,11 +501,6 @@ export class RealtimeGateway implements OnApplicationBootstrap, OnModuleDestroy 
     return [rooms.staff(restaurantId, staffId), rooms.alerts(restaurantId, staffId)].some(
       (name) => (joined?.get(name)?.size ?? 0) > 0,
     );
-  }
-
-  /** Whether the device has a live connection now (MGR-006: shown as connected, can be located). */
-  isDeviceConnected(restaurantId: string, deviceId: string): boolean {
-    return (this.namespace?.adapter.rooms.get(rooms.device(restaurantId, deviceId))?.size ?? 0) > 0;
   }
 
   /** Live listener: each published event goes to its rooms (ORD-010). */
@@ -480,7 +542,7 @@ export class RealtimeGateway implements OnApplicationBootstrap, OnModuleDestroy 
   private async checkConnections(): Promise<void> {
     const namespace = this.namespace;
     if (namespace === undefined) return;
-    const sockets = [...namespace.sockets.values()];
+    const sockets = [...namespace.sockets.values()].filter((socket) => this.reading(socket));
     if (sockets.length === 0) return;
     try {
       // Sessions first, devices second: unpairing revokes the device and its sessions in one
@@ -504,10 +566,7 @@ export class RealtimeGateway implements OnApplicationBootstrap, OnModuleDestroy 
         const row = deviceById.get(device.deviceId);
         if (row?.status !== 'ACTIVE') {
           this.end(socket, 'DEVICE_REVOKED');
-        } else if (
-          principal !== undefined &&
-          live.get(principal.sessionId) !== permissionKey(principal)
-        ) {
+        } else if (principal !== undefined && live.get(principal.sessionId) !== principal.role) {
           // Before a binding change: signing out on a waiter phone also ends its alerts (P2-06a),
           // and the app must hear that the person is signed out.
           this.end(socket, 'SESSION_ENDED');
@@ -534,15 +593,42 @@ export class RealtimeGateway implements OnApplicationBootstrap, OnModuleDestroy 
         for (const { socket, principal } of recheck) {
           this.end(
             socket,
-            again.get(principal.sessionId) === permissionKey(principal)
-              ? 'DEVICE_CHANGED'
-              : 'SESSION_ENDED',
+            again.get(principal.sessionId) === principal.role ? 'DEVICE_CHANGED' : 'SESSION_ENDED',
           );
         }
       }
     } catch (error) {
       this.logger.warn({ err: error }, 'Could not re-check live connections; will retry');
     }
+  }
+
+  /**
+   * Whether the connection still reads what it is sent; one that stopped while messages piled up
+   * is cut off (PC-D3): many waiting and nothing sent to it for two sweeps, or far too many. A
+   * paired device that stops reading but answers pings would otherwise keep the server buffering
+   * for it all day. Its TCP connection is destroyed: closing it politely would wait for those
+   * messages to go out first, which they never do.
+   */
+  private reading(socket: RealtimeSocket): boolean {
+    const { unsent } = socket.data;
+    const sent = bytesSent(socket.request.socket);
+    const moved = sent !== socket.data.sent;
+    socket.data.sent = sent;
+    const limit = this.options.maxUnsentPerConnection;
+    // A reading app may have many waiting just after a burst of events, while engine.io holds
+    // them back until the previous flush is all written (megabytes after a replay, read at the
+    // app's pace), so progress is what the operating system took, not whole flushes. Two sweeps,
+    // as one can come straight after this PC was too busy to write to anyone.
+    socket.data.stalls = unsent > limit && !moved ? socket.data.stalls + 1 : 0;
+    if (unsent <= limit * 10 && socket.data.stalls < 2) return true;
+    this.refusals.note(`stopped-reading|${socket.data.device.deviceId}`);
+    socket.request.socket.destroy();
+    return false;
+  }
+
+  /** A device's binding changed (its stations, say): its connections reconnect to new rooms. */
+  reconnectDevice(restaurantId: string, deviceId: string): void {
+    this.endRoom(rooms.device(restaurantId, deviceId), 'DEVICE_CHANGED');
   }
 
   private end(socket: RealtimeSocket, reason: RealtimeEndReason): void {

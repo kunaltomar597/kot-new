@@ -1,13 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import {
+  actorGrant,
   CAPABILITIES,
   canApproveOverride,
   checkCustomRole,
+  CUSTOM_ROLE_GRANTABLE,
   DEFAULT_PERMISSION_MATRIX,
   evaluatePermission,
+  extraCapabilitiesOf,
   grantFor,
-  grantOf,
-  OWNER_ONLY_CAPABILITIES,
+  OVERRIDE_RECORD_TYPES,
   OWNER_SECOND_FACTOR_CAPABILITIES,
   ROLES,
 } from '../src/index.js';
@@ -87,59 +89,86 @@ describe('[AUTH-011] permission evaluation', () => {
     expect(canApproveOverride('OWNER')).toBe(true);
     expect(canApproveOverride('WAITER')).toBe(false);
   });
+
+  it('[PC-T2] names the kind of record every approvable action is about', () => {
+    const approvable = CAPABILITIES.filter((capability) =>
+      ROLES.some((role) => grantFor(role, capability) === 'OVERRIDE'),
+    );
+    expect(Object.keys(OVERRIDE_RECORD_TYPES).sort()).toEqual([...approvable].sort());
+    expect(OVERRIDE_RECORD_TYPES.ITEM_VOID_AFTER_PREP).toBe('order_item');
+    expect(OVERRIDE_RECORD_TYPES.INVOICE_VOID).toBe('invoice');
+  });
 });
 
 describe('[AUTH-012] custom roles', () => {
-  const captain = {
-    role: 'WAITER' as const,
-    customRole: {
-      added: ['BILL_PRINT_AND_PAYMENT', 'ORDER_APPROVE_CUSTOMER'] as const,
-      removed: ['ITEM_CANCEL_BEFORE_PREP'] as const,
-    },
-  };
-
-  it('adds capabilities outright, takes others away and leaves the rest to the base role', () => {
-    expect(grantOf(captain, 'BILL_PRINT_AND_PAYMENT')).toBe('ALLOW');
-    // A waiter approves orders for their own tables only; the captain approves them for any.
-    expect(grantOf(captain, 'ORDER_APPROVE_CUSTOMER')).toBe('ALLOW');
-    expect(grantOf(captain, 'ITEM_CANCEL_BEFORE_PREP')).toBe('DENY');
-    expect(grantOf(captain, 'ITEM_VOID_AFTER_PREP')).toBe('OVERRIDE');
-    expect(grantOf(captain, 'MENU_MANAGE')).toBe('DENY');
-    expect(grantOf({ role: 'CASHIER' }, 'INVOICE_VOID')).toBe('OVERRIDE');
-    expect(grantOf({ role: 'CASHIER', customRole: null }, 'INVOICE_VOID')).toBe('OVERRIDE');
-  });
-
-  it('keeps tax and invoice settings, data administration and the licence to the Owner', () => {
-    expect([...OWNER_ONLY_CAPABILITIES].sort()).toEqual([
+  it('may add what a manager does, never managing staff or the Owner-only actions', () => {
+    expect(CUSTOM_ROLE_GRANTABLE).toContain('REPORTS_VIEW_EXPORT');
+    expect(CUSTOM_ROLE_GRANTABLE).toContain('DISCOUNT_ABOVE_LIMIT');
+    expect(CUSTOM_ROLE_GRANTABLE).toContain('MENU_MANAGE');
+    for (const never of [
+      'STAFF_MANAGE',
+      'TAX_AND_INVOICE_SETTINGS',
       'DATA_ADMIN',
       'LICENSE_MANAGE',
-      'TAX_AND_INVOICE_SETTINGS',
-    ]);
-    expect(
-      checkCustomRole('MANAGER', { added: ['TAX_AND_INVOICE_SETTINGS'], removed: [] }),
-    ).toEqual([{ capability: 'TAX_AND_INVOICE_SETTINGS', problem: 'OWNER_ONLY' }]);
+    ]) {
+      expect(CUSTOM_ROLE_GRANTABLE).not.toContain(never);
+    }
   });
 
-  it('accepts anything a manager may do, and taking away anything the base role may do', () => {
-    expect(checkCustomRole('WAITER', captain.customRole)).toEqual([]);
+  it('adds grants on top of the base role, and nothing else', () => {
+    const captain = {
+      role: 'WAITER' as const,
+      extraCapabilities: ['ORDER_APPROVE_CUSTOMER' as const, 'DISCOUNT_WITHIN_LIMIT' as const],
+    };
+    expect(actorGrant(captain, 'ORDER_APPROVE_CUSTOMER')).toBe('ALLOW');
+    expect(actorGrant(captain, 'DISCOUNT_WITHIN_LIMIT')).toBe('ALLOW');
+    expect(actorGrant(captain, 'BILL_PRINT_AND_PAYMENT')).toBe('DENY');
+    expect(actorGrant({ role: 'WAITER' }, 'ORDER_APPROVE_CUSTOMER')).toBe('OWN');
+    // A stored capability that may not be granted is ignored.
     expect(
-      checkCustomRole('CASHIER', { added: ['STAFF_MANAGE', 'DAY_END_CLOSE'], removed: [] }),
-    ).toEqual([]);
-    expect(checkCustomRole('MANAGER', { added: [], removed: ['DAY_END_CLOSE'] })).toEqual([]);
-  });
-
-  it('refuses changes that change nothing, contradict each other or repeat', () => {
+      actorGrant({ role: 'WAITER', extraCapabilities: ['STAFF_MANAGE'] }, 'STAFF_MANAGE'),
+    ).toBe('DENY');
     expect(
-      checkCustomRole('WAITER', {
-        added: ['ORDER_CREATE', 'MENU_MANAGE', 'MENU_MANAGE'],
-        removed: ['DAY_END_CLOSE', 'MENU_MANAGE', 'BILL_REQUEST', 'BILL_REQUEST'],
+      evaluatePermission('CASHIER', 'ITEM_VOID_AFTER_PREP', {
+        extraCapabilities: ['ITEM_VOID_AFTER_PREP'],
       }),
-    ).toEqual([
-      { capability: 'ORDER_CREATE', problem: 'ALREADY_ALLOWED' },
-      { capability: 'MENU_MANAGE', problem: 'REPEATED' },
-      { capability: 'DAY_END_CLOSE', problem: 'NOT_GRANTED' },
-      { capability: 'MENU_MANAGE', problem: 'BOTH' },
-      { capability: 'BILL_REQUEST', problem: 'REPEATED' },
+    ).toEqual({ allowed: true, viaOverride: false });
+    expect(evaluatePermission('CASHIER', 'ITEM_VOID_AFTER_PREP')).toEqual({
+      allowed: false,
+      reason: 'NEEDS_OVERRIDE',
+    });
+  });
+
+  it('keeps only what really adds to the base role', () => {
+    expect(
+      extraCapabilitiesOf('WAITER', [
+        'REPORTS_VIEW_EXPORT',
+        'ORDER_CREATE',
+        'STAFF_MANAGE',
+        'NOT_A_CAPABILITY',
+        'REPORTS_VIEW_EXPORT',
+        'ORDER_APPROVE_CUSTOMER',
+      ]),
+    ).toEqual(['ORDER_APPROVE_CUSTOMER', 'REPORTS_VIEW_EXPORT']);
+  });
+
+  it('checks the name, base role and capabilities', () => {
+    const draft = {
+      name: 'Senior captain',
+      baseRole: 'WAITER' as const,
+      capabilities: ['DISCOUNT_WITHIN_LIMIT'],
+    };
+    expect(checkCustomRole(draft, ['Manager', 'Head chef'])).toEqual([]);
+    expect(checkCustomRole({ ...draft, name: ' senior CAPTAIN ' }, ['Senior captain'])).toEqual([
+      'NAME_TAKEN',
+    ]);
+    expect(checkCustomRole({ ...draft, name: ' ' }, [])).toEqual(['NAME_REQUIRED']);
+    expect(checkCustomRole({ ...draft, baseRole: 'MANAGER' }, [])).toEqual(['BASE_ROLE_INVALID']);
+    expect(checkCustomRole({ ...draft, capabilities: ['DATA_ADMIN'] }, [])).toEqual([
+      'CAPABILITY_NOT_GRANTABLE',
+    ]);
+    expect(checkCustomRole({ ...draft, capabilities: ['ORDER_CREATE'] }, [])).toEqual([
+      'NOTHING_ADDED',
     ]);
   });
 });

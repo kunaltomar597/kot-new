@@ -3,590 +3,597 @@ import {
   type CategoryView,
   type ComboRequest,
   type ComboView,
-  ItemAvailabilityRequest,
-  ItemRequest,
+  type ItemRequest,
   type ItemView,
   type MenuDraftResponse,
   type ModifierGroupRequest,
   type ModifierGroupView,
-  PHOTO_MAX_BYTES,
+  SalesChannel,
 } from '@rp/contracts';
-import { canonicalJson, parseRupees } from '@rp/domain';
-import { inputFromPaise } from '../../billing/money-input.js';
+import { formatRupees, parseRupees } from '@rp/domain';
 
 /**
- * The menu editor's logic (P4-02d, MGR-005, MENU-001 to MENU-011), without React: the category
- * tree, the item list and its search, and the forms for items, combos, modifier groups,
- * categories and availability, with the same checks as the contracts so the server rarely has
- * to refuse anything.
+ * The menu editor (P4-02d, MGR-005, MENU-001 to MENU-011): forms that mirror the server's checks,
+ * so a manager hears about a mistake before saving, and the list's filters. Prices are typed in
+ * rupees and sent as integer paise (BRD §9.4).
  */
 
-export type FoodType = ItemView['foodType'];
-export type SalesChannel = ItemView['channels'][number];
+export const SALES_CHANNELS = SalesChannel.options;
+export const FOOD_TYPES = ['VEG', 'NON_VEG', 'EGG'] as const;
+/** Spice levels 0 to 3 by name (MENU-002). */
+export const SPICE_LEVELS = ['none', 'mild', 'medium', 'hot'] as const;
 
-export const SALES_CHANNELS: readonly SalesChannel[] = ['POS', 'WAITER_APP', 'TABLE_TABLET', 'QR'];
-export const FOOD_TYPES: readonly FoodType[] = ['VEG', 'NON_VEG', 'EGG'];
-export const SPICE_LEVELS = [0, 1, 2, 3] as const;
-/** The words for each spice level (MENU-002: 0 to 3). */
-export const SPICE_LABELS = [
-  'menuEditor.editor.spice.level0',
-  'menuEditor.editor.spice.level1',
-  'menuEditor.editor.spice.level2',
-  'menuEditor.editor.spice.level3',
-] as const;
-
-/** The largest price the contracts accept: ₹1,00,000. */
-const MAX_PRICE = 10_000_000;
-const MAX_ORDER = 9_999;
-
-let lastKey = 0;
-/** A key for a row typed in a form (a size, an option, a combo part) until the server names it. */
+let keys = 0;
+/** A stable key for a new row in a form (a variant, an option, a combo part). */
 export function newKey(): string {
-  lastKey += 1;
-  return `new-${String(lastKey)}`;
+  keys += 1;
+  return `new-${String(keys)}`;
 }
 
-const isActive = (entry: { readonly archivedAt: string | null }) => entry.archivedAt === null;
-
-/** A whole number typed in a field, within bounds; undefined otherwise. */
-function wholeNumber(text: string, min: number, max: number): number | undefined {
-  const trimmed = text.trim();
-  if (!/^\d+$/.test(trimmed)) return undefined;
-  const value = Number(trimmed);
-  return value >= min && value <= max ? value : undefined;
-}
-
-/** Rupees typed in a field as paise (BRD §9.4), zero allowed; undefined when not an amount. */
-export function pricePaise(text: string, options: { negative?: boolean } = {}): number | undefined {
-  if (text.trim() === '') return undefined;
+/** Paise from what was typed, or undefined when it is not an amount. */
+export function paiseOf(text: string, allowNegative = false): number | undefined {
   try {
-    const paise = parseRupees(text, { allowNegative: options.negative === true });
-    return Math.abs(paise) <= MAX_PRICE ? paise : undefined;
+    return parseRupees(text, { allowNegative });
   } catch {
     return undefined;
   }
 }
 
-/** A price change as typed back: "20.00", "-10.00", "0". */
-export function signedInputFromPaise(paise: number): string {
-  if (paise === 0) return '0';
-  return paise < 0 ? `-${inputFromPaise(-paise)}` : inputFromPaise(paise);
+/** Paise as a manager types them: "120.50", no symbol or grouping. */
+export function rupeesText(paise: number): string {
+  return formatRupees(paise, { symbol: false }).replace(/,/g, '');
 }
 
-/** Words separated by commas, trimmed, empty ones dropped. */
-export function listOf(text: string): string[] {
-  return text
-    .split(',')
-    .map((word) => word.trim())
-    .filter((word) => word !== '');
+/** "a, b , c" as a list, without blanks or repeats (case-insensitive). */
+export function splitList(text: string): string[] {
+  const seen = new Set<string>();
+  const result: string[] = [];
+  for (const part of text.split(',')) {
+    const value = part.trim();
+    if (value === '' || seen.has(value.toLowerCase())) continue;
+    seen.add(value.toLowerCase());
+    result.push(value);
+  }
+  return result;
 }
 
-function repeats(values: readonly string[]): boolean {
-  const lower = values.map((value) => value.toLowerCase());
-  return new Set(lower).size !== lower.length;
-}
+// ---------------------------------------------------------------- categories
 
-// ---------------------------------------------------------------- categories (MENU-001)
-
-export interface CategoryNode {
+export interface CategoryRow {
   readonly category: CategoryView;
-  readonly children: readonly CategoryView[];
+  /** 0 for a top-level category, 1 for a sub-category (MENU-001). */
+  readonly depth: 0 | 1;
 }
 
-/**
- * Top-level categories in menu order, each with its sub-categories (MENU-001). Archived ones only
- * when asked for. A sub-category whose parent is not shown stands at the top level.
- */
-export function categoryTree(
-  categories: readonly CategoryView[],
-  options: { readonly archived: boolean },
-): CategoryNode[] {
-  const shown = categories.filter((category) => options.archived || isActive(category));
-  const shownIds = new Set(shown.map((category) => category.id));
-  const isRoot = (category: CategoryView) =>
-    category.parentId === null || !shownIds.has(category.parentId);
-  return shown.filter(isRoot).map((category) => ({
-    category,
-    children: shown.filter((child) => child.parentId === category.id && !isRoot(child)),
-  }));
-}
+const byOrder = (a: CategoryView, b: CategoryView) =>
+  a.displayOrder - b.displayOrder || a.name.localeCompare(b.name);
 
-/** Where an item can go: every active category, sub-categories after their parent. */
-export function categoryChoices(
+/** Categories in menu order, each sub-category under its parent. */
+export function categoryRows(
   categories: readonly CategoryView[],
-): { readonly category: CategoryView; readonly parent: CategoryView | null }[] {
-  return categoryTree(categories, { archived: false }).flatMap((node) => [
-    { category: node.category, parent: null },
-    ...node.children.map((child) => ({ category: child, parent: node.category })),
-  ]);
-}
-
-/**
- * Where a category can go (MENU-001: one level of sub-categories): under an active top-level
- * category other than itself, unless it has sub-categories of its own.
- */
-export function parentChoices(
-  categories: readonly CategoryView[],
-  selfId: string | undefined,
-): CategoryView[] {
-  if (selfId !== undefined && hasSubcategories(categories, selfId)) return [];
-  return categories.filter(
-    (category) => isActive(category) && category.parentId === null && category.id !== selfId,
+  options: { readonly archived?: boolean } = {},
+): CategoryRow[] {
+  const shown = categories.filter(
+    (category) => options.archived === true || category.archivedAt === null,
   );
+  const rows: CategoryRow[] = [];
+  for (const parent of shown.filter((category) => category.parentId === null).sort(byOrder)) {
+    rows.push({ category: parent, depth: 0 });
+    for (const child of shown.filter((category) => category.parentId === parent.id).sort(byOrder)) {
+      rows.push({ category: child, depth: 1 });
+    }
+  }
+  // A sub-category whose parent is hidden still shows, at the end.
+  const listed = new Set(rows.map((row) => row.category.id));
+  for (const orphan of shown.filter((category) => !listed.has(category.id)).sort(byOrder)) {
+    rows.push({ category: orphan, depth: 1 });
+  }
+  return rows;
 }
 
-export function hasSubcategories(categories: readonly CategoryView[], id: string): boolean {
-  return categories.some((category) => category.parentId === id && isActive(category));
-}
-
-/** Active items in a category (archiving needs it empty). */
-export function itemsIn(items: readonly ItemView[], categoryId: string): number {
-  return items.filter((item) => item.categoryId === categoryId && isActive(item)).length;
-}
-
-/** After the last of its neighbours, so a new entry goes to the end unless placed. */
-function nextOrder(orders: readonly number[]): number {
-  return Math.min(MAX_ORDER, orders.length === 0 ? 0 : Math.max(...orders) + 1);
+/** "Mains › Curries" for a sub-category, "Mains" for a top-level one. */
+export function categoryPath(categories: readonly CategoryView[], id: string): string {
+  const category = categories.find((entry) => entry.id === id);
+  if (category === undefined) return '';
+  const parent =
+    category.parentId === null
+      ? undefined
+      : categories.find((entry) => entry.id === category.parentId);
+  return parent === undefined ? category.name : `${parent.name} › ${category.name}`;
 }
 
 export interface CategoryForm {
   readonly name: string;
   /** Empty for a top-level category. */
   readonly parentId: string;
-  /** Empty puts it last among its neighbours. */
   readonly displayOrder: string;
 }
 
-export type CategoryField = 'name' | 'displayOrder';
-export type CategoryProblem = 'nameProblem' | 'displayOrderProblem';
+export type CategoryProblem = 'nameRequired' | 'orderInvalid' | 'parentIsChild';
 
-export function emptyCategoryForm(): CategoryForm {
-  return { name: '', parentId: '', displayOrder: '' };
-}
-
-export function categoryFormOf(category: CategoryView): CategoryForm {
+export function categoryFormOf(category?: CategoryView, nextOrder = 0): CategoryForm {
   return {
-    name: category.name,
-    parentId: category.parentId ?? '',
-    displayOrder: String(category.displayOrder),
+    name: category?.name ?? '',
+    parentId: category?.parentId ?? '',
+    displayOrder: String(category?.displayOrder ?? nextOrder),
   };
 }
 
-export function checkCategory(form: CategoryForm): Partial<Record<CategoryField, CategoryProblem>> {
-  const problems: Partial<Record<CategoryField, CategoryProblem>> = {};
-  const name = form.name.trim();
-  if (name === '' || name.length > 60) problems.name = 'nameProblem';
-  if (
-    form.displayOrder.trim() !== '' &&
-    wholeNumber(form.displayOrder, 0, MAX_ORDER) === undefined
-  ) {
-    problems.displayOrder = 'displayOrderProblem';
-  }
+/** Parents a category may have: active top-level categories other than itself (one level). */
+export function parentChoices(categories: readonly CategoryView[], self?: CategoryView) {
+  const hasChildren =
+    self !== undefined && categories.some((category) => category.parentId === self.id);
+  if (hasChildren) return [];
+  return categories
+    .filter(
+      (category) =>
+        category.archivedAt === null && category.parentId === null && category.id !== self?.id,
+    )
+    .sort(byOrder)
+    .map((category) => ({ value: category.id, label: category.name }));
+}
+
+export function checkCategory(
+  form: CategoryForm,
+): Partial<Record<'name' | 'displayOrder', CategoryProblem>> {
+  const problems: Partial<Record<'name' | 'displayOrder', CategoryProblem>> = {};
+  if (form.name.trim() === '' || form.name.trim().length > 60) problems.name = 'nameRequired';
+  if (!isOrder(form.displayOrder)) problems.displayOrder = 'orderInvalid';
   return problems;
 }
 
-export function categoryRequestOf(
-  form: CategoryForm,
-  categories: readonly CategoryView[],
-  selfId: string | undefined,
-): CategoryRequest {
-  const parentId = form.parentId === '' ? null : form.parentId;
-  const neighbours = categories.filter(
-    (category) => isActive(category) && category.parentId === parentId && category.id !== selfId,
-  );
+export function categoryRequestOf(form: CategoryForm): CategoryRequest {
   return {
     name: form.name.trim(),
-    parentId,
-    displayOrder:
-      wholeNumber(form.displayOrder, 0, MAX_ORDER) ??
-      nextOrder(neighbours.map((category) => category.displayOrder)),
+    parentId: form.parentId === '' ? null : form.parentId,
+    displayOrder: Number(form.displayOrder),
   };
 }
 
-// ---------------------------------------------------------------- the item list
-
-/** Archived items and categories only when asked for; a search looks at every item shown. */
-export interface ItemFilter {
-  readonly query: string;
-  readonly archived: boolean;
+function isOrder(text: string): boolean {
+  return /^\d{1,4}$/.test(text.trim());
 }
 
-export interface ItemGroup {
-  readonly category: CategoryView;
-  /** The top-level category of a sub-category. */
-  readonly parent: CategoryView | null;
-  readonly items: readonly ItemView[];
+/** The next display order after the largest used, in steps of 10 so others fit between. */
+export function nextOrder(orders: readonly number[]): number {
+  return Math.min(9_990, orders.reduce((max, order) => Math.max(max, order), -10) + 10);
 }
 
-/** An item matches a search by name, short code, tag or search word (MENU-011). */
-export function matchesQuery(item: ItemView, query: string): boolean {
-  const wanted = query.trim().toLowerCase();
-  if (wanted === '') return true;
-  return [item.name, item.shortCode ?? '', ...item.tags, ...item.synonyms].some((text) =>
-    text.toLowerCase().includes(wanted),
-  );
-}
+// ---------------------------------------------------------------- items
 
-/**
- * The items in menu order, grouped by category (top-level, then its sub-categories). Without a
- * search every shown category is listed, empty or not; with one, only those with a match.
- */
-export function itemGroups(
-  draft: Pick<MenuDraftResponse, 'categories' | 'items'>,
-  filter: ItemFilter,
-): ItemGroup[] {
-  const searching = filter.query.trim() !== '';
-  const shown = draft.items.filter(
-    (item) => (filter.archived || isActive(item)) && matchesQuery(item, filter.query),
-  );
-  const groupOf = (category: CategoryView, parent: CategoryView | null): ItemGroup => ({
-    category,
-    parent,
-    items: shown.filter((item) => item.categoryId === category.id),
-  });
-  return categoryTree(draft.categories, { archived: filter.archived })
-    .flatMap((node) => [
-      groupOf(node.category, null),
-      ...node.children.map((child) => groupOf(child, node.category)),
-    ])
-    .filter((group) => !searching || group.items.length > 0);
-}
-
-/** The lowest and highest price on the menu: the sizes' prices, or the item's own. */
-export function priceRange(item: ItemView): { readonly low: number; readonly high: number } {
-  const prices = item.variants.filter(isActive).map((variant) => variant.price);
-  if (prices.length === 0) return { low: item.basePrice, high: item.basePrice };
-  return { low: Math.min(...prices), high: Math.max(...prices) };
-}
-
-/** Channels the item is not sold on, in the usual order (MENU-002). */
-export function missingChannels(item: ItemView): SalesChannel[] {
-  return SALES_CHANNELS.filter((channel) => !item.channels.includes(channel));
-}
-
-/** Items that are a part (fixed or a choice) of some combo, and so cannot be combos themselves. */
-export function comboPartIds(combos: readonly ComboView[]): Set<string> {
-  return new Set(
-    combos.flatMap((combo) =>
-      combo.components.flatMap((component) =>
-        component.kind === 'FIXED' && component.itemId !== null
-          ? [component.itemId]
-          : component.itemIds,
-      ),
-    ),
-  );
-}
-
-// ---------------------------------------------------------------- availability (MENU-006)
-
-export interface AvailabilityForm {
-  readonly available: boolean;
-  /** Count what is left: each order takes from it, and at 0 the item is out of stock. */
-  readonly counting: boolean;
-  readonly left: string;
-}
-
-export function availabilityFormOf(item: ItemView): AvailabilityForm {
-  return {
-    available: item.available,
-    counting: item.stockCount !== null,
-    left: item.stockCount === null ? '' : String(item.stockCount),
-  };
-}
-
-/** The request, or undefined while the count is not a whole number from 0 to 100000. */
-export function availabilityRequestOf(form: AvailabilityForm): ItemAvailabilityRequest | undefined {
-  const request = {
-    available: form.available,
-    stockCount: form.counting ? (wholeNumber(form.left, 0, 100_000) ?? -1) : null,
-  };
-  const parsed = ItemAvailabilityRequest.safeParse(request);
-  return parsed.success ? parsed.data : undefined;
-}
-
-// ---------------------------------------------------------------- items (MENU-002, MENU-003)
-
-/** A size (variant, MENU-003) as typed; a kept one carries its id, since orders refer to it. */
-export interface SizeForm {
+export interface VariantForm {
   readonly key: string;
-  readonly id: string | undefined;
+  readonly id?: string;
   readonly name: string;
   readonly price: string;
-  /** Kept as it is: the editor does not show a size's external ID. */
-  readonly externalId: string | null;
 }
 
 export interface ItemForm {
-  readonly name: string;
   readonly categoryId: string;
+  readonly name: string;
   readonly shortCode: string;
   readonly description: string;
   readonly photoId: string | null;
   readonly basePrice: string;
   readonly taxGroupId: string;
-  /** Empty until chosen: veg or not is never guessed. */
-  readonly foodType: FoodType | '';
+  readonly foodType: (typeof FOOD_TYPES)[number];
   readonly spiceLevel: number;
-  readonly sizes: readonly SizeForm[];
-  readonly modifierGroupIds: readonly string[];
+  readonly tags: string;
   readonly stationId: string;
   readonly prepTime: string;
-  readonly channels: readonly SalesChannel[];
-  /** Separated by commas. */
-  readonly tags: string;
-  /** Separated by commas. */
-  readonly synonyms: string;
-  /** Empty puts a new item last in its category. */
+  /** MENU-007: the hours it is served each day, 'HH:MM', both empty for all day. */
+  readonly servedFrom: string;
+  readonly servedUntil: string;
   readonly displayOrder: string;
+  readonly channels: readonly ItemRequest['channels'][number][];
+  readonly variants: readonly VariantForm[];
+  readonly modifierGroupIds: readonly string[];
+  readonly synonyms: string;
   readonly repeatable: boolean;
   readonly externalId: string;
-  /** Why a price changed (MENU-009), only asked when one did. */
+  /** Why the price changed, for the audit (MENU-009); optional. */
   readonly reason: string;
 }
 
-/** A new item: every channel, not spicy; a category, tax group and station when there is one. */
-export function emptyItemForm(choices: {
-  readonly categoryId?: string;
-  readonly taxGroupId?: string;
-  readonly stationId?: string;
-}): ItemForm {
-  return {
-    name: '',
-    categoryId: choices.categoryId ?? '',
-    shortCode: '',
-    description: '',
-    photoId: null,
-    basePrice: '',
-    taxGroupId: choices.taxGroupId ?? '',
-    foodType: '',
-    spiceLevel: 0,
-    sizes: [],
-    modifierGroupIds: [],
-    stationId: choices.stationId ?? '',
-    prepTime: '',
-    channels: SALES_CHANNELS,
-    tags: '',
-    synonyms: '',
-    displayOrder: '',
-    repeatable: false,
-    externalId: '',
-    reason: '',
-  };
+export type ItemField =
+  | 'name'
+  | 'categoryId'
+  | 'basePrice'
+  | 'taxGroupId'
+  | 'stationId'
+  | 'shortCode'
+  | 'prepTime'
+  | 'hours'
+  | 'displayOrder'
+  | 'channels'
+  | 'tags'
+  | 'synonyms'
+  | 'variants'
+  | 'description';
+
+export type ItemProblem =
+  | 'nameRequired'
+  | 'categoryRequired'
+  | 'priceInvalid'
+  | 'taxGroupRequired'
+  | 'stationRequired'
+  | 'shortCodeInvalid'
+  | 'prepTimeInvalid'
+  | 'hoursIncomplete'
+  | 'hoursSame'
+  | 'orderInvalid'
+  | 'channelsRequired'
+  | 'tooMany'
+  | 'variantInvalid'
+  | 'variantNamesRepeat'
+  | 'descriptionTooLong';
+
+export interface ItemDefaults {
+  readonly categoryId: string;
+  readonly taxGroupId: string;
+  readonly stationId: string;
+  readonly displayOrder: number;
 }
 
-export function itemFormOf(item: ItemView): ItemForm {
+export function itemFormOf(item: ItemView | undefined, defaults: ItemDefaults): ItemForm {
+  if (item === undefined) {
+    return {
+      categoryId: defaults.categoryId,
+      name: '',
+      shortCode: '',
+      description: '',
+      photoId: null,
+      basePrice: '',
+      taxGroupId: defaults.taxGroupId,
+      foodType: 'VEG',
+      spiceLevel: 0,
+      tags: '',
+      stationId: defaults.stationId,
+      prepTime: '',
+      servedFrom: '',
+      servedUntil: '',
+      displayOrder: String(defaults.displayOrder),
+      channels: [...SALES_CHANNELS],
+      variants: [],
+      modifierGroupIds: [],
+      synonyms: '',
+      repeatable: false,
+      externalId: '',
+      reason: '',
+    };
+  }
   return {
-    name: item.name,
     categoryId: item.categoryId,
+    name: item.name,
     shortCode: item.shortCode ?? '',
     description: item.description ?? '',
     photoId: item.photoId,
-    basePrice: inputFromPaise(item.basePrice),
+    basePrice: rupeesText(item.basePrice),
     taxGroupId: item.taxGroupId,
     foodType: item.foodType,
     spiceLevel: item.spiceLevel,
-    sizes: item.variants.filter(isActive).map((variant) => ({
-      key: variant.id,
-      id: variant.id,
-      name: variant.name,
-      price: inputFromPaise(variant.price),
-      externalId: variant.externalId,
-    })),
-    modifierGroupIds: item.modifierGroupIds,
+    tags: item.tags.join(', '),
     stationId: item.stationId,
     prepTime: item.prepTimeMinutes === null ? '' : String(item.prepTimeMinutes),
-    channels: SALES_CHANNELS.filter((channel) => item.channels.includes(channel)),
-    tags: item.tags.join(', '),
-    synonyms: item.synonyms.join(', '),
+    servedFrom: item.timeWindow?.start ?? '',
+    servedUntil: item.timeWindow?.end ?? '',
     displayOrder: String(item.displayOrder),
+    channels: item.channels,
+    variants: item.variants
+      .filter((variant) => variant.archivedAt === null)
+      .map((variant) => ({
+        key: variant.id,
+        id: variant.id,
+        name: variant.name,
+        price: rupeesText(variant.price),
+      })),
+    modifierGroupIds: item.modifierGroupIds,
+    synonyms: item.synonyms.join(', '),
     repeatable: item.repeatable,
     externalId: item.externalId ?? '',
     reason: '',
   };
 }
 
-export function emptySize(): SizeForm {
-  return { key: newKey(), id: undefined, name: '', price: '', externalId: null };
+const MAX_PRICE = 10_000_000;
+
+function priceOk(text: string): boolean {
+  const paise = paiseOf(text);
+  return paise !== undefined && paise <= MAX_PRICE;
 }
 
-export type ItemProblem =
-  | 'nameProblem'
-  | 'categoryProblem'
-  | 'shortCodeProblem'
-  | 'descriptionProblem'
-  | 'priceProblem'
-  | 'taxGroupProblem'
-  | 'foodTypeProblem'
-  | 'sizeNameProblem'
-  | 'stationProblem'
-  | 'prepTimeProblem'
-  | 'channelsProblem'
-  | 'tagsProblem'
-  | 'synonymsProblem'
-  | 'displayOrderProblem'
-  | 'externalIdProblem'
-  | 'reasonProblem';
-
-/** Problems by field: `name`, `basePrice`, …, and `size:<key>:name` / `size:<key>:price`. */
-export type ItemProblems = Readonly<Partial<Record<string, ItemProblem>>>;
-
-export function checkItem(form: ItemForm): ItemProblems {
-  const problems: Partial<Record<string, ItemProblem>> = {};
+/** The same checks as the server's `ItemRequest` (MENU-002 to MENU-004). */
+export function checkItem(form: ItemForm): Partial<Record<ItemField, ItemProblem>> {
+  const problems: Partial<Record<ItemField, ItemProblem>> = {};
   const name = form.name.trim();
-  if (name === '' || name.length > 80) problems.name = 'nameProblem';
-  if (form.categoryId === '') problems.categoryId = 'categoryProblem';
-  const shortCode = form.shortCode.trim();
-  if (shortCode !== '' && !ItemRequest.shape.shortCode.safeParse(shortCode).success) {
-    problems.shortCode = 'shortCodeProblem';
+  if (name === '' || name.length > 80) problems.name = 'nameRequired';
+  if (form.categoryId === '') problems.categoryId = 'categoryRequired';
+  if (!priceOk(form.basePrice)) problems.basePrice = 'priceInvalid';
+  if (form.taxGroupId === '') problems.taxGroupId = 'taxGroupRequired';
+  if (form.stationId === '') problems.stationId = 'stationRequired';
+  if (form.shortCode.trim() !== '' && !/^[A-Za-z0-9-]{1,12}$/.test(form.shortCode.trim())) {
+    problems.shortCode = 'shortCodeInvalid';
   }
-  if (form.description.trim().length > 500) problems.description = 'descriptionProblem';
-  if (pricePaise(form.basePrice) === undefined) problems.basePrice = 'priceProblem';
-  if (form.taxGroupId === '') problems.taxGroupId = 'taxGroupProblem';
-  if (form.foodType === '') problems.foodType = 'foodTypeProblem';
-  const sizeNames = form.sizes.map((size) => size.name.trim());
-  const sizeNamesRepeat = repeats(sizeNames);
-  for (const size of form.sizes) {
-    const sizeName = size.name.trim();
-    if (sizeName === '' || sizeName.length > 40 || sizeNamesRepeat) {
-      problems[`size:${size.key}:name`] = 'sizeNameProblem';
-    }
-    if (pricePaise(size.price) === undefined) problems[`size:${size.key}:price`] = 'priceProblem';
+  if (form.description.trim().length > 500) problems.description = 'descriptionTooLong';
+  const prep = form.prepTime.trim();
+  if (prep !== '' && !(/^\d{1,3}$/.test(prep) && Number(prep) <= 240)) {
+    problems.prepTime = 'prepTimeInvalid';
   }
-  if (form.stationId === '') problems.stationId = 'stationProblem';
-  if (form.prepTime.trim() !== '' && wholeNumber(form.prepTime, 0, 240) === undefined) {
-    problems.prepTime = 'prepTimeProblem';
+  if ((form.servedFrom === '') !== (form.servedUntil === '')) {
+    problems.hours = 'hoursIncomplete';
+  } else if (form.servedFrom !== '' && form.servedFrom === form.servedUntil) {
+    problems.hours = 'hoursSame';
   }
-  if (form.channels.length === 0) problems.channels = 'channelsProblem';
-  const tags = listOf(form.tags);
-  if (tags.length > 20 || tags.some((tag) => tag.length > 30) || repeats(tags)) {
-    problems.tags = 'tagsProblem';
-  }
-  const synonyms = listOf(form.synonyms);
-  if (synonyms.length > 20 || synonyms.some((word) => word.length > 40) || repeats(synonyms)) {
-    problems.synonyms = 'synonymsProblem';
+  if (!isOrder(form.displayOrder)) problems.displayOrder = 'orderInvalid';
+  if (form.channels.length === 0) problems.channels = 'channelsRequired';
+  const tags = splitList(form.tags);
+  if (tags.length > 20 || tags.some((tag) => tag.length > 30)) problems.tags = 'tooMany';
+  const synonyms = splitList(form.synonyms);
+  if (synonyms.length > 20 || synonyms.some((synonym) => synonym.length > 40)) {
+    problems.synonyms = 'tooMany';
   }
   if (
-    form.displayOrder.trim() !== '' &&
-    wholeNumber(form.displayOrder, 0, MAX_ORDER) === undefined
+    form.variants.length > 10 ||
+    form.variants.some(
+      (variant) =>
+        variant.name.trim() === '' || variant.name.trim().length > 40 || !priceOk(variant.price),
+    )
   ) {
-    problems.displayOrder = 'displayOrderProblem';
+    problems.variants = 'variantInvalid';
+  } else {
+    const names = form.variants.map((variant) => variant.name.trim().toLowerCase());
+    if (new Set(names).size !== names.length) problems.variants = 'variantNamesRepeat';
   }
-  if (form.externalId.trim().length > 128) problems.externalId = 'externalIdProblem';
-  const reason = form.reason.trim();
-  if (reason !== '' && (reason.length < 3 || reason.length > 200))
-    problems.reason = 'reasonProblem';
   return problems;
 }
 
-/** The request for a checked form; a new item without a place goes last in its category. */
-export function itemRequestOf(form: ItemForm, items: readonly ItemView[]): ItemRequest {
-  const neighbours = items.filter((item) => item.categoryId === form.categoryId && isActive(item));
-  const reason = form.reason.trim();
-  const optional = (text: string) => (text.trim() === '' ? null : text.trim());
+/** The request for a checked form. */
+export function itemRequestOf(form: ItemForm): ItemRequest {
+  const text = (value: string) => (value.trim() === '' ? null : value.trim());
   return {
     categoryId: form.categoryId,
     name: form.name.trim(),
-    shortCode: optional(form.shortCode),
-    description: optional(form.description),
+    shortCode: text(form.shortCode),
+    description: text(form.description),
     photoId: form.photoId,
-    basePrice: pricePaise(form.basePrice) ?? 0,
+    basePrice: paiseOf(form.basePrice) ?? 0,
     taxGroupId: form.taxGroupId,
-    foodType: form.foodType === '' ? 'VEG' : form.foodType,
+    foodType: form.foodType,
     spiceLevel: form.spiceLevel,
-    tags: listOf(form.tags),
+    tags: splitList(form.tags),
     stationId: form.stationId,
-    prepTimeMinutes: wholeNumber(form.prepTime, 0, 240) ?? null,
-    displayOrder:
-      wholeNumber(form.displayOrder, 0, MAX_ORDER) ??
-      nextOrder(neighbours.map((item) => item.displayOrder)),
+    prepTimeMinutes: form.prepTime.trim() === '' ? null : Number(form.prepTime.trim()),
+    timeWindow: form.servedFrom === '' ? null : { start: form.servedFrom, end: form.servedUntil },
+    displayOrder: Number(form.displayOrder),
     channels: [...form.channels],
-    variants: form.sizes.map((size) => ({
-      ...(size.id !== undefined && { id: size.id }),
-      name: size.name.trim(),
-      price: pricePaise(size.price) ?? 0,
-      externalId: size.externalId,
+    variants: form.variants.map((variant) => ({
+      ...(variant.id !== undefined && { id: variant.id }),
+      name: variant.name.trim(),
+      price: paiseOf(variant.price) ?? 0,
     })),
     modifierGroupIds: [...form.modifierGroupIds],
-    synonyms: listOf(form.synonyms),
+    synonyms: splitList(form.synonyms),
     repeatable: form.repeatable,
-    externalId: optional(form.externalId),
-    ...(reason !== '' && { reason }),
+    externalId: text(form.externalId),
+    ...(form.reason.trim().length >= 3 && { reason: form.reason.trim() }),
   };
 }
 
-/** Whether saving would change the item at all (the reason alone changes nothing). */
-export function itemChanged(item: ItemView, request: ItemRequest): boolean {
-  const { reason: _reason, ...wanted } = request;
-  const { reason: _was, ...current } = itemRequestOf(itemFormOf(item), []);
-  return canonicalJson(wanted) !== canonicalJson(current);
-}
-
-/** Whether the item's price or a size's price would change (MENU-009 asks why). */
-export function pricesChange(item: ItemView, form: ItemForm): boolean {
-  if (pricePaise(form.basePrice) !== item.basePrice) return true;
+/** Whether a saved item's prices would change (the reason field is offered then, MENU-009). */
+export function changesPrice(item: ItemView | undefined, form: ItemForm): boolean {
+  if (item === undefined) return false;
+  if (paiseOf(form.basePrice) !== item.basePrice) return true;
   const before = new Map(
-    item.variants.filter(isActive).map((variant) => [variant.id, variant.price]),
+    item.variants
+      .filter((variant) => variant.archivedAt === null)
+      .map((variant) => [variant.id, variant.price]),
   );
-  return form.sizes.some(
-    (size) => size.id !== undefined && pricePaise(size.price) !== before.get(size.id),
+  return form.variants.some(
+    (variant) => variant.id !== undefined && before.get(variant.id) !== paiseOf(variant.price),
   );
 }
 
-// ---------------------------------------------------------------- photos (MENU-008)
-
-/** A photo read for `uploadPhoto`: its base64, or too large (the server checks again). */
-export type PhotoContent = { readonly ok: true; readonly base64: string } | { readonly ok: false };
-
-/** The photo as base64 for `uploadPhoto`; above 5 MB it is not read at all (MENU-008). */
-export async function photoBase64(file: Blob): Promise<PhotoContent> {
-  if (file.size > PHOTO_MAX_BYTES) return { ok: false };
-  const dataUrl = await new Promise<string>((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      resolve(typeof reader.result === 'string' ? reader.result : '');
-    };
-    reader.onerror = () => {
-      reject(reader.error ?? new Error('The photo could not be read'));
-    };
-    reader.readAsDataURL(file);
-  });
-  return { ok: true, base64: dataUrl.slice(dataUrl.indexOf(',') + 1) };
+/** The item's price in the list: its own, or "from" the cheapest variant. */
+export function priceLabel(item: ItemView): { readonly from: boolean; readonly paise: number } {
+  const prices = item.variants
+    .filter((variant) => variant.archivedAt === null)
+    .map((variant) => variant.price);
+  return prices.length === 0
+    ? { from: false, paise: item.basePrice }
+    : { from: true, paise: Math.min(...prices) };
 }
 
-// ---------------------------------------------------------------- combos (MENU-005)
+export interface ItemFilter {
+  /** Empty for every category; a top-level category also shows its sub-categories' items. */
+  readonly categoryId: string;
+  readonly search: string;
+  readonly archived: boolean;
+}
+
+/** The items the list shows, in menu order (category, then display order, then name). */
+export function filterItems(draft: MenuDraftResponse, filter: ItemFilter): ItemView[] {
+  const rows = categoryRows(draft.categories, { archived: true });
+  const rank = new Map(rows.map((row, index) => [row.category.id, index]));
+  const inCategory = (item: ItemView) => {
+    if (filter.categoryId === '') return true;
+    if (item.categoryId === filter.categoryId) return true;
+    const category = draft.categories.find((entry) => entry.id === item.categoryId);
+    return category?.parentId === filter.categoryId;
+  };
+  const words = filter.search.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  const matches = (item: ItemView) => {
+    if (words.length === 0) return true;
+    const text = [item.name, item.shortCode ?? '', ...item.tags, ...item.synonyms]
+      .join(' ')
+      .toLowerCase();
+    return words.every((word) => text.includes(word));
+  };
+  return draft.items
+    .filter((item) => (filter.archived ? item.archivedAt !== null : item.archivedAt === null))
+    .filter(inCategory)
+    .filter(matches)
+    .sort(
+      (a, b) =>
+        (rank.get(a.categoryId) ?? 0) - (rank.get(b.categoryId) ?? 0) ||
+        a.displayOrder - b.displayOrder ||
+        a.name.localeCompare(b.name),
+    );
+}
+
+// ---------------------------------------------------------------- modifier groups
+
+export interface OptionForm {
+  readonly key: string;
+  readonly id?: string;
+  readonly name: string;
+  readonly priceDelta: string;
+  readonly available: boolean;
+}
+
+export interface GroupForm {
+  readonly name: string;
+  readonly minSelections: string;
+  readonly maxSelections: string;
+  readonly options: readonly OptionForm[];
+}
+
+export type GroupField = 'name' | 'minSelections' | 'maxSelections' | 'options';
+export type GroupProblem =
+  | 'nameRequired'
+  | 'countInvalid'
+  | 'minAboveMax'
+  | 'minAboveOptions'
+  | 'optionInvalid'
+  | 'optionNamesRepeat'
+  | 'optionsRequired';
+
+export function groupFormOf(group?: ModifierGroupView): GroupForm {
+  if (group === undefined) {
+    return {
+      name: '',
+      minSelections: '0',
+      maxSelections: '1',
+      options: [{ key: newKey(), name: '', priceDelta: '0', available: true }],
+    };
+  }
+  return {
+    name: group.name,
+    minSelections: String(group.minSelections),
+    maxSelections: String(group.maxSelections),
+    options: group.options
+      .filter((option) => option.archivedAt === null)
+      .map((option) => ({
+        key: option.id,
+        id: option.id,
+        name: option.name,
+        priceDelta: rupeesText(option.priceDelta),
+        available: option.available,
+      })),
+  };
+}
+
+const count = (text: string) => (/^\d{1,2}$/.test(text.trim()) ? Number(text.trim()) : undefined);
+
+/** The same checks as the server's `ModifierGroupRequest` (MENU-004). */
+export function checkGroup(form: GroupForm): Partial<Record<GroupField, GroupProblem>> {
+  const problems: Partial<Record<GroupField, GroupProblem>> = {};
+  if (form.name.trim() === '' || form.name.trim().length > 60) problems.name = 'nameRequired';
+  const min = count(form.minSelections);
+  const max = count(form.maxSelections);
+  if (min === undefined || min > 20) problems.minSelections = 'countInvalid';
+  if (max === undefined || max < 1 || max > 20) problems.maxSelections = 'countInvalid';
+  if (form.options.length === 0 || form.options.length > 50) {
+    problems.options = 'optionsRequired';
+  } else if (
+    form.options.some((option) => {
+      const delta = paiseOf(option.priceDelta, true);
+      return (
+        option.name.trim() === '' ||
+        option.name.trim().length > 60 ||
+        delta === undefined ||
+        Math.abs(delta) > MAX_PRICE
+      );
+    })
+  ) {
+    problems.options = 'optionInvalid';
+  } else {
+    const names = form.options.map((option) => option.name.trim().toLowerCase());
+    if (new Set(names).size !== names.length) problems.options = 'optionNamesRepeat';
+  }
+  if (min !== undefined && max !== undefined && problems.minSelections === undefined) {
+    if (min > max) problems.minSelections = 'minAboveMax';
+    else if (min > form.options.length) problems.minSelections = 'minAboveOptions';
+  }
+  return problems;
+}
+
+export function groupRequestOf(form: GroupForm): ModifierGroupRequest {
+  return {
+    name: form.name.trim(),
+    minSelections: Number(form.minSelections.trim()),
+    maxSelections: Number(form.maxSelections.trim()),
+    options: form.options.map((option) => ({
+      ...(option.id !== undefined && { id: option.id }),
+      name: option.name.trim(),
+      priceDelta: paiseOf(option.priceDelta, true) ?? 0,
+      available: option.available,
+    })),
+  };
+}
+
+/** "Choose 1", "Optional, up to 3", "Choose 1 to 2" for a group's rule. */
+export type GroupRule =
+  | { readonly kind: 'EXACTLY'; readonly count: number }
+  | { readonly kind: 'UP_TO'; readonly count: number }
+  | { readonly kind: 'BETWEEN'; readonly min: number; readonly max: number };
+
+export function groupRule(group: Pick<ModifierGroupView, 'minSelections' | 'maxSelections'>) {
+  if (group.minSelections === group.maxSelections) {
+    return { kind: 'EXACTLY', count: group.minSelections } as const;
+  }
+  if (group.minSelections === 0) return { kind: 'UP_TO', count: group.maxSelections } as const;
+  return { kind: 'BETWEEN', min: group.minSelections, max: group.maxSelections } as const;
+}
+
+// ---------------------------------------------------------------- combos
 
 export interface ComboPartForm {
   readonly key: string;
   readonly kind: 'FIXED' | 'CHOICE';
-  /** The fixed item; empty until chosen. */
+  /** For a fixed part. */
   readonly itemId: string;
-  /** A choice's name, such as "Any 1 drink". */
+  /** For a choice: "Any 1 drink" and the items to choose from. */
   readonly label: string;
-  /** A choice's items. */
   readonly itemIds: readonly string[];
   readonly quantity: string;
 }
 
 export interface ComboForm {
-  /** Once an item is a combo it stays one (there is no way back): archive it to stop selling it. */
-  readonly enabled: boolean;
   readonly parts: readonly ComboPartForm[];
   readonly activeFrom: string;
   readonly activeUntil: string;
-  readonly start: string;
-  readonly end: string;
+  readonly windowStart: string;
+  readonly windowEnd: string;
 }
 
-export function emptyComboPart(): ComboPartForm {
-  return { key: newKey(), kind: 'FIXED', itemId: '', label: '', itemIds: [], quantity: '1' };
+export type ComboField = 'parts' | 'dates' | 'window';
+export type ComboProblem = 'partsRequired' | 'partInvalid' | 'datesBackwards' | 'windowIncomplete';
+
+export function newComboPart(kind: ComboPartForm['kind']): ComboPartForm {
+  return { key: newKey(), kind, itemId: '', label: '', itemIds: [], quantity: '1' };
 }
 
-export function comboFormOf(combo: ComboView | undefined): ComboForm {
+export function comboFormOf(combo?: ComboView): ComboForm {
   if (combo === undefined) {
-    return { enabled: false, parts: [], activeFrom: '', activeUntil: '', start: '', end: '' };
+    return {
+      parts: [newComboPart('FIXED')],
+      activeFrom: '',
+      activeUntil: '',
+      windowStart: '',
+      windowEnd: '',
+    };
   }
   return {
-    enabled: true,
     parts: combo.components.map((component) => ({
       key: newKey(),
       kind: component.kind,
@@ -597,179 +604,59 @@ export function comboFormOf(combo: ComboView | undefined): ComboForm {
     })),
     activeFrom: combo.activeFrom ?? '',
     activeUntil: combo.activeUntil ?? '',
-    start: combo.timeWindow?.start ?? '',
-    end: combo.timeWindow?.end ?? '',
+    windowStart: combo.timeWindow?.start ?? '',
+    windowEnd: combo.timeWindow?.end ?? '',
   };
 }
 
-export type ComboProblem =
-  | 'partsProblem'
-  | 'itemProblem'
-  | 'labelProblem'
-  | 'choicesProblem'
-  | 'quantityProblem'
-  | 'datesProblem'
-  | 'windowProblem';
+/** Items a combo can hold: active items that are not combos and not the combo itself. */
+export function comboCandidates(draft: MenuDraftResponse, comboItemId?: string): ItemView[] {
+  const combos = new Set(draft.combos.map((combo) => combo.itemId));
+  return draft.items
+    .filter((item) => item.archivedAt === null && !combos.has(item.id) && item.id !== comboItemId)
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
 
-/** Problems by field: `parts`, `dates`, `window`, and `part:<key>:item|label|choices|quantity`. */
-export type ComboProblems = Readonly<Partial<Record<string, ComboProblem>>>;
-
-export function checkCombo(form: ComboForm): ComboProblems {
-  const problems: Partial<Record<string, ComboProblem>> = {};
-  if (!form.enabled) return problems;
-  if (form.parts.length < 1 || form.parts.length > 10) problems.parts = 'partsProblem';
-  for (const part of form.parts) {
-    if (part.kind === 'FIXED') {
-      if (part.itemId === '') problems[`part:${part.key}:item`] = 'itemProblem';
-    } else {
-      const label = part.label.trim();
-      if (label === '' || label.length > 60) problems[`part:${part.key}:label`] = 'labelProblem';
-      if (part.itemIds.length < 2 || part.itemIds.length > 30) {
-        problems[`part:${part.key}:choices`] = 'choicesProblem';
-      }
-    }
-    if (wholeNumber(part.quantity, 1, 20) === undefined) {
-      problems[`part:${part.key}:quantity`] = 'quantityProblem';
-    }
+/** The same checks as the server's `ComboRequest` (MENU-005). */
+export function checkCombo(form: ComboForm): Partial<Record<ComboField, ComboProblem>> {
+  const problems: Partial<Record<ComboField, ComboProblem>> = {};
+  const quantityOk = (text: string) =>
+    /^\d{1,2}$/.test(text) && Number(text) >= 1 && Number(text) <= 20;
+  if (form.parts.length === 0 || form.parts.length > 10) {
+    problems.parts = 'partsRequired';
+  } else if (
+    form.parts.some((part) =>
+      part.kind === 'FIXED'
+        ? part.itemId === '' || !quantityOk(part.quantity.trim())
+        : part.label.trim() === '' ||
+          part.itemIds.length < 2 ||
+          part.itemIds.length > 30 ||
+          !quantityOk(part.quantity.trim()),
+    )
+  ) {
+    problems.parts = 'partInvalid';
   }
   if (form.activeFrom !== '' && form.activeUntil !== '' && form.activeFrom > form.activeUntil) {
-    problems.dates = 'datesProblem';
+    problems.dates = 'datesBackwards';
   }
-  if ((form.start === '') !== (form.end === '')) problems.window = 'windowProblem';
+  if ((form.windowStart === '') !== (form.windowEnd === '')) problems.window = 'windowIncomplete';
   return problems;
 }
 
 export function comboRequestOf(form: ComboForm): ComboRequest {
   return {
-    components: form.parts.map((part) => {
-      const quantity = wholeNumber(part.quantity, 1, 20) ?? 1;
-      return part.kind === 'FIXED'
-        ? { kind: 'FIXED' as const, itemId: part.itemId, quantity }
+    components: form.parts.map((part) =>
+      part.kind === 'FIXED'
+        ? { kind: 'FIXED', itemId: part.itemId, quantity: Number(part.quantity.trim()) }
         : {
-            kind: 'CHOICE' as const,
+            kind: 'CHOICE',
             label: part.label.trim(),
             itemIds: [...part.itemIds],
-            quantity,
-          };
-    }),
+            quantity: Number(part.quantity.trim()),
+          },
+    ),
     activeFrom: form.activeFrom === '' ? null : form.activeFrom,
     activeUntil: form.activeUntil === '' ? null : form.activeUntil,
-    timeWindow: form.start === '' || form.end === '' ? null : { start: form.start, end: form.end },
+    timeWindow: form.windowStart === '' ? null : { start: form.windowStart, end: form.windowEnd },
   };
-}
-
-/** Whether saving would set the combo: a new one, or one that differs from what it is. */
-export function comboChanged(form: ComboForm, combo: ComboView | undefined): boolean {
-  if (!form.enabled) return false;
-  if (combo === undefined) return true;
-  return canonicalJson(comboRequestOf(form)) !== canonicalJson(comboRequestOf(comboFormOf(combo)));
-}
-
-/** Items a combo can bundle: active, not combos themselves, not the combo item. */
-export function comboItemChoices(
-  draft: Pick<MenuDraftResponse, 'items' | 'combos'>,
-  selfId: string | undefined,
-): ItemView[] {
-  const combos = new Set(draft.combos.map((combo) => combo.itemId));
-  return draft.items.filter((item) => isActive(item) && !combos.has(item.id) && item.id !== selfId);
-}
-
-// ---------------------------------------------------------------- modifier groups (MENU-004)
-
-export interface OptionForm {
-  readonly key: string;
-  readonly id: string | undefined;
-  readonly name: string;
-  /** Rupees added to the item's price; a minus takes them off. Empty is no change. */
-  readonly priceDelta: string;
-  readonly available: boolean;
-}
-
-export interface GroupForm {
-  readonly name: string;
-  readonly min: string;
-  readonly max: string;
-  readonly options: readonly OptionForm[];
-}
-
-export function emptyOption(): OptionForm {
-  return { key: newKey(), id: undefined, name: '', priceDelta: '', available: true };
-}
-
-/** A new group: optional, at most one, with one option to fill in. */
-export function emptyGroupForm(): GroupForm {
-  return { name: '', min: '0', max: '1', options: [emptyOption()] };
-}
-
-export function groupFormOf(group: ModifierGroupView): GroupForm {
-  return {
-    name: group.name,
-    min: String(group.minSelections),
-    max: String(group.maxSelections),
-    options: group.options.filter(isActive).map((option) => ({
-      key: option.id,
-      id: option.id,
-      name: option.name,
-      priceDelta: signedInputFromPaise(option.priceDelta),
-      available: option.available,
-    })),
-  };
-}
-
-export type GroupProblem =
-  'nameProblem' | 'countProblem' | 'optionsProblem' | 'optionNameProblem' | 'optionPriceProblem';
-
-/** Problems by field: `name`, `count`, `options`, and `option:<key>:name|price`. */
-export type GroupProblems = Readonly<Partial<Record<string, GroupProblem>>>;
-
-export function checkGroup(form: GroupForm): GroupProblems {
-  const problems: Partial<Record<string, GroupProblem>> = {};
-  const name = form.name.trim();
-  if (name === '' || name.length > 60) problems.name = 'nameProblem';
-  const min = wholeNumber(form.min, 0, 20);
-  const max = wholeNumber(form.max, 1, 20);
-  if (min === undefined || max === undefined || min > max || min > form.options.length) {
-    problems.count = 'countProblem';
-  }
-  if (form.options.length < 1 || form.options.length > 50) problems.options = 'optionsProblem';
-  const names = form.options.map((option) => option.name.trim());
-  const namesRepeat = repeats(names);
-  for (const option of form.options) {
-    const optionName = option.name.trim();
-    if (optionName === '' || optionName.length > 60 || namesRepeat) {
-      problems[`option:${option.key}:name`] = 'optionNameProblem';
-    }
-    if (
-      option.priceDelta.trim() !== '' &&
-      pricePaise(option.priceDelta, { negative: true }) === undefined
-    ) {
-      problems[`option:${option.key}:price`] = 'optionPriceProblem';
-    }
-  }
-  return problems;
-}
-
-export function groupRequestOf(form: GroupForm): ModifierGroupRequest {
-  return {
-    name: form.name.trim(),
-    minSelections: wholeNumber(form.min, 0, 20) ?? 0,
-    maxSelections: wholeNumber(form.max, 1, 20) ?? 1,
-    options: form.options.map((option) => ({
-      ...(option.id !== undefined && { id: option.id }),
-      name: option.name.trim(),
-      priceDelta:
-        option.priceDelta.trim() === ''
-          ? 0
-          : (pricePaise(option.priceDelta, { negative: true }) ?? 0),
-      available: option.available,
-    })),
-  };
-}
-
-/** Active groups an item can offer, then any archived one it still names (shown as such). */
-export function groupChoices(
-  groups: readonly ModifierGroupView[],
-  chosen: readonly string[],
-): ModifierGroupView[] {
-  return groups.filter((group) => isActive(group) || chosen.includes(group.id));
 }

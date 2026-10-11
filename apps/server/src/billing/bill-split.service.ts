@@ -13,6 +13,7 @@ import { describeItem } from './bill-calculation.js';
 import type { BillContext } from './bills.service.js';
 import { BillsService } from './bills.service.js';
 import { InvoicesService, particularsOf } from './invoices.service.js';
+import { withLineShares } from './line-shares.js';
 
 export type ParsedSplit = ReturnType<typeof SplitBillRequest.parse>;
 
@@ -202,7 +203,13 @@ export class BillSplitService {
             issuedAt: now,
             printCount: 0,
             replacesInvoiceId: index === 0 ? (replaces?.id ?? null) : null,
-            lines: { create: lines },
+            lines: {
+              create: withLineShares(
+                lines,
+                taxLines,
+                (orderItemId) => itemsById.get(orderItemId)?.itemId,
+              ),
+            },
             taxLines: { create: taxLines },
           },
         });

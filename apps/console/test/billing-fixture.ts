@@ -11,6 +11,7 @@ export const B = {
   invoice: uuid(705),
   shift: uuid(706),
   discount: uuid(707),
+  printer: uuid(708),
 } as const;
 
 export function billView(overrides: Partial<BillView> = {}): BillView {
@@ -71,6 +72,7 @@ export function billView(overrides: Partial<BillView> = {}): BillView {
     customer: { name: null, phone: null, phoneConsent: false, gstin: null },
     invoiceIds: [],
     editingInvoiceId: null,
+    amountInWords: true,
     ...overrides,
   };
 }
@@ -97,6 +99,7 @@ export function invoiceView(overrides: Partial<InvoiceView> = {}): InvoiceView {
       phone: null,
       headerLines: [],
       footerLines: [],
+      amountInWords: true,
     },
     customer: { name: null, phone: null, phoneConsent: false, gstin: null },
     priceMode: 'TAX_EXCLUSIVE',

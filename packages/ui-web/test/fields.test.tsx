@@ -36,22 +36,16 @@ describe('[NFR-U05] TextField', () => {
 });
 
 describe('[NFR-U05] TextArea', () => {
-  it('labels the text and links hint and error', async () => {
+  it('labels the field, links hint and error, and takes several lines', async () => {
     const { user, container } = renderUi(
-      <TextArea
-        label="Description"
-        hint="Shown on the menu"
-        error="Keep it to 500 characters."
-        maxLength={500}
-      />,
+      <TextArea label="Header lines" hint="One per line." error="Use up to 4 lines." rows={3} />,
     );
-    const area = screen.getByRole('textbox', { name: 'Description' });
-    expect(area.tagName).toBe('TEXTAREA');
+    const area = screen.getByRole('textbox', { name: 'Header lines' });
     expect(area).toHaveAttribute('rows', '3');
     expect(area).toHaveAttribute('aria-invalid', 'true');
-    expect(area).toHaveAccessibleDescription('Shown on the menu Keep it to 500 characters.');
-    await user.type(area, 'Slow-cooked black lentils');
-    expect(area).toHaveValue('Slow-cooked black lentils');
+    expect(area).toHaveAccessibleDescription('One per line. Use up to 4 lines.');
+    await user.type(area, 'Thank you{Enter}Visit again');
+    expect(area).toHaveValue('Thank you\nVisit again');
     await expectNoAxeViolations(container);
   });
 });

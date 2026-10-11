@@ -1,4 +1,8 @@
-import { ReleaseChannel, ReleaseInfo } from '@rp/contracts/control-plane';
+import {
+  PendingDiagnosticsRequest,
+  ReleaseChannel,
+  ReleaseInfo,
+} from '@rp/contracts/control-plane';
 import { z } from 'zod';
 import type { PrismaService, TransactionClient } from '../database/prisma.service.js';
 
@@ -6,6 +10,8 @@ type Client = PrismaService | TransactionClient;
 
 const ENROLMENT_KEY = 'control_plane.enrolment';
 const OFFERED_UPDATE_KEY = 'control_plane.offered_update';
+const DIAGNOSTICS_REQUESTS_KEY = 'control_plane.diagnostics_requests';
+const VENDOR_SETTINGS_KEY = 'control_plane.vendor_settings_digest';
 
 /** This PC's identity at the Control Plane, saved when it enrolled (ADR-0012). */
 export const Enrolment = z.object({
@@ -60,4 +66,29 @@ export function saveOfferedUpdate(
   update: ReleaseInfo | null,
 ): Promise<void> {
   return writeJson(prisma, OFFERED_UPDATE_KEY, update);
+}
+
+/** Support's open requests for diagnostics from the last heartbeat answer (UPD-008, P7-08b). */
+export async function readDiagnosticsRequests(
+  prisma: Client,
+): Promise<PendingDiagnosticsRequest[]> {
+  return (
+    (await readJson(prisma, DIAGNOSTICS_REQUESTS_KEY, z.array(PendingDiagnosticsRequest))) ?? []
+  );
+}
+
+export function saveDiagnosticsRequests(
+  prisma: Client,
+  requests: readonly PendingDiagnosticsRequest[],
+): Promise<void> {
+  return writeJson(prisma, DIAGNOSTICS_REQUESTS_KEY, requests);
+}
+
+/** The digest of the vendor settings this PC applied (UPD-010, P7-08c); null before any. */
+export async function readVendorSettingsDigest(prisma: Client): Promise<string | null> {
+  return (await readJson(prisma, VENDOR_SETTINGS_KEY, z.string().nullable())) ?? null;
+}
+
+export function saveVendorSettingsDigest(prisma: Client, digest: string): Promise<void> {
+  return writeJson(prisma, VENDOR_SETTINGS_KEY, digest);
 }

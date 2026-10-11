@@ -1,16 +1,87 @@
-import { DeviceSession, MemoryStore } from '@rp/mobile-core';
+import { CLIENT_API_VERSION } from '@rp/contracts';
+import {
+  type ApkInstaller,
+  ApkUpdater,
+  DeviceSession,
+  type DownloadedApk,
+  MemoryStore,
+  OtaUpdater,
+} from '@rp/mobile-core';
 import {
   alertRaisedFrame,
   alertView,
   FakeKeys,
   itemReadyFrame,
   SocketFactory,
+  STAFF,
 } from '@rp/mobile-core/testing';
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
+import { AppState } from 'react-native';
 import { App } from '../src/App';
 import { Restaurant, signedInApp, T2_SESSION, translator } from './restaurant';
 
 jest.mock('expo-status-bar', () => ({ StatusBar: () => null }));
+
+/** Android's PackageInstaller as the APK updater sees it (P7-04e2). */
+class FakeInstaller implements ApkInstaller {
+  readonly enabled = true;
+  readonly installedVersion = '0.1.0';
+  readonly calls: string[] = [];
+  constructor(private readonly owner: boolean) {}
+  silent(): boolean {
+    return this.owner;
+  }
+  mayRequestInstall(): Promise<boolean> {
+    return Promise.resolve(true);
+  }
+  openInstallSettings(): Promise<void> {
+    return Promise.resolve();
+  }
+  download(): Promise<DownloadedApk> {
+    this.calls.push('download');
+    return Promise.resolve({ path: '/cache/rp-apk/new.apk' });
+  }
+  install(): Promise<void> {
+    this.calls.push('install');
+    return Promise.resolve();
+  }
+  onResult(): () => void {
+    return () => undefined;
+  }
+}
+
+/** The PC's newer build of the app, and the client API its server speaks. */
+const appBuildRoutes = (kind: 'waiter-app' | 'table-tablet') =>
+  [
+    [
+      '/api/v1/devices/current/app-build',
+      {
+        status: 200,
+        body: {
+          build: {
+            kind,
+            version: '9.0.0',
+            clientApi: CLIENT_API_VERSION,
+            sha256: 'd'.repeat(64),
+            sizeBytes: 40_000_000,
+          },
+        },
+      },
+    ],
+    [
+      '/api/v1/version',
+      {
+        status: 200,
+        body: {
+          name: 'rp-server',
+          version: '2.3.0',
+          apiVersion: 'v1',
+          node: '24.12.0',
+          clientApi: { current: CLIENT_API_VERSION, oldest: CLIENT_API_VERSION },
+        },
+      },
+    ],
+  ] as const;
 
 function setup() {
   const restaurant = new Restaurant();
@@ -26,6 +97,58 @@ function setup() {
   });
   return { restaurant, server, session, sockets };
 }
+
+describe('[WTR-001] a new APK from the restaurant PC on a waiter phone (P7-04e2)', () => {
+  it('is offered on the sign-in screen and installed when the person asks', async () => {
+    const { server, session } = setup();
+    for (const [path, answer] of appBuildRoutes('waiter-app')) server.on('GET', path, () => answer);
+    await session.start();
+    await session.pair('http://pos.test:3000', 'ABCD-EFGH');
+    const installer = new FakeInstaller(false);
+    const apkUpdater = new ApkUpdater({ session, installer });
+    await apkUpdater.check();
+    await render(<App session={session} translator={translator} apkUpdater={apkUpdater} />);
+    expect(await screen.findByText('Tap your name')).toBeOnTheScreen();
+    expect(screen.getByTestId('apk-offer-text')).toHaveTextContent(
+      translator('mobile.apk.available', { version: '9.0.0', megabytes: 40 }),
+    );
+    // A phone never installs by itself.
+    expect(installer.calls).toEqual([]);
+    await fireEvent.press(screen.getByTestId('apk-install'));
+    expect(installer.calls).toEqual(['download', 'install']);
+  });
+});
+
+describe('[UPD-001] over-the-air updates on a waiter phone', () => {
+  it('restart the app on a downloaded update only once nobody is signed in', async () => {
+    const { session } = setup();
+    await session.start();
+    await session.pair('http://pos.test:3000', 'ABCD-EFGH');
+    await session.signIn(STAFF.WAITER.staffId, '4444');
+    const reload = jest.fn(() => Promise.resolve());
+    // The vendor's rollback to the APK's JavaScript: nothing to ask the server first.
+    const updater = new OtaUpdater({
+      session,
+      source: {
+        enabled: true,
+        emergencyLaunchReason: null,
+        check: () => Promise.resolve({ kind: 'rollback' }),
+        fetch: () => Promise.resolve({ kind: 'rollback' }),
+        reload,
+      },
+    });
+    Object.assign(AppState, { currentState: 'active' });
+    await render(<App session={session} translator={translator} updater={updater} />);
+    await act(() => updater.check());
+    expect(updater.getSnapshot().status).toBe('ready');
+    expect(reload).not.toHaveBeenCalled();
+
+    await fireEvent.press(await screen.findByRole('button', { name: 'Sign out' }));
+    expect(await screen.findByText('Tap your name')).toBeOnTheScreen();
+    expect(reload).toHaveBeenCalledTimes(1);
+    Object.assign(AppState, { currentState: undefined });
+  });
+});
 
 describe('[WTR-001] waiter app smoke flow', () => {
   it('pairs, signs a waiter in, shows live tables and signs out', async () => {

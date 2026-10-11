@@ -1,0 +1,4 @@
+{
+  "input": { "type": "string", "enum": ["DIGITAL_BILL_AND_FEEDBACK"] },
+  "output": { "type": "string", "enum": ["DIGITAL_BILL_AND_FEEDBACK"] }
+}

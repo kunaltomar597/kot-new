@@ -71,6 +71,7 @@
               "type": "string",
               "enum": [
                 "PENDING_APPROVAL",
+                "HELD",
                 "SENT",
                 "PREPARING",
                 "READY",
@@ -90,7 +91,8 @@
                 },
                 { "type": "null" }
               ]
-            }
+            },
+            "movedTo": { "default": null, "type": ["string", "null"] }
           },
           "required": [
             "orderItemId",
@@ -197,6 +199,7 @@
               "type": "string",
               "enum": [
                 "PENDING_APPROVAL",
+                "HELD",
                 "SENT",
                 "PREPARING",
                 "READY",
@@ -216,7 +219,8 @@
                 },
                 { "type": "null" }
               ]
-            }
+            },
+            "movedTo": { "default": null, "type": ["string", "null"] }
           },
           "required": [
             "orderItemId",
@@ -227,7 +231,8 @@
             "instructions",
             "comboName",
             "state",
-            "readyAt"
+            "readyAt",
+            "movedTo"
           ],
           "additionalProperties": false
         }

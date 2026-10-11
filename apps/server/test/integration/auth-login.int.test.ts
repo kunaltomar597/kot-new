@@ -1,5 +1,5 @@
 import type { INestApplication } from '@nestjs/common';
-import { ApiError, LoginResponse, StaffTilesResponse } from '@rp/contracts';
+import { ApiError, DeviceView, LoginResponse, StaffTilesResponse } from '@rp/contracts';
 import request from 'supertest';
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { authSettingKey, AuthSettingsService } from '../../src/auth/auth-settings.js';
@@ -242,6 +242,175 @@ describe('[AUTH-003] [AUTH-013] lockout', () => {
     expect(unlocked.status).toBe(204);
     expect(await auditCount('STAFF_UNLOCKED', locked)).toBe(1);
     expect((await pinLogin(deviceId, locked, TEST_PINS.KITCHEN)).status).toBe(200);
+  });
+});
+
+describe('[PC-S5] [PC-D2] lockouts reach the managers', () => {
+  it('alerts the managers and the Owner when a login locks, and clears it when it is unlocked', async () => {
+    const deviceId = await addDevice(app, kit);
+    const staffId = await addStaff(app, kit, 'CASHIER');
+    for (let attempt = 1; attempt <= 5; attempt += 1) await pinLogin(deviceId, staffId, '9999');
+    const alert = await prisma.alert.findFirstOrThrow({
+      where: { type: 'SIGN_IN_LOCKED', dedupeKey: `lockout:staff:${staffId}` },
+    });
+    expect(alert.status).toBe('OPEN');
+    expect(alert.recipientIds).toEqual(expect.arrayContaining([kit.staff.OWNER]));
+    expect(alert.payload).toMatchObject({
+      scope: 'PERSON',
+      staffId,
+      staffName: 'Extra cashier',
+      deviceId,
+      method: 'PIN',
+    });
+
+    const manager = await signIn(app, kit, 'MANAGER');
+    const unlocked = await server()
+      .post('/api/v1/auth/unlock')
+      .set(authHeaders(kit.deviceId, manager.accessToken))
+      .send({ staffId });
+    expect(unlocked.status).toBe(204);
+    expect((await prisma.alert.findUniqueOrThrow({ where: { id: alert.id } })).status).toBe(
+      'CLEARED',
+    );
+  });
+});
+
+describe('[PC-S5] [SEC-009] wrong PINs counted per device', () => {
+  it('stops a device taking any PIN after 10 wrong ones for anyone, spread over people', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    const deviceId = await addDevice(app, kit);
+    const people: string[] = [];
+    for (let person = 1; person <= 5; person += 1) people.push(await addStaff(app, kit, 'WAITER'));
+    const codes: string[] = [];
+    let last: ApiError | undefined;
+    for (let attempt = 0; attempt < 10; attempt += 1) {
+      // Two wrong PINs each: far from any one person's lockout.
+      last = ApiError.parse((await pinLogin(deviceId, people[attempt % 5] ?? '', '9999')).body);
+      codes.push(last.code);
+      vi.setSystemTime(Date.now() + 30_000);
+    }
+    expect(codes.slice(0, 9).every((code) => code === 'INVALID_CREDENTIALS')).toBe(true);
+    expect(codes[9]).toBe('DEVICE_LOCKED');
+    expect(last?.details).toHaveProperty('lockedUntil');
+    expect(await auditCount('DEVICE_PINS_LOCKED', deviceId)).toBe(1);
+    for (const person of people) expect(await auditCount('LOGIN_LOCKED', person)).toBe(0);
+
+    // The right PIN is refused here too, and audited; on another device it works.
+    const right = await pinLogin(deviceId, kit.staff.MANAGER, TEST_PINS.MANAGER);
+    expect(right.status).toBe(423);
+    expect(ApiError.parse(right.body).code).toBe('DEVICE_LOCKED');
+    expect(
+      await prisma.auditLog.count({
+        where: { action: 'LOGIN_FAILED', deviceId, reason: 'This device takes no PINs for now' },
+      }),
+    ).toBe(1);
+    expect((await pinLogin(kit.deviceId, people[0] ?? '', TEST_PINS.WAITER)).status).toBe(200);
+    const alert = await prisma.alert.findFirstOrThrow({
+      where: { type: 'SIGN_IN_LOCKED', dedupeKey: `lockout:device:${deviceId}` },
+    });
+    expect(alert.payload).toMatchObject({ scope: 'DEVICE', deviceId });
+
+    // After the lockout time it takes PINs again by itself.
+    vi.setSystemTime(Date.now() + 15 * 60_000);
+    expect((await pinLogin(deviceId, kit.staff.MANAGER, TEST_PINS.MANAGER)).status).toBe(200);
+  });
+
+  it('says when the device, not the person, is about to stop taking PINs', async () => {
+    const deviceId = await addDevice(app, kit);
+    await prisma.device.update({
+      where: { id: deviceId },
+      data: { pinFailures: 8, pinFailureWindowStartedAt: new Date() },
+    });
+    const response = await pinLogin(deviceId, await addStaff(app, kit, 'WAITER'), '9999');
+    const error = ApiError.parse(response.body);
+    expect(error.details).toEqual({ attemptsRemaining: 1 });
+    expect(error.message).toContain('this device stops taking PINs');
+  });
+
+  it('lets a manager, not a waiter, let a device take PINs again at once', async () => {
+    const deviceId = await addDevice(app, kit);
+    await prisma.device.update({
+      where: { id: deviceId },
+      data: { pinsLockedUntil: new Date(Date.now() + 15 * 60_000) },
+    });
+    expect((await pinLogin(deviceId, kit.staff.WAITER, TEST_PINS.WAITER)).status).toBe(423);
+    const unlock = async (role: 'WAITER' | 'MANAGER') =>
+      server()
+        .post(`/api/v1/devices/${deviceId}/pins/unlock`)
+        .set(authHeaders(kit.deviceId, (await signIn(app, kit, role)).accessToken));
+    expect((await unlock('WAITER')).status).toBe(403);
+    const response = await unlock('MANAGER');
+    expect(response.status).toBe(200);
+    expect(DeviceView.parse(response.body).pinsLockedUntil).toBeNull();
+    expect(await auditCount('DEVICE_PINS_UNLOCKED', deviceId)).toBe(1);
+    expect((await pinLogin(deviceId, kit.staff.WAITER, TEST_PINS.WAITER)).status).toBe(200);
+    const missing = await server()
+      .post(`/api/v1/devices/${newId()}/pins/unlock`)
+      .set(authHeaders(kit.deviceId, (await signIn(app, kit, 'MANAGER')).accessToken));
+    expect(missing.status).toBe(404);
+  });
+});
+
+describe('[AUTH-005] [MOBILE-E3] inactivity as the app sees it', () => {
+  const me = (deviceId: string, accessToken: string, idleSeconds?: number) => {
+    const call = server().get('/api/v1/probe-auth/me').set(authHeaders(deviceId, accessToken));
+    return idleSeconds === undefined ? call : call.set('x-rp-idle-seconds', String(idleSeconds));
+  };
+
+  it('does not keep a session alive with calls the app made by itself while the person was away', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    const start = Date.now();
+    const deviceId = await addDevice(app, kit, 'WAITER_PHONE');
+    const session = await signIn(app, kit, 'WAITER', deviceId);
+    // The phone reads every minute by itself; nobody touches it after signing in.
+    for (let minute = 1; minute <= 9; minute += 1) {
+      vi.setSystemTime(start + minute * 60_000);
+      expect((await me(deviceId, session.accessToken, minute * 60)).status).toBe(200);
+    }
+    const refreshed = await server()
+      .post('/api/v1/auth/refresh')
+      .set(authHeaders(deviceId))
+      .set('x-rp-idle-seconds', String(9 * 60))
+      .send({ refreshToken: session.refreshToken });
+    expect(refreshed.status).toBe(200);
+    const renewed = LoginResponse.parse(refreshed.body);
+    vi.setSystemTime(start + 10 * 60_000 + 5_000);
+    const late = await me(deviceId, renewed.accessToken, 605);
+    expect(late.status).toBe(401);
+    expect(ApiError.parse(late.body).code).toBe('SESSION_EXPIRED');
+  });
+
+  it('keeps it alive as of the last touch, and every call counts without the header', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    const start = Date.now();
+    const deviceId = await addDevice(app, kit, 'WAITER_PHONE');
+    const session = await signIn(app, kit, 'WAITER', deviceId);
+    // Touched 30 s before this call: active as of 7:30.
+    vi.setSystemTime(start + 8 * 60_000);
+    expect((await me(deviceId, session.accessToken, 30)).status).toBe(200);
+    // 9:30 after that touch the person taps again; the refresh counts it.
+    vi.setSystemTime(start + 17 * 60_000);
+    const refreshed = await server()
+      .post('/api/v1/auth/refresh')
+      .set(authHeaders(deviceId))
+      .set('x-rp-idle-seconds', '0')
+      .send({ refreshToken: session.refreshToken });
+    expect(refreshed.status).toBe(200);
+    vi.setSystemTime(start + 26 * 60_000);
+    const renewed = LoginResponse.parse(refreshed.body);
+    expect((await me(deviceId, renewed.accessToken, 0)).status).toBe(200);
+
+    // An app that does not say: every call counts, as before; so does a header that is no number.
+    const other = await addDevice(app, kit, 'WAITER_PHONE');
+    const old = await signIn(app, kit, 'WAITER', other);
+    for (const minute of [30, 34, 38]) {
+      vi.setSystemTime(start + minute * 60_000);
+      expect((await me(other, old.accessToken)).status).toBe(200);
+    }
+    vi.setSystemTime(start + 40 * 60_000);
+    expect((await me(other, old.accessToken).set('x-rp-idle-seconds', 'soon')).status).toBe(200);
+    const row = await prisma.session.findUniqueOrThrow({ where: { id: old.session.id } });
+    expect(row.lastActiveAt.getTime()).toBe(Date.now());
   });
 });
 

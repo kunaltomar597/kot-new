@@ -1,0 +1,4 @@
+{
+  "input": { "type": "string", "enum": ["ARCHIVING", "VERIFYING", "PURGING", "DONE", "FAILED"] },
+  "output": { "type": "string", "enum": ["ARCHIVING", "VERIFYING", "PURGING", "DONE", "FAILED"] }
+}

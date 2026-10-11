@@ -106,6 +106,17 @@ export const VariantRequest = z.strictObject({
 });
 export type VariantRequest = z.infer<typeof VariantRequest>;
 
+const LocalTime = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/);
+
+/** A daily window in the restaurant's local time; an end before the start runs past midnight. */
+export const DailyHours = z
+  .strictObject({ start: LocalTime, end: LocalTime })
+  .refine((hours) => hours.start !== hours.end, {
+    message: 'The hours must start and end at different times',
+    path: ['end'],
+  });
+export type DailyHours = z.infer<typeof DailyHours>;
+
 /** MENU-002: every attribute of an item. */
 export const ItemRequest = z
   .strictObject({
@@ -128,6 +139,11 @@ export const ItemRequest = z
     tags: z.array(Name(30)).max(20),
     stationId: Id,
     prepTimeMinutes: z.int().min(0).max(240).nullable(),
+    /**
+     * MENU-007: served only at these hours each day (breakfast 07:00-11:00), null for all day.
+     * Left out, an edit keeps the item's hours.
+     */
+    timeWindow: DailyHours.nullable().optional(),
     displayOrder: z.int().min(0).max(9_999),
     channels: z.array(SalesChannel).min(1),
     /** In display order. Variants left out are archived. */
@@ -183,6 +199,8 @@ export const ItemView = z.object({
   tags: z.array(z.string()),
   stationId: Id,
   prepTimeMinutes: z.int().nullable(),
+  /** MENU-007: the hours it is served each day, or null for all day. */
+  timeWindow: z.object({ start: z.string(), end: z.string() }).nullable().default(null),
   displayOrder: z.int(),
   channels: z.array(SalesChannel),
   variants: z.array(VariantView),
@@ -193,7 +211,7 @@ export const ItemView = z.object({
   /** Availability and stock are set on their own (MENU-006, P1-03b). */
   available: z.boolean(),
   trackStock: z.boolean(),
-  /** What is left while stock is counted (`trackStock`), else null (MENU-006, P4-02d). */
+  /** Portions left while stock is counted (MENU-006), else null. */
   stockCount: z.int().nonnegative().nullable(),
   archivedAt: Timestamp.nullable(),
   updatedAt: Timestamp,
@@ -202,6 +220,10 @@ export type ItemView = z.infer<typeof ItemView>;
 
 export const MenuArchiveRequest = z.strictObject({ reason: Reason });
 export type MenuArchiveRequest = z.infer<typeof MenuArchiveRequest>;
+
+/** A dish's photo set or taken away on its own (P6-04c, ONB-007: bulk photo upload). */
+export const ItemPhotoRequest = z.strictObject({ photoId: Id.nullable() });
+export type ItemPhotoRequest = z.infer<typeof ItemPhotoRequest>;
 
 export const MenuEntityParams = z.strictObject({ id: Id });
 export type MenuEntityParams = z.infer<typeof MenuEntityParams>;
@@ -234,8 +256,8 @@ export const ComboRequest = z
     /** Optional daily window, local time; end before start runs past midnight. */
     timeWindow: z
       .strictObject({
-        start: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/),
-        end: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/),
+        start: LocalTime,
+        end: LocalTime,
       })
       .nullable(),
     reason: Reason.optional(),
@@ -266,6 +288,15 @@ export const ComboView = z.object({
 });
 export type ComboView = z.infer<typeof ComboView>;
 
+/** The whole draft menu for the editor, archived entries included, with every combo's parts. */
+export const MenuDraftResponse = z.object({
+  categories: z.array(CategoryView),
+  modifierGroups: z.array(ModifierGroupView),
+  items: z.array(ItemView),
+  combos: z.array(ComboView),
+});
+export type MenuDraftResponse = z.infer<typeof MenuDraftResponse>;
+
 // ---------------------------------------------------------------- availability (P1-03b)
 
 /**
@@ -295,22 +326,3 @@ export const MenuPublishResponse = z.object({
   published: z.boolean(),
 });
 export type MenuPublishResponse = z.infer<typeof MenuPublishResponse>;
-
-// ---------------------------------------------------------------- the editor's draft
-
-/** The whole draft menu for the editor, archived entries included. */
-export const MenuDraftResponse = z.object({
-  categories: z.array(CategoryView),
-  modifierGroups: z.array(ModifierGroupView),
-  items: z.array(ItemView),
-  /** The combo of every item that is one (MENU-005, P4-02d). */
-  combos: z.array(ComboView),
-  /** The menu version every ordering surface shows now, or null before the first publish. */
-  published: z.object({ version: z.int().positive(), publishedAt: Timestamp }).nullable(),
-  /**
-   * The draft differs from that version, so publishing would show something new (P4-02d).
-   * Availability and stock counts are live and never wait for publishing, so they do not count.
-   */
-  unpublished: z.boolean(),
-});
-export type MenuDraftResponse = z.infer<typeof MenuDraftResponse>;

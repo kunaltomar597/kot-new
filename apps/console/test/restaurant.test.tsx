@@ -1,438 +1,249 @@
-import type { RestaurantProfile } from '@rp/contracts';
-import { act, screen, waitFor, within } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { FakeServer, RecordedCall } from './fake-server.js';
-import { login } from './fakes.js';
+import type { Role } from '@rp/domain';
+import type { FakeServer } from './fake-server.js';
 import { expectNoAxeViolations, renderConsole, server, signsInAs, t } from './harness.js';
-import { bareProfile, LOGO, NEW_LOGO, profile, restaurantChanged, week } from './tax-fixture.js';
+import { EXEMPT, profileView, seriesViews, TAKEAWAY, taxGroupViews } from './restaurant-fixture.js';
+import { ownerSecurity, SECOND_FACTOR_REQUIRED } from './staff-fixture.js';
 
-const PATH = '/manage/settings/restaurant';
-const RESTAURANT = '/api/v1/restaurant';
-const PROFILE = '/api/v1/restaurant/profile';
-/** 11:30 in the restaurant on 10 October 2026. */
-const NOW = '2026-10-10T06:00:00.000Z';
+const PATH = '/manage/restaurant';
 
-const PHOTO = {
-  id: NEW_LOGO,
-  mimeType: 'image/webp',
-  width: 480,
-  height: 240,
-  renditions: [{ width: 160, height: 80, bytes: 3_000, url: `/api/v1/photos/${NEW_LOGO}/160` }],
-  createdAt: NOW,
-};
-
-/** A fake server holding the profile: a saved change is read back from then on. */
-function restaurantServer(initial: RestaurantProfile = profile()): FakeServer {
-  let current = initial;
-  const save = (call: RecordedCall) => {
-    const { reason: _reason, ...request } = call.body as Record<string, unknown>;
-    current = { ...current, ...(request as Partial<RestaurantProfile>) };
-    return { status: 200, body: current };
-  };
-  return signsInAs(server(), 'MANAGER')
-    .on('GET', RESTAURANT, () => ({ status: 200, body: current }))
-    .on('PUT', PROFILE, save);
+function restaurantServer(role: Role = 'OWNER'): FakeServer {
+  return signsInAs(server(), role)
+    .on('GET', '/api/v1/restaurant', () => ({ status: 200, body: profileView() }))
+    .on('GET', '/api/v1/tax-groups', () => ({ status: 200, body: { taxGroups: taxGroupViews() } }))
+    .on('GET', '/api/v1/invoice-series', () => ({
+      status: 200,
+      body: { invoiceSeries: seriesViews() },
+    }))
+    .on('GET', '/api/v1/auth/owner/security', () => ({ status: 200, body: ownerSecurity() }))
+    .on('POST', '/api/v1/auth/step-up', () => ({
+      status: 200,
+      body: { secondFactorValidUntil: '2026-10-01T10:10:00.000Z' },
+    }))
+    .on('PUT', '/api/v1/restaurant/profile', () => ({ status: 200, body: profileView() }));
 }
 
-/** `text` matched literally, followed by any hint. */
-const labelled = (text: string) =>
-  new RegExp(`^${text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}( \\*)?$`);
-const partOf = (title: string) =>
-  screen.getByRole('heading', { level: 3, name: title }).closest('section')!;
-const factOf = (part: HTMLElement, term: string) =>
-  within(part).getByText(term, { selector: 'dt' }).nextElementSibling as HTMLElement;
-const putsTo = (fake: FakeServer) => fake.callsTo('PUT', PROFILE).map((call) => call.body);
-const saveIn = (dialog: HTMLElement) =>
-  within(dialog).getByRole('button', { name: t('settings.dialog.save') });
+const dialog = (name: string) => screen.findByRole('dialog', { name });
+const section = async (name: string) =>
+  (await screen.findByRole('heading', { level: 3, name })).closest('section')!;
 
 beforeEach(() => {
   vi.stubGlobal('isSecureContext', true);
-  vi.useFakeTimers({ toFake: ['Date'], shouldAdvanceTime: true });
-  vi.setSystemTime(new Date(NOW));
 });
 
 afterEach(() => {
-  vi.useRealTimers();
   vi.unstubAllGlobals();
 });
 
-describe('[ONB-004] [MGR-007] the Restaurant page', () => {
-  it('shows the name, contact details, logo, opening hours and when the business day ends', async () => {
-    const { container } = await renderConsole({
+describe('[ONB-004] [BILL-002] [BILL-003] [BILL-004] the restaurant page', () => {
+  it('shows the profile, invoice particulars, tax groups and series', async () => {
+    const { container, user } = await renderConsole({
       fake: restaurantServer(),
-      path: '/manage/settings',
-      signedIn: 'MANAGER',
+      path: '/manage',
+      signedIn: 'OWNER',
     });
-    const pages = await screen.findByRole('navigation', { name: t('settings.pages.label') });
-    within(pages)
-      .getByRole('link', { name: t('settings.pages.restaurant') })
-      .click();
+    await user.click(
+      within(screen.getByRole('navigation', { name: t('dashboard.navigation') })).getByRole(
+        'link',
+        { name: t('dashboard.section.restaurant') },
+      ),
+    );
+    const profile = within(await section(t('restaurantPage.profile.title')));
+    expect(profile.getByText('Spice Route')).toBeVisible();
     expect(
-      await screen.findByRole('heading', { level: 2, name: t('restaurant.title') }),
+      profile.getByText(`${t('restaurantPage.weekday.MON')}: 11:00 to 15:00, 19:00 to 23:30`),
     ).toBeVisible();
-    await screen.findByText('Rooftop Tandoor');
     expect(
-      screen.getAllByRole('heading', { level: 3 }).map((heading) => heading.textContent),
-    ).toEqual([
-      t('restaurant.contact.title'),
-      t('restaurant.hours.title'),
-      t('restaurant.businessDay.title'),
-    ]);
-
-    const contact = partOf(t('restaurant.contact.title'));
-    expect(factOf(contact, t('restaurant.contact.name'))).toHaveTextContent('Rooftop Tandoor');
-    expect(factOf(contact, t('restaurant.contact.phone'))).toHaveTextContent('+91 20 2612 3456');
-    expect(factOf(contact, t('restaurant.contact.email'))).toHaveTextContent(
-      'hello@rooftop.example',
-    );
-    expect(
-      within(contact).getByRole('img', {
-        name: t('restaurant.contact.logoAlt', { name: 'Rooftop Tandoor' }),
-      }),
-    ).toHaveAttribute('src', `http://pos.test/api/v1/photos/${LOGO}/480`);
-
-    // Lunch and dinner, past midnight at the weekend, closed on Sunday.
-    const hours = partOf(t('restaurant.hours.title'));
-    const lunch = t('restaurant.hours.window', { start: '12:00', end: '15:30' });
-    expect(factOf(hours, t('restaurant.days.MON'))).toHaveTextContent(
-      `${lunch}, ${t('restaurant.hours.window', { start: '19:00', end: '23:30' })}`,
-    );
-    expect(factOf(hours, t('restaurant.days.FRI'))).toHaveTextContent(
-      `${lunch}, ${t('restaurant.hours.windowOvernight', { start: '19:00', end: '01:00' })}`,
-    );
-    expect(factOf(hours, t('restaurant.days.SUN'))).toHaveTextContent(t('restaurant.hours.closed'));
-    expect(
-      factOf(partOf(t('restaurant.businessDay.title')), t('restaurant.businessDay.endsAt')),
-    ).toHaveTextContent('04:00');
-
-    for (const label of [
-      t('restaurant.contact.changeLabel'),
-      t('restaurant.hours.changeLabel'),
-      t('restaurant.businessDay.changeLabel'),
-    ]) {
-      expect(screen.getByRole('button', { name: label })).toHaveTextContent(t('restaurant.change'));
-    }
+      profile.getByText(
+        `${t('restaurantPage.weekday.TUE')}: ${t('restaurantPage.profile.closed')}`,
+      ),
+    ).toBeVisible();
+    const legal = within(await section(t('restaurantPage.legal.title')));
+    expect(legal.getByText('27AAPFU0939F1ZV')).toBeVisible();
+    expect(legal.getByText('12 MG Road, Pune 411001')).toBeVisible();
+    const tax = within(await section(t('restaurantPage.taxGroups.title')));
+    expect(tax.getByText('CGST 2.5% + SGST 2.5%')).toBeVisible();
+    expect(tax.getByText(t('restaurantPage.taxGroups.noTax'))).toBeVisible();
+    const series = within(await section(t('restaurantPage.series.title')));
+    expect(series.getByText(t('restaurantPage.series.default'))).toBeVisible();
+    expect(series.getByText(t('restaurantPage.series.fixed'))).toBeVisible();
     await expectNoAxeViolations(container);
   });
 
-  it('says what is not given yet', async () => {
-    await renderConsole({
-      fake: restaurantServer(bareProfile()),
-      path: PATH,
-      signedIn: 'MANAGER',
-    });
-    await screen.findByText('Rooftop Tandoor');
-    const contact = partOf(t('restaurant.contact.title'));
-    expect(factOf(contact, t('restaurant.contact.phone'))).toHaveTextContent(
-      t('restaurant.notGiven'),
-    );
-    expect(factOf(contact, t('restaurant.contact.logo'))).toHaveTextContent(
-      t('restaurant.contact.noLogo'),
-    );
-    const hours = partOf(t('restaurant.hours.title'));
-    expect(within(hours).getAllByText(t('restaurant.hours.closed'))).toHaveLength(7);
-  });
-
-  it('changes the name and the phone, uploads a new logo and keeps the reason', async () => {
-    const fake = restaurantServer().on('POST', '/api/v1/photos', () => ({
-      status: 201,
-      body: PHOTO,
-    }));
-    const { user, container } = await renderConsole({ fake, path: PATH, signedIn: 'MANAGER' });
-    await user.click(
-      await screen.findByRole('button', { name: t('restaurant.contact.changeLabel') }),
-    );
-    const dialog = await screen.findByRole('dialog', { name: t('restaurant.contactDialog.title') });
-    const name = within(dialog).getByLabelText(labelled(t('restaurant.contactDialog.name')));
-    expect(name).toHaveValue('Rooftop Tandoor');
-    await user.clear(name);
-    await user.type(name, 'Rooftop Tandoor and Bar');
-    const phone = within(dialog).getByLabelText(labelled(t('restaurant.contactDialog.phone')));
-    await user.clear(phone);
-    await user.type(phone, '020-2612-9999');
-    await user.clear(within(dialog).getByLabelText(labelled(t('restaurant.contactDialog.email'))));
-    await user.upload(
-      within(dialog).getByLabelText(t('restaurant.contactDialog.logo')),
-      new File([new Uint8Array([0x89, 0x50, 0x4e, 0x47])], 'logo.png', { type: 'image/png' }),
-    );
-    expect(
-      await within(dialog).findByRole('img', {
-        name: t('restaurant.contact.logoAlt', { name: 'Rooftop Tandoor and Bar' }),
-      }),
-    ).toHaveAttribute('src', `http://pos.test/api/v1/photos/${NEW_LOGO}/480`);
-    expect(fake.callsTo('POST', '/api/v1/photos')[0]?.body).toEqual({ contentBase64: 'iVBORw==' });
-    await user.type(
-      within(dialog).getByLabelText(labelled(t('settings.dialog.reason'))),
-      'New sign board',
-    );
-    await expectNoAxeViolations(container);
-    await user.click(saveIn(dialog));
-
-    expect(await screen.findByText(t('restaurant.contactDialog.saved'))).toBeVisible();
-    expect(putsTo(fake)).toEqual([
-      {
-        displayName: 'Rooftop Tandoor and Bar',
-        contact: { phone: '020-2612-9999', email: null },
-        businessHours: week(),
-        logoPhotoId: NEW_LOGO,
-        businessDayCutoff: '04:00',
-        reason: 'New sign board',
-      },
-    ]);
-    const contact = partOf(t('restaurant.contact.title'));
-    await waitFor(() => {
-      expect(factOf(contact, t('restaurant.contact.name'))).toHaveTextContent(
-        'Rooftop Tandoor and Bar',
-      );
-    });
-    expect(factOf(contact, t('restaurant.contact.email'))).toHaveTextContent(
-      t('restaurant.notGiven'),
-    );
-  });
-
-  it('asks for a name, a phone number and an email address that are right, and a longer reason', async () => {
-    const fake = restaurantServer();
+  it('lets a manager change the profile but not what the Owner changes', async () => {
+    const fake = restaurantServer('MANAGER');
     const { user } = await renderConsole({ fake, path: PATH, signedIn: 'MANAGER' });
-    await user.click(
-      await screen.findByRole('button', { name: t('restaurant.contact.changeLabel') }),
-    );
-    const dialog = await screen.findByRole('dialog', { name: t('restaurant.contactDialog.title') });
-    await user.clear(within(dialog).getByLabelText(labelled(t('restaurant.contactDialog.name'))));
-    const phone = within(dialog).getByLabelText(labelled(t('restaurant.contactDialog.phone')));
-    await user.clear(phone);
-    await user.type(phone, '12345');
-    const email = within(dialog).getByLabelText(labelled(t('restaurant.contactDialog.email')));
-    await user.clear(email);
-    await user.type(email, 'desk@');
-    await user.type(within(dialog).getByLabelText(labelled(t('settings.dialog.reason'))), 'ok');
-    await user.click(saveIn(dialog));
-    for (const problem of [
-      t('restaurant.contactDialog.problems.nameRequired'),
-      t('restaurant.contactDialog.problems.phone'),
-      t('restaurant.contactDialog.problems.email'),
-      t('settings.dialog.reasonShort'),
-    ]) {
-      expect(within(dialog).getByText(problem)).toBeVisible();
-    }
-    expect(putsTo(fake)).toEqual([]);
-  });
+    const legal = within(await section(t('restaurantPage.legal.title')));
+    expect(legal.getByText(t('restaurantPage.notOwner'))).toBeVisible();
+    expect(legal.queryByRole('button', { name: t('restaurantPage.change') })).toBeNull();
+    expect(screen.queryByRole('button', { name: t('restaurantPage.taxGroups.add') })).toBeNull();
+    expect(screen.queryByRole('button', { name: t('restaurantPage.series.add') })).toBeNull();
 
-  it('[AUTH-012] lets people who cannot manage the menu remove the logo but not upload one', async () => {
-    // A manager whose custom role does not manage the menu still keeps the profile up to date.
-    const configurer = login('MANAGER');
-    const fake = restaurantServer().on('POST', '/api/v1/auth/pin-login', () => ({
-      status: 200,
-      body: {
-        ...configurer,
-        staff: {
-          ...configurer.staff,
-          customRole: {
-            id: '0199a0e0-0000-7000-8000-000000000c01',
-            name: 'Front of house lead',
-            added: [],
-            removed: ['MENU_MANAGE'],
-          },
-        },
-      },
-    }));
-    const { user } = await renderConsole({ fake, path: PATH, signedIn: 'MANAGER' });
+    const profile = within(await section(t('restaurantPage.profile.title')));
+    await user.click(profile.getByRole('button', { name: t('restaurantPage.change') }));
+    const form = within(await dialog(t('restaurantPage.profile.dialogTitle')));
     await user.click(
-      await screen.findByRole('button', { name: t('restaurant.contact.changeLabel') }),
-    );
-    const dialog = await screen.findByRole('dialog', { name: t('restaurant.contactDialog.title') });
-    expect(within(dialog).getByText(t('restaurant.contactDialog.logoNeedsMenu'))).toBeVisible();
-    expect(
-      within(dialog).queryByRole('button', { name: t('restaurant.contactDialog.replaceLogo') }),
-    ).toBeNull();
-    await user.click(
-      within(dialog).getByRole('button', { name: t('restaurant.contactDialog.removeLogo') }),
-    );
-    expect(within(dialog).getByText(t('restaurant.contact.noLogo'))).toBeVisible();
-    await user.click(saveIn(dialog));
-    await screen.findByText(t('restaurant.contactDialog.saved'));
-    expect(putsTo(fake)).toMatchObject([{ logoPhotoId: null }]);
-  });
-
-  it('changes the opening hours: Monday’s hours every day, Sunday closed, late on Saturday', async () => {
-    const fake = restaurantServer(profile({ businessHours: [] }));
-    const { user, container } = await renderConsole({ fake, path: PATH, signedIn: 'MANAGER' });
-    await user.click(
-      await screen.findByRole('button', { name: t('restaurant.hours.changeLabel') }),
-    );
-    const dialog = await screen.findByRole('dialog', { name: t('restaurant.hoursDialog.title') });
-    expect(within(dialog).getAllByText(t('restaurant.hoursDialog.closed'))).toHaveLength(7);
-    const monday = t('restaurant.days.MON');
-    const windowOf = (day: string, number: number) =>
-      within(dialog).getByRole('group', {
-        name: t('restaurant.hoursDialog.hoursLegend', { day, number }),
-      });
-    const fill = async (day: string, number: number, start: string, end: string) => {
-      const group = windowOf(day, number);
-      await user.type(
-        within(group).getByLabelText(labelled(t('restaurant.hoursDialog.opens'))),
-        start,
-      );
-      await user.type(
-        within(group).getByLabelText(labelled(t('restaurant.hoursDialog.closes'))),
-        end,
-      );
-    };
-    const add = (day: string) =>
-      user.click(
-        within(dialog).getByRole('button', { name: t('restaurant.hoursDialog.addLabel', { day }) }),
-      );
-
-    await add(monday);
-    await fill(monday, 1, '12:00', '15:30');
-    await add(monday);
-    await fill(monday, 2, '19:00', '23:30');
-    await user.click(
-      within(dialog).getByRole('button', {
-        name: t('restaurant.hoursDialog.copy', { day: monday }),
+      form.getByRole('button', {
+        name: t('restaurantPage.profile.addHours', { day: t('restaurantPage.weekday.TUE') }),
       }),
     );
-    const sunday = t('restaurant.days.SUN');
-    for (const number of [2, 1]) {
-      await user.click(
-        within(dialog).getByRole('button', {
-          name: t('restaurant.hoursDialog.removeLabel', { day: sunday, number }),
+    await user.click(form.getByRole('button', { name: t('restaurantPage.save') }));
+    expect(form.getAllByText(t('restaurantPage.problems.HOURS_INVALID')).length).toBeGreaterThan(0);
+    expect(fake.callsTo('PUT', '/api/v1/restaurant/profile')).toHaveLength(0);
+
+    await user.click(
+      form.getByRole('button', {
+        name: t('restaurantPage.profile.removeHours', {
+          day: t('restaurantPage.weekday.TUE'),
+          number: 1,
         }),
-      );
-    }
-    // Saturday's dinner runs past midnight.
-    const saturday = t('restaurant.days.SAT');
-    const late = within(windowOf(saturday, 2)).getByLabelText(
-      labelled(t('restaurant.hoursDialog.closes')),
+      }),
     );
-    await user.clear(late);
-    await user.type(late, '01:00');
-    expect(
-      within(windowOf(saturday, 2)).getByText(t('restaurant.hoursDialog.overnight')),
-    ).toBeVisible();
-    await expectNoAxeViolations(container);
-    await user.click(saveIn(dialog));
+    const email = form.getByRole('textbox', { name: t('restaurantPage.profile.email') });
+    await user.type(email, 'owner@spiceroute.in');
+    // The tablets' accent colour (P3-01a): checked like the other fields.
+    const accent = form.getByRole('textbox', { name: t('restaurantPage.profile.accent') });
+    await user.type(accent, 'red');
+    await user.click(form.getByRole('button', { name: t('restaurantPage.save') }));
+    expect(form.getByText(t('restaurantPage.problems.ACCENT_INVALID'))).toBeVisible();
+    await user.clear(accent);
+    await user.type(accent, '#b4232a');
+    await user.click(form.getByRole('button', { name: t('restaurantPage.save') }));
+    expect(await screen.findByText(t('restaurantPage.profile.saved'))).toBeVisible();
+    expect(fake.callsTo('PUT', '/api/v1/restaurant/profile')[0]?.body).toMatchObject({
+      contact: { phone: '+91 98765 43210', email: 'owner@spiceroute.in' },
+      accentColor: '#B4232A',
+      businessDayCutoff: '04:00',
+    });
+  });
 
-    expect(await screen.findByText(t('restaurant.hoursDialog.saved'))).toBeVisible();
-    const lunchAndDinner = (day: string, end = '23:30') => [
-      { day, start: '12:00', end: '15:30' },
-      { day, start: '19:00', end },
-    ];
-    expect(putsTo(fake)).toEqual([
+  it('adds a tax group after the Owner confirms the second factor', async () => {
+    const fake = restaurantServer().on(
+      'POST',
+      '/api/v1/tax-groups',
+      () => SECOND_FACTOR_REQUIRED,
+      () => ({ status: 201, body: taxGroupViews()[0] }),
+    );
+    const { user } = await renderConsole({ fake, path: PATH, signedIn: 'OWNER' });
+    await user.click(
+      await screen.findByRole('button', { name: t('restaurantPage.taxGroups.add') }),
+    );
+    const form = within(await dialog(t('restaurantPage.taxGroups.addTitle')));
+    await user.type(
+      form.getByRole('textbox', { name: t('restaurantPage.taxGroups.name') }),
+      'GST 18%',
+    );
+    const rates = form.getAllByRole('textbox', { name: t('restaurantPage.taxGroups.rate') });
+    await user.type(rates[0]!, '9');
+    await user.type(rates[1]!, '9');
+    expect(form.getByText(t('restaurantPage.taxGroups.draftTotal', { rate: '18' }))).toBeVisible();
+    await user.click(form.getByRole('button', { name: t('restaurantPage.save') }));
+
+    const confirm = within(await dialog(t('secondFactor.title')));
+    await user.type(
+      await confirm.findByLabelText(new RegExp(`^${t('secondFactor.password')}`)),
+      'correct horse battery',
+    );
+    await user.type(confirm.getByLabelText(new RegExp(`^${t('secondFactor.code')}`)), '123456');
+    await user.click(confirm.getByRole('button', { name: t('secondFactor.confirm') }));
+    expect(
+      await screen.findByText(t('restaurantPage.taxGroups.added', { name: 'GST 18%' })),
+    ).toBeVisible();
+    expect(fake.callsTo('POST', '/api/v1/tax-groups').map((call) => call.body)).toEqual([
       {
-        displayName: 'Rooftop Tandoor',
-        contact: profile().contact,
-        businessHours: [
-          ...lunchAndDinner('MON'),
-          ...lunchAndDinner('TUE'),
-          ...lunchAndDinner('WED'),
-          ...lunchAndDinner('THU'),
-          ...lunchAndDinner('FRI'),
-          ...lunchAndDinner('SAT', '01:00'),
+        name: 'GST 18%',
+        sacCode: '996331',
+        components: [
+          { code: 'CGST', rateBp: 900 },
+          { code: 'SGST', rateBp: 900 },
         ],
-        logoPhotoId: LOGO,
-        businessDayCutoff: '04:00',
+      },
+      {
+        name: 'GST 18%',
+        sacCode: '996331',
+        components: [
+          { code: 'CGST', rateBp: 900 },
+          { code: 'SGST', rateBp: 900 },
+        ],
       },
     ]);
   });
 
-  it('asks for both times of a window, and different ones', async () => {
-    const fake = restaurantServer(profile({ businessHours: [] }));
-    const { user } = await renderConsole({ fake, path: PATH, signedIn: 'MANAGER' });
+  it('archives a tax group with a reason, and makes a series the default', async () => {
+    const fake = restaurantServer()
+      .on('POST', `/api/v1/tax-groups/${EXEMPT}/archive`, () => ({
+        status: 200,
+        body: { ...taxGroupViews()[1], archivedAt: '2026-10-01T10:00:00.000Z' },
+      }))
+      .on('POST', `/api/v1/invoice-series/${TAKEAWAY}/default`, () => ({
+        status: 200,
+        body: { ...seriesViews()[1], isDefault: true },
+      }));
+    const { user } = await renderConsole({ fake, path: PATH, signedIn: 'OWNER' });
     await user.click(
-      await screen.findByRole('button', { name: t('restaurant.hours.changeLabel') }),
+      within(
+        await screen.findByRole('group', {
+          name: t('restaurantPage.taxGroups.actionsFor', { name: 'Exempt' }),
+        }),
+      ).getByRole('button', { name: t('restaurantPage.taxGroups.archive') }),
     );
-    const dialog = await screen.findByRole('dialog', { name: t('restaurant.hoursDialog.title') });
-    const tuesday = t('restaurant.days.TUE');
-    const addTuesday = within(dialog).getByRole('button', {
-      name: t('restaurant.hoursDialog.addLabel', { day: tuesday }),
-    });
-    await user.click(addTuesday);
-    await user.click(addTuesday);
-    const second = within(dialog).getByRole('group', {
-      name: t('restaurant.hoursDialog.hoursLegend', { day: tuesday, number: 2 }),
-    });
-    await user.type(
-      within(second).getByLabelText(labelled(t('restaurant.hoursDialog.opens'))),
-      '18:00',
+    const archive = within(
+      await dialog(t('restaurantPage.taxGroups.archiveTitle', { name: 'Exempt' })),
     );
-    await user.type(
-      within(second).getByLabelText(labelled(t('restaurant.hoursDialog.closes'))),
-      '18:00',
-    );
-    await user.click(saveIn(dialog));
-    expect(within(dialog).getByText(t('restaurant.hoursDialog.problems.time'))).toBeVisible();
-    expect(within(second).getByText(t('restaurant.hoursDialog.problems.same'))).toBeVisible();
-    // Four windows a day at most.
-    await user.click(addTuesday);
-    await user.click(addTuesday);
-    expect(addTuesday).toBeDisabled();
-    expect(putsTo(fake)).toEqual([]);
-  });
-
-  it('changes when the business day ends, and shows the server’s refusal in the dialog', async () => {
-    const refusal =
-      'Changing the cut-off now would move the business date. Change it later in the day, after both the old and the new cut-off time.';
-    const fake = restaurantServer().on(
-      'PUT',
-      PROFILE,
-      () => ({
-        status: 409,
-        body: { code: 'CUTOFF_WOULD_MOVE_BUSINESS_DATE', message: refusal },
-      }),
-      (call) => ({ status: 200, body: { ...profile(), ...(call.body as object) } }),
-    );
-    const { user } = await renderConsole({ fake, path: PATH, signedIn: 'MANAGER' });
-    await user.click(
-      await screen.findByRole('button', { name: t('restaurant.businessDay.changeLabel') }),
-    );
-    const dialog = await screen.findByRole('dialog', { name: t('restaurant.cutoffDialog.title') });
-    const time = within(dialog).getByLabelText(labelled(t('restaurant.cutoffDialog.time')));
-    expect(time).toHaveValue('04:00');
-    await user.clear(time);
-    await user.type(time, '13:00');
-    await user.click(saveIn(dialog));
-    expect(within(dialog).getByText(t('restaurant.cutoffDialog.problems.morning'))).toBeVisible();
-
-    await user.clear(time);
-    await user.type(time, '05:00');
-    await user.click(saveIn(dialog));
-    expect(await within(dialog).findByRole('alert')).toHaveTextContent(refusal);
-    await user.click(saveIn(dialog));
+    await user.type(archive.getByRole('textbox'), 'Not used');
+    await user.click(archive.getByRole('button', { name: t('restaurantPage.taxGroups.archive') }));
     expect(
-      await screen.findByText(t('restaurant.cutoffDialog.saved', { time: '05:00' })),
+      await screen.findByText(t('restaurantPage.taxGroups.archived', { name: 'Exempt' })),
     ).toBeVisible();
-    expect(putsTo(fake)).toMatchObject([
-      { businessDayCutoff: '05:00' },
-      { businessDayCutoff: '05:00' },
-    ]);
-  });
-
-  it('follows changes made on another screen', async () => {
-    let name = 'Rooftop Tandoor';
-    const fake = signsInAs(server(), 'MANAGER').on('GET', RESTAURANT, () => ({
-      status: 200,
-      body: profile({ displayName: name }),
-    }));
-    const { sockets } = await renderConsole({ fake, path: PATH, signedIn: 'MANAGER' });
-    await screen.findByText('Rooftop Tandoor');
-    name = 'Rooftop Tandoor Koregaon Park';
-    act(() => {
-      sockets.sync(0);
-      sockets.last.fire('event', restaurantChanged(1, 'PROFILE'));
+    expect(fake.callsTo('POST', `/api/v1/tax-groups/${EXEMPT}/archive`)[0]?.body).toEqual({
+      reason: 'Not used',
     });
-    expect(await screen.findByText('Rooftop Tandoor Koregaon Park')).toBeVisible();
+    // The group still used by dishes keeps its actions; the default series has no Make default.
+    expect(
+      screen.getByRole('group', {
+        name: t('restaurantPage.taxGroups.actionsFor', { name: 'GST 5%' }),
+      }),
+    ).toBeVisible();
+
+    await user.click(
+      within(
+        screen.getByRole('group', {
+          name: t('restaurantPage.series.actionsFor', { name: 'Takeaway' }),
+        }),
+      ).getByRole('button', { name: t('restaurantPage.series.makeDefault') }),
+    );
+    const confirm = within(
+      await dialog(t('restaurantPage.series.defaultTitle', { name: 'Takeaway' })),
+    );
+    await user.click(confirm.getByRole('button', { name: t('restaurantPage.series.makeDefault') }));
+    await waitFor(() => {
+      expect(fake.callsTo('POST', `/api/v1/invoice-series/${TAKEAWAY}/default`)).toHaveLength(1);
+    });
+    expect(
+      within(
+        screen.getByRole('group', {
+          name: t('restaurantPage.series.actionsFor', { name: 'Dine-in' }),
+        }),
+      ).queryByRole('button', { name: t('restaurantPage.series.makeDefault') }),
+    ).toBeNull();
   });
 
-  it('says when the restaurant cannot be read, and reads it again', async () => {
-    const fake = signsInAs(server(), 'MANAGER').on(
-      'GET',
-      RESTAURANT,
-      () => ({ status: 500, body: { code: 'INTERNAL', message: 'Something went wrong.' } }),
-      () => ({ status: 200, body: profile() }),
+  it('keeps a series format fixed once it has invoices', async () => {
+    const { user } = await renderConsole({
+      fake: restaurantServer(),
+      path: PATH,
+      signedIn: 'OWNER',
+    });
+    await user.click(
+      within(
+        await screen.findByRole('group', {
+          name: t('restaurantPage.series.actionsFor', { name: 'Dine-in' }),
+        }),
+      ).getByRole('button', { name: t('restaurantPage.series.edit') }),
     );
-    const { user } = await renderConsole({ fake, path: PATH, signedIn: 'MANAGER' });
-    expect(await screen.findByText(t('restaurant.loadFailed'))).toBeVisible();
-    await user.click(screen.getByRole('button', { name: t('states.retry') }));
-    expect(await screen.findByText('Rooftop Tandoor')).toBeVisible();
+    const form = within(await dialog(t('restaurantPage.series.editTitle', { name: 'Dine-in' })));
+    expect(form.getByText(t('restaurantPage.series.fixedHint'))).toBeVisible();
+    expect(form.getByRole('textbox', { name: t('restaurantPage.series.prefix') })).toBeDisabled();
   });
 });

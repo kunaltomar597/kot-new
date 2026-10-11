@@ -53,6 +53,19 @@ bulk photo upload matched by file name or item code with manual correction.
 Acceptance: pipeline test with a fixture menu (provider call mocked in CI); review screen blocks
 commit until reviewed.
 
+Split in three (2026-10-02):
+
+- **P6-04a Control Plane reading service.** Signed job API (`/v1/menu-extractions`), files held
+  only until read, a worker calling the AI provider (Anthropic Messages API, forced tool call) with
+  the key from the Control Plane's secret store, retries, a daily limit per restaurant, audit; the
+  provider mocked in CI.
+- **P6-04b Review and import on the restaurant PC.** The local server sends the photos (resized
+  first) to the Control Plane and fetches the draft; the console's review screen shows every dish,
+  lets the manager correct it and set what a printed menu cannot say (tax group, station), blocks
+  the import until each dish is checked, then imports through the P1-05 template path.
+- **P6-04c Bulk photo upload (ONB-007).** Many photos at once, matched to dishes by file name or
+  short code, with a table to correct the matches before upload.
+
 ## P6-05 Should-have operations batch
 
 Requirements: ORD-016 (hold and fire), TBL-006 (merge tables, transfer items), MENU-007
@@ -64,3 +77,22 @@ Depends on: Phase 1 to 3 WPs for each feature.
 Notes: split into P6-05a, P6-05b, ... per feature group when started. Each feature ships behind a
 setting where it changes workflow.
 Acceptance: per feature, tests and a short PROGRESS.md entry.
+
+Split (2026-10-02), after a survey of what P1 to P5 already built (KDS-010 was done):
+
+- **P6-05a Finishing what was half built.** Kitchen screens with one or more stations and the
+  Expo/Pass view (KDS-002, the M part too), automatic escalation of uncollected food (KDS-006),
+  "On break" in the waiter app (NTF-009), the denomination count at shift close (BILL-013).
+- **P6-05b Hold and fire** (ORD-016).
+- **P6-05c Ordering.** Takeaway from the waiter app (WTR-013), time-based item availability
+  (MENU-007). Done: per-dish daily hours, checked like a combo's hours on every surface.
+- **P6-05d Tables.** Merge tables and transfer items (TBL-006), "Needs cleaning" (TBL-004).
+  Done: merge closes the joining table's session; dishes move as whole lines; cleaning is a
+  setting, off by default.
+- **P6-05e Billing.** Amount in words (BILL-001), print the bill from the waiter app (WTR-008).
+  Done: printing from the app is a setting, off by default (the §4.2 matrix does not allow it).
+- **P6-05f Setup: the floor.** Manage → Floor (sections and tables; the API existed, the page did
+  not) with the drag-and-drop floor plan (ONB-004 step 5), shown on the POS too. Done.
+- **P6-05g Printer auto-discovery** (ONB-004 step 6): find network receipt printers on the
+  restaurant's network from Manage → Kitchen and printers, and add one in a tap. Done (port 9100
+  on the PC's own private /24).

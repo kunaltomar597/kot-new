@@ -5,8 +5,10 @@ fleet health, release channels and rollouts, support diagnostics and AI menu imp
 NestJS API on managed PostgreSQL in an India region, with separate development, staging and
 production (VCP-009).
 
-Built so far: P0-17a (ADR-0012). Later: P7-01 to P7-04, P7-08 and P6-04; the web app for vendor
-staff comes in P7-02.
+Built so far: P0-17a (ADR-0012) and P6-04a (AI menu import). Later: P7-01 to P7-04 and P7-08;
+the web app for vendor staff is `apps/control-plane-web` (P7-02e), served at `/` when
+`CP_WEB_DIR` is set. Fleet monitoring (P7-03) is in `src/fleet/`: health and alerts from
+heartbeats, the audit chain checks, and the alert webhook.
 
 ## What exists (P0-17a)
 
@@ -45,14 +47,44 @@ staff comes in P7-02.
 - Contracts: `@rp/contracts/control-plane`. The generated document is
   `docs/api/control-plane.openapi.json`.
 
+## AI menu import (P6-04a)
+
+- `POST /v1/menu-extractions` (signed): a restaurant's server sends up to 10 photos (JPEG, PNG,
+  WebP, at most 5 MB each) or PDFs, 20 MB together. The answer (202) is the job; `GET
+/v1/menu-extractions/:id` gives its status and, once `DONE`, the draft (`MenuDraft`: sections,
+  dishes with prices in paise, sizes, veg marks, spice, tags, add-ons and what the reader was
+  unsure of). A job belongs to the restaurant (tenant) that sent it.
+- A worker in the service reads queued jobs two at a time through `MenuExtractor`. In production
+  that is `AnthropicMenuExtractor`: one Messages API call with every file and a forced
+  `record_menu` tool call, so the answer is structured; prices come back as printed text and are
+  turned into paise with integer arithmetic. Tests use a scripted reader; CI never calls the
+  provider.
+- A busy provider is tried three times, 30 seconds apart; a job cut off by a restart is read
+  again. The files are deleted as soon as a job is done or failed; drafts are dropped after 30
+  days, while the job's record (model, tokens) stays for the costs. Every request and result is
+  audited.
+- Without `CP_AI_API_KEY`, `POST` answers 503 `AI_IMPORT_UNAVAILABLE`. Each restaurant may read
+  `CP_AI_DAILY_LIMIT` menus in 24 hours (429 `AI_IMPORT_LIMIT`). Setting up the key is
+  [manual task 22](../../manual-tasks/22-ai-menu-import.md).
+
 ## Configuration
 
 Environment variables only; see `.env.example`.
 
 - `CP_ENV` is `development`, `staging` or `production`. Staging and production require
-  `sslmode=require` (or stricter) in `DATABASE_URL` and send HSTS.
+  `sslmode=require` (or stricter) in `DATABASE_URL` and send HSTS. Every answer carries the
+  security headers of `src/http/pipeline.ts` (`API_SECURITY_HEADERS`), the vendor web app's
+  pages a CSP with Trusted Types, and a path outside `/v1` that nothing served is the API's JSON
+  404 (P8-03c1, `docs/security/dast.md`).
 - `CP_TRUST_PROXY` is the number of reverse proxies in front of the service. It is needed so the
-  enrolment rate limit sees the client's address, not the load balancer's.
+  enrolment rate limit sees the client's address, not the load balancer's. Staging and production
+  refuse to start without it while the request limits are on.
+- `CP_REQUEST_BURST` (300) and `CP_REQUESTS_PER_SECOND` (30) limit each client address, and
+  `CP_PUBLIC_REQUEST_BURST` (60) and `CP_PUBLIC_REQUESTS_PER_SECOND` (5) the digital bill pages
+  on top of that: past them the answer is 429 `RATE_LIMITED` with `Retry-After`, before any body
+  is read (`src/http/request-limits.ts`, threat CP-D1). The health probe is never limited. A
+  burst of 0 turns them off. These are each instance's own; the edge in front of the service
+  limits across instances (`infra/edge/README.md`).
 - Serve the API at the root of its host. The signature covers the path, so a proxy must not
   rewrite it.
 
@@ -92,3 +124,22 @@ Schema changes follow the local server's routine (`apps/server/README.md`): edit
   database per test file.
 - `@rp/control-plane/testing` exports what the local server's acceptance test (P0-17b) needs to
   run a real Control Plane beside it.
+- `test/integration/tenant-isolation.int.test.ts` calls every endpoint a PC may call with another
+  restaurant's ids (SEC-005, ADR-0021). A new PC endpoint fails it until it has its case there.
+- `test/helpers/vendor.ts` sets accounts up through the service; the API's own set-up steps, and
+  their limit of 20 tries per address, are tested in `vendor-staff.int.test.ts`.
+
+## Security (P8-03b4a)
+
+What the Control Plane's threat model (`docs/security/threat-models/control-plane.md`) asked for:
+
+- Vendor sign-in counts each try before checking it, spends an authenticator code once, and
+  answers an unknown email or a disabled account as a wrong password (CP-S1).
+- A Super Admin's account is reset only by two other Super Admins (CP-E3).
+- Cloud backups are kept by the days the Control Plane stored them, dated no later than its clock,
+  8 a day per PC (CP-T2).
+- Diagnostics bundles are deleted 30 days after they arrive (CP-I2).
+- Outside services are `https:` in staging and production; the request log masks bill links and
+  storage grants (`src/http/log-redaction.ts`, CP-I3).
+- Daily limits (AI menus, digital bills) are counted under a lock (`src/database/advisory-lock.ts`,
+  CP-D3).

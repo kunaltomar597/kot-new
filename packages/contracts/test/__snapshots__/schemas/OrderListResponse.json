@@ -131,6 +131,7 @@
                     "type": "string",
                     "enum": [
                       "PENDING_APPROVAL",
+                      "HELD",
                       "SENT",
                       "PREPARING",
                       "READY",
@@ -141,7 +142,8 @@
                       "VOIDED"
                     ]
                   },
-                  "instructions": { "type": ["string", "null"] }
+                  "instructions": { "type": ["string", "null"] },
+                  "endReason": { "type": ["string", "null"] }
                 },
                 "required": [
                   "id",
@@ -345,6 +347,7 @@
                     "type": "string",
                     "enum": [
                       "PENDING_APPROVAL",
+                      "HELD",
                       "SENT",
                       "PREPARING",
                       "READY",
@@ -355,7 +358,8 @@
                       "VOIDED"
                     ]
                   },
-                  "instructions": { "type": ["string", "null"] }
+                  "instructions": { "type": ["string", "null"] },
+                  "endReason": { "type": ["string", "null"] }
                 },
                 "required": [
                   "id",

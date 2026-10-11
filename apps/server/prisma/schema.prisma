@@ -63,6 +63,7 @@ enum TableState {
   OCCUPIED
   BILL_REQUESTED
   BILL_PRINTED
+  NEEDS_CLEANING
 }
 
 enum TableSessionStatus {
@@ -126,6 +127,8 @@ enum OrderStatus {
 /// @rp/domain ORDER_ITEM_STATES.
 enum OrderItemState {
   PENDING_APPROVAL
+  /// Ordered by staff and kept from the kitchen until fired (ORD-016).
+  HELD
   SENT
   PREPARING
   READY
@@ -224,11 +227,17 @@ model Restaurant {
   logoPhotoId       String?  @map("logo_photo_id") @db.Uuid
   /// Restrict: a photo in use as the logo is never removed by photo clean-up (P1-04).
   logoPhoto         Photo?   @relation(fields: [logoPhotoId], references: [id], onDelete: Restrict)
+  /// Brand colour of the table tablets, "#RRGGBB" (TAB-003); null: the standard colour.
+  accentColor       String?  @map("accent_color")
   timeZone          String   @default("Asia/Kolkata") @map("time_zone")
   /// Business-day cut-off, local time HH:MM (default 04:00).
   businessDayCutoff String   @default("04:00") @map("business_day_cutoff")
   createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt         DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  relayOrders RelayOrder[]
+
+  relayServiceRequests RelayServiceRequest[]
 
   @@map("restaurants")
 }
@@ -291,22 +300,21 @@ model DailyCounter {
 // ---------------------------------------------------------------- staff, access, devices
 
 model Role {
-  id                  String    @id @default(uuid(7)) @db.Uuid
-  restaurantId        String    @map("restaurant_id") @db.Uuid
-  /// Stable key: "MANAGER" for a built-in role, "custom:<id>" for a custom role (P4-02e).
-  key                 String
-  name                String
-  baseRole            StaffRole @map("base_role")
-  builtIn             Boolean   @default(true) @map("built_in")
-  /// Capabilities a custom role may use outright on top of its base role (AUTH-012).
-  capabilities        String[]  @default([])
-  /// Capabilities of the base role a custom role may not use (P4-02e).
-  removedCapabilities String[]  @default([]) @map("removed_capabilities")
-  /// Custom roles are archived, never deleted: deactivated people keep theirs.
-  archivedAt          DateTime? @map("archived_at") @db.Timestamptz(3)
-  staff               Staff[]
-  createdAt           DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt           DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  id           String    @id @default(uuid(7)) @db.Uuid
+  restaurantId String    @map("restaurant_id") @db.Uuid
+  /// Stable key, e.g. "MANAGER"; custom roles (later) get their own keys.
+  key          String
+  name         String
+  baseRole     StaffRole @map("base_role")
+  builtIn      Boolean   @default(true) @map("built_in")
+  /// Extra capabilities granted on top of the base role (custom roles, AUTH-012). Only those
+  /// `@rp/domain` `extraCapabilitiesOf` accepts are ever applied.
+  capabilities String[]  @default([])
+  /// Custom roles are archived, never deleted; built-in roles are never archived.
+  archivedAt   DateTime? @map("archived_at") @db.Timestamptz(3)
+  staff        Staff[]
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt    DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   @@unique([restaurantId, key])
   @@index([restaurantId])
@@ -333,6 +341,7 @@ model Staff {
   pagers           Device[]
   shiftAssignments ShiftAssignment[]
   shifts           Shift[]
+  digitalBills     DigitalBill[]
   createdAt        DateTime          @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt        DateTime          @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
 
@@ -368,44 +377,61 @@ model Credential {
 }
 
 model Device {
-  id                     String       @id @default(uuid(7)) @db.Uuid
-  restaurantId           String       @map("restaurant_id") @db.Uuid
-  type                   DeviceType
-  name                   String
-  status                 DeviceStatus @default(PENDING)
+  id                        String                @id @default(uuid(7)) @db.Uuid
+  restaurantId              String                @map("restaurant_id") @db.Uuid
+  type                      DeviceType
+  name                      String
+  status                    DeviceStatus          @default(PENDING)
   /// Device public key (SPKI PEM) registered at pairing (AUTH-007).
-  publicKey              String?      @map("public_key")
+  publicKey                 String?               @map("public_key")
   /// "Ed25519" or "ES256".
-  keyAlgorithm           String?      @map("key_algorithm")
-  certificateFingerprint String?      @map("certificate_fingerprint")
-  pairedAt               DateTime?    @map("paired_at") @db.Timestamptz(3)
-  pairedById             String?      @map("paired_by_id") @db.Uuid
-  revokedAt              DateTime?    @map("revoked_at") @db.Timestamptz(3)
-  lastSeenAt             DateTime?    @map("last_seen_at") @db.Timestamptz(3)
-  appVersion             String?      @map("app_version")
+  keyAlgorithm              String?               @map("key_algorithm")
+  certificateFingerprint    String?               @map("certificate_fingerprint")
+  pairedAt                  DateTime?             @map("paired_at") @db.Timestamptz(3)
+  pairedById                String?               @map("paired_by_id") @db.Uuid
+  revokedAt                 DateTime?             @map("revoked_at") @db.Timestamptz(3)
+  lastSeenAt                DateTime?             @map("last_seen_at") @db.Timestamptz(3)
+  appVersion                String?               @map("app_version")
+  /// The client API the app last said it speaks (`x-rp-client`, UPD-006), e.g. `1.0`.
+  clientApi                 String?               @map("client_api")
   /// Table a table tablet is bound to (AUTH-009).
-  tableId                String?      @map("table_id") @db.Uuid
-  table                  DiningTable? @relation(fields: [tableId], references: [id])
-  /// Station a kitchen screen shows (KDS-002).
-  stationId              String?      @map("station_id") @db.Uuid
-  station                Station?     @relation(fields: [stationId], references: [id])
+  tableId                   String?               @map("table_id") @db.Uuid
+  table                     DiningTable?          @relation(fields: [tableId], references: [id])
+  /// Station a kitchen screen shows (KDS-002); its first, when it shows several.
+  stationId                 String?               @map("station_id") @db.Uuid
+  station                   Station?              @relation(fields: [stationId], references: [id])
+  /// The screen's other stations (KDS-002: one or more), after `stationId`.
+  extraStationIds           String[]              @default([]) @map("extra_station_ids") @db.Uuid
   /// Person wearing a pager, or holding a waiter phone: whom it alerts (P2-06a).
-  staffId                String?      @map("staff_id") @db.Uuid
+  staffId                   String?               @map("staff_id") @db.Uuid
   /// Serial printed (and in the QR code) on a pager (PGR-012).
-  serial                 String?
+  serial                    String?
   /// Peppered Argon2id hash of the pager's MQTT secret (SEC-012); the secret is shown once when issued (P2-04).
-  mqttSecretHash         String?      @map("mqtt_secret_hash")
-  /// Last heartbeat's battery, signal and firmware (PGR-007).
-  batteryPercent         Int?         @map("battery_percent")
-  rssi                   Int?
-  firmwareVersion        String?      @map("firmware_version")
-  /// Pagers: heard from within 3 heartbeats (the pager broker). Kitchen screens and table tablets:
-  /// a live connection, or one lost less than devices.offlineAfterSeconds ago (DeviceLiveness).
-  online                 Boolean      @default(false)
-  staff                  Staff?       @relation(fields: [staffId], references: [id])
-  sessions               Session[]
-  createdAt              DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt              DateTime     @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  mqttSecretHash            String?               @map("mqtt_secret_hash")
+  /// Sign-ins to the broker as this pager with a wrong secret since its credential was issued (PAGER-R3).
+  mqttSignInFailures        Int                   @default(0) @map("mqtt_sign_in_failures")
+  mqttSignInFailedAt        DateTime?             @map("mqtt_sign_in_failed_at") @db.Timestamptz(3)
+  /// Last battery and signal: a pager's heartbeat (PGR-007), an app's health report (TAB-015).
+  batteryPercent            Int?                  @map("battery_percent")
+  rssi                      Int?
+  firmwareVersion           String?               @map("firmware_version")
+  /// An app's last health report: on charge, and how it reached the network (TAB-015).
+  charging                  Boolean?
+  /// "WIFI", "ETHERNET", "CELLULAR", "NONE" or "OTHER" (`NetworkKind`).
+  network                   String?
+  /// Pagers: heard from within 3 heartbeats (the pager service). Tablets and kitchen screens:
+  /// connected, or not yet away for `devices.offlineAlertSeconds` (the presence monitor).
+  online                    Boolean               @default(false)
+  /// Wrong PINs and passwords typed on this device, for anyone, in the current window (PC-S5).
+  pinFailures               Int                   @default(0) @map("pin_failures")
+  pinFailureWindowStartedAt DateTime?             @map("pin_failure_window_started_at") @db.Timestamptz(3)
+  /// The device takes no PINs or passwords until then, unless a manager lets it sooner.
+  pinsLockedUntil           DateTime?             @map("pins_locked_until") @db.Timestamptz(3)
+  staff                     Staff?                @relation(fields: [staffId], references: [id])
+  sessions                  Session[]
+  firmwareUpdates           PagerFirmwareUpdate[]
+  createdAt                 DateTime              @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt                 DateTime              @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   @@index([restaurantId, status])
   @@index([restaurantId, serial])
@@ -479,22 +505,24 @@ model OverrideGrant {
 
 /// A manager's one-time code for pairing one device (AUTH-007).
 model PairingCode {
-  id           String     @id @default(uuid(7)) @db.Uuid
-  restaurantId String     @map("restaurant_id") @db.Uuid
+  id              String     @id @default(uuid(7)) @db.Uuid
+  restaurantId    String     @map("restaurant_id") @db.Uuid
   /// SHA-256 of the code; the code itself is shown once and never stored.
-  codeHash     String     @unique @map("code_hash")
-  type         DeviceType
-  name         String
-  tableId      String?    @map("table_id") @db.Uuid
-  stationId    String?    @map("station_id") @db.Uuid
-  staffId      String?    @map("staff_id") @db.Uuid
+  codeHash        String     @unique @map("code_hash")
+  type            DeviceType
+  name            String
+  tableId         String?    @map("table_id") @db.Uuid
+  stationId       String?    @map("station_id") @db.Uuid
+  /// A kitchen screen's other stations (KDS-002).
+  extraStationIds String[]   @default([]) @map("extra_station_ids") @db.Uuid
+  staffId         String?    @map("staff_id") @db.Uuid
   /// Manager who created the code; null for the installer's bootstrap code.
-  createdById  String?    @map("created_by_id") @db.Uuid
-  expiresAt    DateTime   @map("expires_at") @db.Timestamptz(3)
-  usedAt       DateTime?  @map("used_at") @db.Timestamptz(3)
-  deviceId     String?    @map("device_id") @db.Uuid
-  createdAt    DateTime   @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt    DateTime   @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  createdById     String?    @map("created_by_id") @db.Uuid
+  expiresAt       DateTime   @map("expires_at") @db.Timestamptz(3)
+  usedAt          DateTime?  @map("used_at") @db.Timestamptz(3)
+  deviceId        String?    @map("device_id") @db.Uuid
+  createdAt       DateTime   @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt       DateTime   @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   @@index([restaurantId])
   @@index([expiresAt])
@@ -519,25 +547,28 @@ model Section {
 }
 
 model DiningTable {
-  id           String            @id @default(uuid(7)) @db.Uuid
-  restaurantId String            @map("restaurant_id") @db.Uuid
-  sectionId    String            @map("section_id") @db.Uuid
-  section      Section           @relation(fields: [sectionId], references: [id])
+  id              String            @id @default(uuid(7)) @db.Uuid
+  restaurantId    String            @map("restaurant_id") @db.Uuid
+  sectionId       String            @map("section_id") @db.Uuid
+  section         Section           @relation(fields: [sectionId], references: [id])
   /// Number or name shown to staff and on KOTs, e.g. "12" or "Terrace 3".
-  label        String
-  capacity     Int               @default(4)
-  state        TableState        @default(FREE)
+  label           String
+  capacity        Int               @default(4)
+  state           TableState        @default(FREE)
   /// Position on the visual floor plan (S requirement), free-form.
-  layout       Json?
-  displayOrder Int               @default(0) @map("display_order")
-  externalId   String?           @map("external_id")
-  archivedAt   DateTime?         @map("archived_at") @db.Timestamptz(3)
-  sessions     TableSession[]
-  devices      Device[]
-  orders       Order[]
-  assignments  ShiftAssignment[]
-  createdAt    DateTime          @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt    DateTime          @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  layout          Json?
+  displayOrder    Int               @default(0) @map("display_order")
+  externalId      String?           @map("external_id")
+  /// The table's QR code token (QR-001, P5-04); the relay keeps only its SHA-256.
+  qrToken         String?           @unique @map("qr_token")
+  qrTokenIssuedAt DateTime?         @map("qr_token_issued_at") @db.Timestamptz(3)
+  archivedAt      DateTime?         @map("archived_at") @db.Timestamptz(3)
+  sessions        TableSession[]
+  devices         Device[]
+  orders          Order[]
+  assignments     ShiftAssignment[]
+  createdAt       DateTime          @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt       DateTime          @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   @@unique([restaurantId, label])
   @@index([restaurantId])
@@ -545,25 +576,27 @@ model DiningTable {
 }
 
 model TableSession {
-  id                 String             @id @default(uuid(7)) @db.Uuid
-  restaurantId       String             @map("restaurant_id") @db.Uuid
-  tableId            String             @map("table_id") @db.Uuid
-  table              DiningTable        @relation(fields: [tableId], references: [id])
-  businessDate       DateTime           @map("business_date") @db.Date
-  status             TableSessionStatus @default(OPEN)
-  covers             Int?
-  waiterId           String?            @map("waiter_id") @db.Uuid
-  openedAt           DateTime           @default(now()) @map("opened_at") @db.Timestamptz(3)
-  closedAt           DateTime?          @map("closed_at") @db.Timestamptz(3)
-  closeReason        String?            @map("close_reason")
+  id                  String             @id @default(uuid(7)) @db.Uuid
+  restaurantId        String             @map("restaurant_id") @db.Uuid
+  tableId             String             @map("table_id") @db.Uuid
+  table               DiningTable        @relation(fields: [tableId], references: [id])
+  businessDate        DateTime           @map("business_date") @db.Date
+  status              TableSessionStatus @default(OPEN)
+  covers              Int?
+  waiterId            String?            @map("waiter_id") @db.Uuid
+  openedAt            DateTime           @default(now()) @map("opened_at") @db.Timestamptz(3)
+  closedAt            DateTime?          @map("closed_at") @db.Timestamptz(3)
+  closeReason         String?            @map("close_reason")
   /// Set when guests moved here from another table (TBL-006).
-  movedFromSessionId String?            @map("moved_from_session_id") @db.Uuid
-  orders             Order[]
-  invoices           Invoice[]
-  serviceRequests    ServiceRequest[]
-  createdAt          DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt          DateTime           @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
-  bill               Bill?
+  movedFromSessionId  String?            @map("moved_from_session_id") @db.Uuid
+  /// Set when this table's guests joined another table's session, for one bill (TBL-006).
+  mergedIntoSessionId String?            @map("merged_into_session_id") @db.Uuid
+  orders              Order[]
+  invoices            Invoice[]
+  serviceRequests     ServiceRequest[]
+  createdAt           DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt           DateTime           @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  bill                Bill?
 
   @@index([restaurantId, businessDate])
   @@index([tableId, status])
@@ -725,6 +758,9 @@ model Item {
   stationId       String              @map("station_id") @db.Uuid
   station         Station             @relation(fields: [stationId], references: [id])
   prepTimeMinutes Int?                @map("prep_time_minutes")
+  /// Served only between these local times "HH:MM", both or neither (MENU-007).
+  windowStart     String?             @map("window_start")
+  windowEnd       String?             @map("window_end")
   available       Boolean             @default(true)
   /// Counts stock in stock_levels when true (MENU-006).
   trackStock      Boolean             @default(false) @map("track_stock")
@@ -1017,6 +1053,7 @@ model Order {
   createdAt      DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt      DateTime      @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
   bill           Bill?
+  relayOrder     RelayOrder?
 
   @@unique([restaurantId, businessDate, orderNumber])
   @@index([tableSessionId])
@@ -1034,6 +1071,9 @@ model OrderItem {
   item                 Item                 @relation(fields: [itemId], references: [id])
   variantId            String?              @map("variant_id") @db.Uuid
   variant              Variant?             @relation(fields: [variantId], references: [id])
+  /// The diner's or device's own id of the line (OrderLineRequest.clientLineId), for status back to
+  /// the QR page (QR-007).
+  clientLineId         String?              @map("client_line_id") @db.Uuid
   /// Combo component lines point at the combo's own order item.
   parentOrderItemId    String?              @map("parent_order_item_id") @db.Uuid
   parent               OrderItem?           @relation("ComboLines", fields: [parentOrderItemId], references: [id])
@@ -1072,6 +1112,8 @@ model OrderItem {
   updatedAt            DateTime             @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   @@index([orderId])
+  // A combo line's parts (P8-01a: read on every kitchen step and by the live order feed).
+  @@index([parentOrderItemId])
   @@index([restaurantId, businessDate, state])
   @@index([stationId, state])
   @@map("order_items")
@@ -1163,45 +1205,48 @@ enum AlertStatus {
 /// Something a person must act on (NTF-001). P1-09 raises "ready, not collected" from the KDS
 /// (KDS-006); the notification engine (P2-03) adds rules, delivery, acknowledgement and escalation.
 model Alert {
-  id               String      @id @default(uuid(7)) @db.Uuid
-  restaurantId     String      @map("restaurant_id") @db.Uuid
-  businessDate     DateTime    @map("business_date") @db.Date
+  id                     String      @id @default(uuid(7)) @db.Uuid
+  restaurantId           String      @map("restaurant_id") @db.Uuid
+  businessDate           DateTime    @map("business_date") @db.Date
   /// e.g. "READY_NOT_COLLECTED".
-  type             String
-  status           AlertStatus @default(OPEN)
-  kotId            String?     @map("kot_id") @db.Uuid
-  kot              Kot?        @relation(fields: [kotId], references: [id])
-  tableId          String?     @map("table_id") @db.Uuid
-  raisedById       String?     @map("raised_by_id") @db.Uuid
-  raisedByDeviceId String?     @map("raised_by_device_id") @db.Uuid
+  type                   String
+  status                 AlertStatus @default(OPEN)
+  kotId                  String?     @map("kot_id") @db.Uuid
+  kot                    Kot?        @relation(fields: [kotId], references: [id])
+  tableId                String?     @map("table_id") @db.Uuid
+  raisedById             String?     @map("raised_by_id") @db.Uuid
+  raisedByDeviceId       String?     @map("raised_by_device_id") @db.Uuid
   /// What the alert says, e.g. the table and the items waiting.
-  payload          Json        @default("{}")
-  acknowledgedAt   DateTime?   @map("acknowledged_at") @db.Timestamptz(3)
-  acknowledgedById String?     @map("acknowledged_by_id") @db.Uuid
+  payload                Json        @default("{}")
+  acknowledgedAt         DateTime?   @map("acknowledged_at") @db.Timestamptz(3)
+  acknowledgedById       String?     @map("acknowledged_by_id") @db.Uuid
+  /// The pager, phone or screen the acknowledgement came from (PAGER-R2).
+  acknowledgedByDeviceId String?     @map("acknowledged_by_device_id") @db.Uuid
   /// The table session or order the alert is about (P2-03).
-  tableSessionId   String?     @map("table_session_id") @db.Uuid
-  orderId          String?     @map("order_id") @db.Uuid
+  tableSessionId         String?     @map("table_session_id") @db.Uuid
+  orderId                String?     @map("order_id") @db.Uuid
   /// One open alert per cause, e.g. "bill:<sessionId>": a repeated trigger does not stack alerts.
-  dedupeKey        String?     @map("dedupe_key")
+  dedupeKey              String?     @map("dedupe_key")
   /// Who is alerted now (the escalation adds the managers on duty).
-  recipientIds     String[]    @default([]) @map("recipient_ids") @db.Uuid
-  channels         String[]    @default([])
-  pagerText        String?     @map("pager_text")
+  recipientIds           String[]    @default([]) @map("recipient_ids") @db.Uuid
+  channels               String[]    @default([])
+  pagerText              String?     @map("pager_text")
   /// Persisted deadlines, so repeats and escalation survive a restart (P2-03).
-  escalateAt       DateTime?   @map("escalate_at") @db.Timestamptz(3)
-  nextRepeatAt     DateTime?   @map("next_repeat_at") @db.Timestamptz(3)
-  escalatedAt      DateTime?   @map("escalated_at") @db.Timestamptz(3)
-  escalatedTo      String[]    @default([]) @map("escalated_to") @db.Uuid
-  repeatCount      Int         @default(0) @map("repeat_count")
-  clearedAt        DateTime?   @map("cleared_at") @db.Timestamptz(3)
-  createdAt        DateTime    @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt        DateTime    @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  escalateAt             DateTime?   @map("escalate_at") @db.Timestamptz(3)
+  nextRepeatAt           DateTime?   @map("next_repeat_at") @db.Timestamptz(3)
+  escalatedAt            DateTime?   @map("escalated_at") @db.Timestamptz(3)
+  escalatedTo            String[]    @default([]) @map("escalated_to") @db.Uuid
+  repeatCount            Int         @default(0) @map("repeat_count")
+  clearedAt              DateTime?   @map("cleared_at") @db.Timestamptz(3)
+  createdAt              DateTime    @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt              DateTime    @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   @@index([restaurantId, status])
   @@index([kotId])
   @@index([status, escalateAt])
   @@index([status, nextRepeatAt])
   @@index([restaurantId, dedupeKey])
+  @@index([restaurantId, businessDate])
   @@map("alerts")
 }
 
@@ -1255,26 +1300,19 @@ model ServiceRequest {
   createdAt        DateTime             @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt        DateTime             @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
 
+  relayRequests RelayServiceRequest[]
+
   @@index([restaurantId, state])
   @@index([tableSessionId, state])
+  @@index([restaurantId, businessDate])
   @@map("service_requests")
 }
 
 /// @rp/domain RECOMMENDATION_LAYERS.
 enum RecommendationLayer {
-  PINNED
   RULE
   LEARNED
-  BOOSTED
   BEST_SELLER
-}
-
-/// @rp/contracts RECOMMENDATION_PREFERENCES.
-enum RecommendationPreferenceKind {
-  NORMAL
-  PIN
-  BOOST
-  BLOCK
 }
 
 /// @rp/contracts RECOMMENDATION_EVENT_KINDS.
@@ -1317,24 +1355,6 @@ model RecommendationRule {
   @@map("recommendation_rules")
 }
 
-/// How the manager wants a dish suggested (REC-009, P4-03c): pinned first, boosted before the best
-/// sellers, blocked never, or NORMAL. One row per dish, changed in place (back to NORMAL rather than
-/// deleted), each change in the audit log. It applies at once, without publishing the menu.
-model RecommendationPreference {
-  id           String                       @id @default(uuid(7)) @db.Uuid
-  restaurantId String                       @map("restaurant_id") @db.Uuid
-  itemId       String                       @map("item_id") @db.Uuid
-  preference   RecommendationPreferenceKind
-  /// The restaurant's own words shown with a pinned or boosted dish (a check constraint).
-  label        String?
-  updatedById  String?                      @map("updated_by_id") @db.Uuid
-  createdAt    DateTime                     @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt    DateTime                     @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
-
-  @@unique([restaurantId, itemId])
-  @@map("recommendation_preferences")
-}
-
 /// What was done with a suggestion (REC-008): shown, opened or put in the cart (from the apps), or
 /// ordered (from an order line that carries it). Table-level only (REC-007): the table session and
 /// the device or staff member, never a diner. Feeds the recommendation report (RPT-012).
@@ -1358,6 +1378,47 @@ model RecommendationEvent {
 
   @@index([restaurantId, businessDate, kind])
   @@map("recommendation_events")
+}
+
+/// "Frequently ordered together" (REC-003, P6-02): the association rules the nightly job learned
+/// from this restaurant's own orders, replaced as a whole by each run. Rates are basis points and
+/// percent; the score orders them (confidence weighted by lift).
+model LearnedAssociation {
+  id           String   @id @default(uuid(7)) @db.Uuid
+  restaurantId String   @map("restaurant_id") @db.Uuid
+  fromItemId   String   @map("from_item_id") @db.Uuid
+  toItemId     String   @map("to_item_id") @db.Uuid
+  /// Visits (or takeaway orders) holding both dishes.
+  pairCount    Int      @map("pair_count")
+  supportBp    Int      @map("support_bp")
+  confidenceBp Int      @map("confidence_bp")
+  liftPercent  Int      @map("lift_percent")
+  score        Int
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt    DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@unique([restaurantId, fromItemId, toItemId])
+  @@map("learned_associations")
+}
+
+/// One run of the learning job (P6-02): the window it read and what it found.
+model LearningRun {
+  id           String   @id @default(uuid(7)) @db.Uuid
+  restaurantId String   @map("restaurant_id") @db.Uuid
+  /// Business dates read, both included.
+  windowFrom   DateTime @map("window_from") @db.Date
+  windowTo     DateTime @map("window_to") @db.Date
+  orders       Int
+  baskets      Int
+  associations Int
+  /// Enough orders to learn from (`reco.minOrders`).
+  active       Boolean
+  durationMs   Int      @map("duration_ms")
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt    DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@index([restaurantId, createdAt])
+  @@map("learning_runs")
 }
 
 /// A note printed at a station that is not a kitchen ticket, e.g. "Moved from T4 to T7" when a
@@ -1528,6 +1589,7 @@ model Invoice {
   taxLines             TaxLine[]
   discounts            Discount[]
   payments             Payment[]
+  digitalBills         DigitalBill[]
   createdAt            DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt            DateTime      @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
 
@@ -1556,6 +1618,10 @@ model InvoiceLine {
   taxableValue Int        @map("taxable_value")
   taxGroupId   String?    @map("tax_group_id") @db.Uuid
   sacCode      String?    @map("sac_code")
+  /// The dish (P4-05c), for item-wise reports without joining the order lines.
+  itemId       String?    @map("item_id") @db.Uuid
+  /// This line's share of its tax group's tax on the invoice, as issued (P4-05c, RPT-002).
+  taxShare     Int?       @map("tax_share")
   /// The invoice version this line belongs to. An edited invoice (BILL-010) gets new lines under
   /// its next version; earlier lines stay for the audit trail, since lines are never deleted.
   version      Int        @default(1)
@@ -1564,6 +1630,8 @@ model InvoiceLine {
 
   @@index([restaurantId])
   @@index([invoiceId])
+  /// The suspicious-activity report finds an item's bills (AUD-006).
+  @@index([orderItemId])
   @@map("invoice_lines")
 }
 
@@ -1667,6 +1735,7 @@ model Payment {
 
   @@index([invoiceId])
   @@index([restaurantId, businessDate])
+  @@index([shiftId])
   @@map("payments")
 }
 
@@ -1753,6 +1822,7 @@ model AuditLog {
   @@index([restaurantId, businessDate])
   @@index([entityType, entityId])
   @@index([actorId])
+  @@index([restaurantId, action, businessDate])
   @@map("audit_log")
 }
 
@@ -1800,4 +1870,271 @@ model InboxMessage {
   @@unique([source, messageId])
   @@index([restaurantId])
   @@map("inbox")
+}
+
+// ---------------------------------------------------------------- diners' feedback (P3-05b)
+
+/// Where a diner left feedback: the table tablet, or the QR page later (P5).
+enum FeedbackSource {
+  TABLE_TABLET
+  QR
+}
+
+/// Feedback after the bill (TAB-014): food and service out of 5 and a comment. Kept for the
+/// feedback report (RPT-013); anonymised after `retention.feedbackMonths` (P7), never deleted.
+model Feedback {
+  id             String         @id @default(uuid(7)) @db.Uuid
+  restaurantId   String         @map("restaurant_id") @db.Uuid
+  businessDate   DateTime       @map("business_date") @db.Date
+  source         FeedbackSource
+  /// One feedback per table session (the guests at the table that day).
+  tableSessionId String?        @unique @map("table_session_id") @db.Uuid
+  tableId        String?        @map("table_id") @db.Uuid
+  deviceId       String?        @map("device_id") @db.Uuid
+  foodRating     Int            @map("food_rating")
+  serviceRating  Int            @map("service_rating")
+  comment        String?
+  /// The diner's contact, given with consent; null without one or after erasure.
+  dinerContactId String?        @map("diner_contact_id") @db.Uuid
+  dinerContact   DinerContact?  @relation(fields: [dinerContactId], references: [id])
+  createdAt      DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime       @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@index([restaurantId, businessDate])
+  @@map("feedback")
+}
+
+/// A diner's phone, kept only with explicit consent recorded with its purpose, words and time
+/// (BILL-011, SEC-019). Erasure on request (DATA-011) clears the number and keeps the record of
+/// consent and erasure; invoices keep what tax law needs.
+model DinerContact {
+  id             String     @id @default(uuid(7)) @db.Uuid
+  restaurantId   String     @map("restaurant_id") @db.Uuid
+  /// E.164-style "+91…"; null once erased.
+  phone          String?
+  /// What the diner agreed to, e.g. "DIGITAL_BILL_AND_FEEDBACK".
+  consentPurpose String     @map("consent_purpose")
+  /// The exact words the diner agreed to.
+  consentText    String     @map("consent_text")
+  consentGivenAt DateTime   @map("consent_given_at") @db.Timestamptz(3)
+  /// Where consent was given (TABLE_TABLET, QR, POS).
+  consentSource  String     @map("consent_source")
+  deviceId       String?    @map("device_id") @db.Uuid
+  erasedAt       DateTime?  @map("erased_at") @db.Timestamptz(3)
+  feedback       Feedback[]
+  createdAt      DateTime   @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime   @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@index([restaurantId, phone])
+  @@map("diner_contacts")
+}
+
+/// An order picked up from the QR relay (P5-03b, QR-009): the inbox row is written first, so a
+/// second pickup or a restart never creates the order twice; it also remembers what the relay was
+/// last told (QR-007).
+model RelayOrder {
+  id              String     @id @default(uuid(7)) @db.Uuid
+  restaurantId    String     @map("restaurant_id") @db.Uuid
+  restaurant      Restaurant @relation(fields: [restaurantId], references: [id])
+  /// The order's id at the relay; one row each, whatever happens next (ORD-013).
+  relayOrderId    String     @unique @map("relay_order_id") @db.Uuid
+  tableId         String     @map("table_id") @db.Uuid
+  /// The order as the relay gave it (QrPickupOrder).
+  payload         Json
+  expiresAt       DateTime   @map("expires_at") @db.Timestamptz(3)
+  /// CREATED, REJECTED (nothing created) or EXPIRED; null while being handled.
+  outcome         String?
+  orderId         String?    @unique @map("order_id") @db.Uuid
+  order           Order?     @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  rejectionReason String?    @map("rejection_reason")
+  /// What the relay last acknowledged: its status and a hash of status and detail.
+  pushedHash      String?    @map("pushed_hash")
+  pushedStatus    String?    @map("pushed_status")
+  createdAt       DateTime   @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt       DateTime   @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@index([restaurantId, outcome])
+  @@map("relay_orders")
+}
+
+/// A diner's call for a waiter or the bill picked up from the QR relay (P5-05c, QR-011). Several
+/// relay requests may point at one local request: a tablet or another phone asked first.
+model RelayServiceRequest {
+  id               String          @id @default(uuid(7)) @db.Uuid
+  restaurantId     String          @map("restaurant_id") @db.Uuid
+  restaurant       Restaurant      @relation(fields: [restaurantId], references: [id])
+  relayRequestId   String          @unique @map("relay_request_id") @db.Uuid
+  tableId          String          @map("table_id") @db.Uuid
+  type             String
+  expiresAt        DateTime        @map("expires_at") @db.Timestamptz(3)
+  /// RAISED, REJECTED (nothing raised) or EXPIRED; null while being handled.
+  outcome          String?
+  serviceRequestId String?         @map("service_request_id") @db.Uuid
+  serviceRequest   ServiceRequest? @relation(fields: [serviceRequestId], references: [id], onDelete: Restrict)
+  rejectionReason  String?         @map("rejection_reason")
+  pushedHash       String?         @map("pushed_hash")
+  pushedStatus     String?         @map("pushed_status")
+  createdAt        DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt        DateTime        @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@index([serviceRequestId])
+  @@index([restaurantId, outcome])
+  @@map("relay_service_requests")
+}
+
+enum BackupKind {
+  NIGHTLY
+  MANUAL
+  /// Before a software update (UPD-005, P7-04c).
+  UPDATE
+}
+
+enum BackupStatus {
+  RUNNING
+  SUCCEEDED
+  /// Made and checked on the data drive, but the copy at the second location failed.
+  PARTIAL
+  FAILED
+}
+
+/// One backup (DATA-002, DATA-005, P7-05a): the nightly full backup or a "Back up now". The
+/// backup holds the whole database, so the record is installation-wide.
+model BackupRun {
+  id               String       @id @default(uuid(7)) @db.Uuid
+  kind             BackupKind
+  status           BackupStatus
+  startedAt        DateTime     @map("started_at") @db.Timestamptz(3)
+  finishedAt       DateTime?    @map("finished_at") @db.Timestamptz(3)
+  /// The file's name, the same in every location.
+  fileName         String?      @map("file_name")
+  sizeBytes        BigInt?      @map("size_bytes")
+  /// SHA-256 of the encrypted file, hex.
+  sha256           String?
+  /// COPIED, NOT_SET or FAILED: the copy at the second location.
+  secondCopy       String?      @map("second_copy")
+  /// What went wrong, in plain words, without secrets.
+  error            String?
+  requestedById    String?      @map("requested_by_id") @db.Uuid
+  /// The copy in the cloud (DATA-003, P7-05d): PENDING, UPLOADED, FAILED or SKIPPED (not sent:
+  /// a newer backup was, or the Owner opted out); null for a backup that is never sent.
+  cloudStatus      String?      @map("cloud_status")
+  cloudAttemptedAt DateTime?    @map("cloud_attempted_at") @db.Timestamptz(3)
+  cloudUploadedAt  DateTime?    @map("cloud_uploaded_at") @db.Timestamptz(3)
+  cloudError       String?      @map("cloud_error")
+  /// The Control Plane's record of it.
+  cloudBackupId    String?      @map("cloud_backup_id") @db.Uuid
+  createdAt        DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt        DateTime     @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@index([startedAt])
+  @@index([cloudStatus])
+  @@map("backup_runs")
+}
+
+enum ArchiveStatus {
+  ARCHIVING
+  VERIFYING
+  PURGING
+  DONE
+  FAILED
+}
+
+/// Archive-then-purge of a financial year (DATA-008, P7-06b). Once DONE it is the purge record:
+/// what was archived, where, its checksum, and the rows deleted per table. Kept for good.
+model ArchiveRun {
+  id               String        @id @default(uuid(7)) @db.Uuid
+  financialYear    String        @map("financial_year")
+  status           ArchiveStatus
+  startedAt        DateTime      @map("started_at") @db.Timestamptz(3)
+  finishedAt       DateTime?     @map("finished_at") @db.Timestamptz(3)
+  requestedById    String?       @map("requested_by_id") @db.Uuid
+  reason           String
+  folder           String?
+  archiveFile      String?       @map("archive_file")
+  sizeBytes        BigInt?       @map("size_bytes")
+  sha256           String?
+  /// Rows archived, then deleted, per table.
+  counts           Json?
+  /// The audit chain archived: up to this entry, whose hash it was.
+  auditChainTo     BigInt?       @map("audit_chain_to")
+  auditChainHash   String?       @map("audit_chain_hash")
+  error            String?
+  /// The copy in the cloud backup set: PENDING, UPLOADED, FAILED or SKIPPED.
+  cloudStatus      String?       @map("cloud_status")
+  cloudAttemptedAt DateTime?     @map("cloud_attempted_at") @db.Timestamptz(3)
+  cloudUploadedAt  DateTime?     @map("cloud_uploaded_at") @db.Timestamptz(3)
+  cloudError       String?       @map("cloud_error")
+  createdAt        DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt        DateTime      @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@index([financialYear])
+  @@map("archive_runs")
+}
+
+enum DigitalBillStatus {
+  QUEUED
+  SENT
+  FAILED
+}
+
+/// A bill sent to the diner on WhatsApp or SMS through the vendor's Control Plane (BILL-012,
+/// P7-09b), only with the diner's consent (BILL-011). The whole number is kept only until the bill
+/// is sent or given up; the masked one stays.
+model DigitalBill {
+  id            String            @id @default(uuid(7)) @db.Uuid
+  restaurantId  String            @map("restaurant_id") @db.Uuid
+  invoiceId     String            @map("invoice_id") @db.Uuid
+  invoice       Invoice           @relation(fields: [invoiceId], references: [id])
+  /// The invoice's business date, so the record goes with its year (DATA-008).
+  businessDate  DateTime          @map("business_date") @db.Date
+  /// WHATSAPP or SMS.
+  channel       String
+  /// +91 and ten digits; null once sent or given up.
+  phone         String?
+  /// `+91 ******3210`.
+  phoneMasked   String            @map("phone_masked")
+  status        DigitalBillStatus @default(QUEUED)
+  attempts      Int               @default(0)
+  nextAttemptAt DateTime?         @map("next_attempt_at") @db.Timestamptz(3)
+  lastError     String?           @map("last_error")
+  link          String?
+  expiresAt     DateTime?         @map("expires_at") @db.Timestamptz(3)
+  /// Who sent it again by hand; null when it went by itself on settling.
+  requestedById String?           @map("requested_by_id") @db.Uuid
+  requestedBy   Staff?            @relation(fields: [requestedById], references: [id])
+  sentAt        DateTime?         @map("sent_at") @db.Timestamptz(3)
+  createdAt     DateTime          @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt     DateTime          @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@index([status, nextAttemptAt])
+  @@index([invoiceId])
+  @@map("digital_bills")
+}
+
+/// A pager's update to one firmware version (PGR-011, P2-04b): offered over MQTT when the pager is
+/// free, downloaded from this PC, then run, failed or rolled back. Operational: kept with the pager.
+model PagerFirmwareUpdate {
+  id            String    @id @default(uuid(7)) @db.Uuid
+  restaurantId  String    @map("restaurant_id") @db.Uuid
+  deviceId      String    @map("device_id") @db.Uuid
+  device        Device    @relation(fields: [deviceId], references: [id])
+  version       String
+  /// `@rp/domain` PAGER_FIRMWARE_STATES: WAITING, OFFERED, DOWNLOADING, UPDATED, FAILED, ROLLED_BACK.
+  state         String
+  /// Offers made since the last "Update now" (`@rp/domain` gives up after a few).
+  attempts      Int       @default(0)
+  /// Every offer of this version to this pager: the offer's `attempt`, which the pager echoes.
+  offers        Int       @default(0)
+  /// The pager's or the server's last reason; null without one.
+  lastError     String?   @map("last_error")
+  /// A manager's "Update now" (UPD-004), who pressed it and when.
+  requestedAt   DateTime? @map("requested_at") @db.Timestamptz(3)
+  requestedById String?   @map("requested_by_id") @db.Uuid
+  changedAt     DateTime  @default(now()) @map("changed_at") @db.Timestamptz(3)
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt     DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@unique([deviceId, version])
+  @@index([restaurantId, version])
+  @@map("pager_firmware_updates")
 }

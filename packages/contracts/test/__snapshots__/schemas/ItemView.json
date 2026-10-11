@@ -49,6 +49,17 @@
           { "type": "null" }
         ]
       },
+      "timeWindow": {
+        "default": null,
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": { "start": { "type": "string" }, "end": { "type": "string" } },
+            "required": ["start", "end"]
+          },
+          { "type": "null" }
+        ]
+      },
       "displayOrder": {
         "type": "integer",
         "minimum": -9007199254740991,
@@ -203,6 +214,18 @@
           { "type": "null" }
         ]
       },
+      "timeWindow": {
+        "default": null,
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": { "start": { "type": "string" }, "end": { "type": "string" } },
+            "required": ["start", "end"],
+            "additionalProperties": false
+          },
+          { "type": "null" }
+        ]
+      },
       "displayOrder": {
         "type": "integer",
         "minimum": -9007199254740991,
@@ -294,6 +317,7 @@
       "tags",
       "stationId",
       "prepTimeMinutes",
+      "timeWindow",
       "displayOrder",
       "channels",
       "variants",

@@ -1,3 +1,4 @@
+import { LICENSE_STATES } from '@rp/domain';
 import { z } from 'zod';
 import {
   DeviceType,
@@ -36,15 +37,6 @@ export const ItemAvailabilityChanged = event(
   'ItemAvailabilityChanged',
   z.object({ itemId: Id, available: z.boolean(), stockCount: z.int().nonnegative().nullable() }),
 );
-/**
- * The draft menu changed (P4-02d, MGR-005): a category, modifier group or item was added, changed,
- * archived or restored, or a combo set. Only people who manage the menu hear it, so every open
- * menu editor reads the draft again; ordering surfaces wait for `MenuPublished`.
- */
-export const MenuDraftChanged = event(
-  'MenuDraftChanged',
-  z.object({ part: z.enum(['CATEGORIES', 'MODIFIER_GROUPS', 'ITEMS']) }),
-);
 
 export const TableOpened = event(
   'TableOpened',
@@ -55,6 +47,29 @@ export const TableMoved = event(
   z.object({ tableSessionId: Id, fromTableId: Id, toTableId: Id }),
 );
 export const TableClosed = event('TableClosed', z.object({ tableId: Id, tableSessionId: Id }));
+/**
+ * The licence state the restaurant experiences changed, or a restriction was decided (LIC-005,
+ * P7-01c): every screen reads the licence again for its reminder or banner.
+ */
+export const LicenceChanged = event(
+  'LicenceChanged',
+  z.object({ state: z.enum(LICENSE_STATES), restrictedFrom: Timestamp.nullable() }),
+);
+/**
+ * Orders or dishes now at another open table (TBL-006): its guests merged into that table
+ * (MERGE), or some dishes moved to its bill (TRANSFER). `orderIds` are the orders now there.
+ */
+export const OrdersMoved = event(
+  'OrdersMoved',
+  z.object({
+    kind: z.enum(['MERGE', 'TRANSFER']),
+    fromTableSessionId: Id,
+    toTableSessionId: Id,
+    fromTableId: Id,
+    toTableId: Id,
+    orderIds: z.array(Id),
+  }),
+);
 /** Another waiter now looks after an open table (TBL-002 per-session override, P1-02b). */
 export const TableWaiterChanged = event(
   'TableWaiterChanged',
@@ -72,6 +87,8 @@ export const OrderSubmitted = event(
     orderNumber: z.int().positive(),
     source: OrderSource,
     tableSessionId: Id.optional(),
+    /** A QR order for a table that is not open names the table instead (QR-010). */
+    tableId: Id.optional(),
     needsApproval: z.boolean(),
   }),
 );
@@ -201,6 +218,8 @@ export const DeviceStatusChanged = event(
     deviceType: DeviceType,
     online: z.boolean(),
     batteryPercent: z.int().min(0).max(100).optional(),
+    /** On charge (apps' health reports): a charging device is not low on battery. */
+    charging: z.boolean().optional(),
   }),
 );
 
@@ -227,13 +246,12 @@ export const DeviceRevoked = event(
 );
 
 /**
- * A manager asked a device to show itself (MGR-006 "Locate", P4-02c): a screen shows its name and
- * sounds, a table tablet beeps (P3-01), a pager vibrates (P2-05, over MQTT). Only that device hears
- * it, and only while it is connected: it is never replayed to a device that reconnects later.
+ * A manager asks a device to show itself (MGR-006 "Locate", P3-01c): a table tablet flashes and
+ * sounds for `seconds`. Only that device hears it.
  */
 export const DeviceLocateRequested = event(
   'DeviceLocateRequested',
-  z.object({ deviceId: Id, deviceType: DeviceType, name: z.string().max(60) }),
+  z.object({ deviceId: Id, seconds: z.int().min(1).max(60) }),
 );
 
 /**
@@ -251,8 +269,7 @@ export const SettingsChanged = event(
  * assignments, stations, printers, its staff (P4-02a: someone added, changed, deactivated or
  * reactivated, so login tiles and staff lists change) or its devices (P4-02b: a pager registered,
  * given to someone or taken back, or its credential replaced, so pager lists and the wearer's own
- * pager change; P4-02c: a device paired, renamed, moved to another table or unpaired, so device
- * lists and the device's own name change). Screens and bill templates read that part again.
+ * pager change). Screens and bill templates read that part again.
  */
 export const RestaurantChanged = event(
   'RestaurantChanged',
@@ -275,10 +292,11 @@ export const RestaurantChanged = event(
 export const DomainEvent = z.discriminatedUnion('type', [
   MenuPublished,
   ItemAvailabilityChanged,
-  MenuDraftChanged,
   TableOpened,
   TableMoved,
   TableClosed,
+  OrdersMoved,
+  LicenceChanged,
   TableStateChanged,
   TableWaiterChanged,
   OrderSubmitted,

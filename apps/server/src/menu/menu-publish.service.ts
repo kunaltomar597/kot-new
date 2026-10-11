@@ -18,7 +18,6 @@ import { AppError } from '../errors/app-error.js';
 import { appendEvent } from '../events/outbox.js';
 import { lockSetup } from '../restaurant/setup-changes.js';
 import { buildMenuContent, COMBO_INCLUDE, comboView, menuChecksum } from './menu-content.js';
-import { announceDraftChange } from './menu-draft-events.js';
 import { SettingsService } from '../settings/settings.service.js';
 
 /**
@@ -43,9 +42,7 @@ export class MenuPublishService {
   setCombo(principal: Principal, itemId: string, request: ComboRequest): Promise<ComboView> {
     return this.prisma.transaction(async (tx) => {
       await lockSetup(tx);
-      const combo = await this.setComboIn(tx, principal, itemId, request);
-      await announceDraftChange(tx, principal.restaurantId, 'ITEMS');
-      return combo;
+      return this.setComboIn(tx, principal, itemId, request);
     });
   }
 
@@ -85,11 +82,7 @@ export class MenuPublishService {
         { itemIds: refused },
       );
     }
-    // A fixed part or one of a choice's items (P4-02d: choices were not checked before).
-    const partOf =
-      (await tx.comboComponent.count({ where: { itemId } })) +
-      (await tx.comboChoiceOption.count({ where: { itemId } }));
-    if (partOf > 0) {
+    if ((await tx.comboComponent.count({ where: { itemId } })) > 0) {
       throw new AppError(
         422,
         'COMBO_COMPONENT_INVALID',
@@ -283,7 +276,8 @@ export class MenuPublishService {
   }
 
   /**
-   * The published menu with current availability and stock overlaid (MENU-006, MENU-013). A
+   * The published menu with current availability and stock overlaid (MENU-006, MENU-013), and the
+   * restaurant's time zone. A
    * version never changes once published, so its parsed snapshot is kept until the next one: the
    * order engine and recommendations read the menu on every call (NFR-P01, REC-011).
    */
@@ -292,13 +286,21 @@ export class MenuPublishService {
     if (snapshot === null) {
       throw new AppError(404, 'MENU_NOT_PUBLISHED', 'No menu has been published yet.');
     }
-    const live = await this.prisma.item.findMany({
-      where: { id: { in: snapshot.items.map((item) => item.id) } },
-      select: { id: true, available: true, trackStock: true, stockLevel: true },
-    });
+    const [live, restaurant] = await Promise.all([
+      this.prisma.item.findMany({
+        where: { id: { in: snapshot.items.map((item) => item.id) } },
+        select: { id: true, available: true, trackStock: true, stockLevel: true },
+      }),
+      this.prisma.restaurant.findUnique({
+        where: { id: restaurantId },
+        select: { timeZone: true },
+      }),
+    ]);
     const byId = new Map(live.map((item) => [item.id, item]));
     return {
       ...snapshot,
+      // Every surface judges combo hours by the restaurant's clock (MENU-005).
+      ...(restaurant !== null && { timeZone: restaurant.timeZone }),
       items: snapshot.items.map((item) => {
         const now = byId.get(item.id);
         if (now === undefined) return item;

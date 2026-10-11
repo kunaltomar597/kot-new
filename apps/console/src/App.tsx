@@ -1,11 +1,10 @@
 import type { Translator } from '@rp/i18n';
-import { LoadingState, ToastProvider } from '@rp/ui-web';
+import { ErrorState, LoadingState, ToastProvider } from '@rp/ui-web';
 import { Navigate, Route, Routes } from 'react-router';
 import { ConsoleProvider, useConsoleState } from './app/console-context.js';
 import type { ConsoleController, ConsoleSnapshot } from './app/console-controller.js';
 import { I18nProvider, useT } from './app/i18n.js';
 import { homeFor, isStationMode, MODES } from './app/modes.js';
-import { LocateOverlay } from './screens/LocateOverlay.js';
 import { LoginScreen } from './screens/LoginScreen.js';
 import { ModeHome } from './screens/ModeHome.js';
 import { ModeLayout } from './screens/ModeLayout.js';
@@ -26,6 +25,20 @@ export function ConsoleRoutes() {
     return (
       <main className="console-center">
         <LoadingState title={t('states.loading')} />
+      </main>
+    );
+  }
+  if (state.clientTooOld) {
+    return (
+      <main className="console-center">
+        <ErrorState
+          title={t('console.outdated.title')}
+          description={t('console.outdated.description')}
+          retryLabel={t('console.outdated.reload')}
+          onRetry={() => {
+            globalThis.location.reload();
+          }}
+        />
       </main>
     );
   }
@@ -56,10 +69,7 @@ export function ConsoleRoutes() {
   );
 }
 
-/**
- * The console (C3): one app for POS, KDS and the manager dashboard (MGR-001, KDS-001). On every
- * screen, a paired console shows itself when a manager looks for it (MGR-006 "Locate").
- */
+/** The console (C3): one app for POS, KDS and the manager dashboard (MGR-001, KDS-001). */
 export function App({
   controller,
   translator,
@@ -72,7 +82,6 @@ export function App({
       <ConsoleProvider controller={controller}>
         <ToastProvider>
           <ConsoleRoutes />
-          <LocateOverlay />
         </ToastProvider>
       </ConsoleProvider>
     </I18nProvider>

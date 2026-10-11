@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { statfs } from 'node:fs/promises';
 import {
   Inject,
@@ -6,16 +7,37 @@ import {
   type OnApplicationBootstrap,
   type OnModuleDestroy,
 } from '@nestjs/common';
-import type { HeartbeatRequest, ReleaseInfo } from '@rp/contracts/control-plane';
+import { BusinessHours } from '@rp/contracts';
+import type { HeartbeatRequest, HeartbeatResponse, ReleaseInfo } from '@rp/contracts/control-plane';
+import { updateSigningOf } from '@rp/domain';
 import { AuditService } from '../audit/audit.service.js';
 import { SECRET_STORE, type SecretStore } from '../auth/secret-store.js';
 import { newId } from '../common/ids.js';
+import { backupKeyId } from '../backups/backup-file.js';
+import { backupSummary, cloudBackupSummary } from '../backups/backup-state.js';
+import { readRestoreCodesSeen } from '../backups/escrow-state.js';
 import { SERVER_PACKAGE } from '../common/package-version.js';
+import { SettingsService } from '../settings/settings.service.js';
 import { APP_CONFIG, type AppConfig } from '../config/app-config.js';
 import { PrismaService } from '../database/prisma.service.js';
 import { ControlPlaneClient, ControlPlaneError } from './control-plane-client.js';
-import { readEnrolment, readOfferedUpdate, saveOfferedUpdate } from './control-plane-state.js';
+import {
+  readEnrolment,
+  readOfferedUpdate,
+  readVendorSettingsDigest,
+  saveOfferedUpdate,
+} from './control-plane-state.js';
+import { LicenceAgentService } from '../licensing/licence-agent.service.js';
+import { ErrorCounter } from '../observability/error-reporter.js';
+import { RealtimeGateway } from '../realtime/realtime.gateway.js';
+import { readRelayCredential, saveRelayCredential } from '../relay/relay-credential.js';
 import { installationKey } from './installation-key.js';
+import { markUpdateReportDelivered, readUpdateReport } from '../updates/update-state.js';
+import {
+  firmwareHeartbeat,
+  markFirmwareReportDelivered,
+  saveOfferedFirmware,
+} from '../pager-firmware/firmware-state.js';
 
 export const CONTROL_PLANE_OPTIONS = Symbol('CONTROL_PLANE_OPTIONS');
 
@@ -69,6 +91,12 @@ export class HeartbeatService implements OnApplicationBootstrap, OnModuleDestroy
     offeredUpdate: null,
     clockOffsetMs: null,
   };
+  /** The Control Plane's last audit check, answered with the next heartbeat (AUD-003). */
+  private auditCheck: { sequence: number } | null = null;
+  /** The error count at the last heartbeat delivered: the next one reports those since. */
+  private errorsDelivered = 0;
+  /** Services that act on each answer (support's diagnostics requests, P7-08b). */
+  private readonly answerListeners: ((answer: HeartbeatResponse) => Promise<void>)[] = [];
 
   constructor(
     @Inject(APP_CONFIG) private readonly config: AppConfig,
@@ -76,12 +104,18 @@ export class HeartbeatService implements OnApplicationBootstrap, OnModuleDestroy
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     @Inject(CONTROL_PLANE_OPTIONS) private readonly options: ControlPlaneOptions,
+    private readonly licence: LicenceAgentService,
+    private readonly errors: ErrorCounter,
+    private readonly realtime: RealtimeGateway,
+    private readonly settings: SettingsService,
   ) {
     this.intervalMs = options.defaultIntervalMs;
   }
 
   onApplicationBootstrap(): void {
     if (this.config.controlPlaneUrl === undefined) return;
+    // "Check now" on the Owner's licence page sends a heartbeat at once (LIC-006).
+    this.licence.onCheckRequested(() => this.beat());
     this.schedule(this.options.firstHeartbeatDelayMs);
   }
 
@@ -89,6 +123,11 @@ export class HeartbeatService implements OnApplicationBootstrap, OnModuleDestroy
     this.stopped = true;
     clearTimeout(this.timer);
     await this.running;
+  }
+
+  /** Calls `listener` with every answer received; its failures are logged, never thrown. */
+  onAnswer(listener: (answer: HeartbeatResponse) => Promise<void>): void {
+    this.answerListeners.push(listener);
   }
 
   status(): ControlPlaneStatus {
@@ -129,9 +168,38 @@ export class HeartbeatService implements OnApplicationBootstrap, OnModuleDestroy
         timeoutMs: this.options.requestTimeoutMs,
         ...(this.options.fetch !== undefined && { fetch: this.options.fetch }),
       });
-      const answer = await this.client.heartbeat(enrolment.installationId, await this.collect());
+      const errorsNow = this.errors.total;
+      const heartbeat = await this.collect(errorsNow);
+      const answer = await this.client.heartbeat(enrolment.installationId, heartbeat);
+      // The install outcome rode on this heartbeat: it is not sent again (P7-04c).
+      const report = heartbeat.updateReport ?? null;
+      if (report !== null) await markUpdateReportDelivered(this.prisma, report);
+      // So did the pager firmware's (P2-04b); and the firmware on offer is kept for the service.
+      const firmwareReport = heartbeat.pagerFirmware?.report ?? null;
+      if (firmwareReport !== null) await markFirmwareReportDelivered(this.prisma, firmwareReport);
+      if (answer.pagerFirmware !== null) {
+        await saveOfferedFirmware(this.prisma, {
+          ...answer.pagerFirmware,
+          forVersion: heartbeat.pagerFirmware?.version ?? null,
+        });
+      }
       this.intervalMs = answer.nextHeartbeatSeconds * 1_000;
+      this.errorsDelivered = errorsNow;
+      this.auditCheck = answer.auditCheck;
       await this.offer(answer.update);
+      // A renewed licence, the reactivation secret and the clock check (LIC-002, LIC-007); the
+      // tamper events and the reactivation code this heartbeat carried are delivered.
+      await this.licence.accept(answer, heartbeat);
+      // The QR relay credential the vendor provisioned (VCP-002), kept sealed.
+      if (answer.relayCredential !== null) {
+        await saveRelayCredential(this.prisma, this.secrets, answer.relayCredential);
+        this.logger.log('The QR relay credential arrived from the Control Plane');
+      }
+      for (const listener of this.answerListeners) {
+        await listener(answer).catch((error: unknown) => {
+          this.logger.warn({ err: error }, 'Acting on the Control Plane’s answer failed');
+        });
+      }
       if (this.state.lastError !== null) {
         this.logger.log('Reporting to the Control Plane again');
       }
@@ -149,6 +217,34 @@ export class HeartbeatService implements OnApplicationBootstrap, OnModuleDestroy
       this.fail(code, error instanceof Error ? error.message : String(error), error);
     }
     return this.status();
+  }
+
+  /**
+   * A signed connection to the Control Plane for other services (AI menu import, P6-04), or the
+   * reason there is none: not configured, or this PC not enrolled.
+   */
+  async connection(): Promise<
+    | { readonly client: ControlPlaneClient; readonly installationId: string }
+    | { readonly unavailable: 'NOT_CONFIGURED' | 'NOT_ENROLLED' }
+  > {
+    const baseUrl = this.config.controlPlaneUrl;
+    if (baseUrl === undefined) return { unavailable: 'NOT_CONFIGURED' };
+    const enrolment = await readEnrolment(this.prisma);
+    if (enrolment === undefined) return { unavailable: 'NOT_ENROLLED' };
+    this.client ??= new ControlPlaneClient({
+      baseUrl,
+      key: await installationKey(this.secrets),
+      timeoutMs: this.options.requestTimeoutMs,
+      ...(this.options.fetch !== undefined && { fetch: this.options.fetch }),
+    });
+    return { client: this.client, installationId: enrolment.installationId };
+  }
+
+  /** The Owner's `backups.cloudEnabled` (on by default, DATA-003). */
+  private async cloudBackupEnabled(): Promise<boolean> {
+    const restaurant = await this.prisma.restaurant.findFirst({ select: { id: true } });
+    if (restaurant === null) return true;
+    return (await this.settings.snapshot(restaurant.id)).get('backups.cloudEnabled');
   }
 
   /** Logs only when the failure changes, so an offline site does not flood the log. */
@@ -172,13 +268,42 @@ export class HeartbeatService implements OnApplicationBootstrap, OnModuleDestroy
     }
   }
 
-  private async collect(): Promise<HeartbeatRequest> {
-    const [head, devices, disk, postgres] = await Promise.all([
+  private async collect(errorsNow: number): Promise<HeartbeatRequest> {
+    const check = this.auditCheck;
+    const [
+      head,
+      devices,
+      disk,
+      postgres,
+      licence,
+      relayCredential,
+      restaurant,
+      checkpoint,
+      settingsDigest,
+      backup,
+      cloud,
+      cloudEnabled,
+      restoreCodesSeen,
+      updateReport,
+      pagerFirmware,
+    ] = await Promise.all([
       this.audit.chainHead(),
-      this.deviceCounts(),
+      this.deviceHealth(),
       this.disk(),
       this.postgresVersion(),
+      this.licence.heartbeatReport(),
+      readRelayCredential(this.prisma, this.secrets).catch(() => undefined),
+      this.prisma.restaurant.findFirst({ select: { businessHours: true, timeZone: true } }),
+      check === null ? undefined : this.audit.checkpoint(check.sequence),
+      readVendorSettingsDigest(this.prisma),
+      backupSummary(this.prisma),
+      cloudBackupSummary(this.prisma),
+      this.cloudBackupEnabled(),
+      readRestoreCodesSeen(this.prisma),
+      readUpdateReport(this.prisma),
+      firmwareHeartbeat(this.prisma),
     ]);
+    const hours = BusinessHours.safeParse(restaurant?.businessHours);
     return {
       heartbeatId: newId(),
       sentAt: new Date().toISOString(),
@@ -190,17 +315,77 @@ export class HeartbeatService implements OnApplicationBootstrap, OnModuleDestroy
       ],
       disk,
       auditChainHead: head === null ? null : { sequence: head.seq, hash: head.hash },
-      devices,
+      devices: devices.paired,
+      // Fleet health (VCP-005, NFR-O03, P7-03), with the backups (DATA-005, P7-05a).
+      devicesConnected: devices.connected,
+      errorCount: Math.max(0, errorsNow - this.errorsDelivered),
+      backup: {
+        lastSuccessAt: backup.lastSuccessAt?.toISOString() ?? null,
+        lastFailureAt: backup.lastFailureAt?.toISOString() ?? null,
+        lastError: backup.lastError,
+        // DATA-003: the cloud copy, and whether the Owner opted out (P7-05d).
+        cloud: {
+          enabled: cloudEnabled,
+          lastSuccessAt: cloud.lastSuccessAt?.toISOString() ?? null,
+          lastFailureAt: cloud.lastFailureAt?.toISOString() ?? null,
+          lastError: cloud.lastError,
+        },
+      },
+      ...(restaurant !== null &&
+        hours.success && {
+          businessHours: { timeZone: restaurant.timeZone, hours: hours.data },
+        }),
+      ...(checkpoint !== undefined && { auditCheckpoint: checkpoint }),
+      // The vendor settings this PC holds; new ones come until it does (UPD-010).
+      vendorSettings: { digest: settingsDigest },
+      // The backup key to escrow (P7-05e): none while the Owner opted out of the cloud backup.
+      backupKeyId: cloudEnabled ? backupKeyId(await this.secrets.get('backup-key')) : null,
+      restoreCodesSeen,
+      // How the last update went (UPD-003, P7-04c), until a heartbeat carrying it is answered.
+      ...(updateReport !== null && { updateReport }),
+      // Whether this PC takes unsigned updates, a test build the vendor is alerted to (UPD-007).
+      updateSigning: updateSigningOf({
+        publisher: this.config.updatePublisher ?? null,
+        allowUnsigned: this.config.updateAllowUnsigned,
+      }),
+      // The pager firmware this PC passes on, and how its last release went (PGR-011, P2-04b).
+      pagerFirmware,
+      ...licence,
+      relay: {
+        credentialDigest:
+          relayCredential === undefined
+            ? null
+            : createHash('sha256').update(relayCredential, 'utf8').digest('hex').slice(0, 16),
+      },
     };
   }
 
-  private async deviceCounts(): Promise<Record<string, number>> {
-    const groups = await this.prisma.device.groupBy({
-      by: ['type'],
+  /**
+   * Paired devices by type, and how many are connected now: a pager by its heartbeats, an app by
+   * its socket (as on the Devices page).
+   */
+  private async deviceHealth(): Promise<{
+    paired: Record<string, number>;
+    connected: Record<string, number>;
+  }> {
+    const rows = await this.prisma.device.findMany({
       where: { status: 'ACTIVE' },
-      _count: { _all: true },
+      select: { id: true, type: true, online: true, restaurantId: true },
     });
-    return Object.fromEntries(groups.map((group) => [group.type, group._count._all]));
+    const paired: Record<string, number> = {};
+    const connected: Record<string, number> = {};
+    const sockets = new Map<string, ReadonlySet<string>>();
+    for (const row of rows) {
+      let ids = sockets.get(row.restaurantId);
+      if (ids === undefined) {
+        ids = this.realtime.connectedDeviceIds(row.restaurantId);
+        sockets.set(row.restaurantId, ids);
+      }
+      paired[row.type] = (paired[row.type] ?? 0) + 1;
+      const isConnected = row.type === 'PAGER' ? row.online : ids.has(row.id);
+      connected[row.type] = (connected[row.type] ?? 0) + (isConnected ? 1 : 0);
+    }
+    return { paired, connected };
   }
 
   /** Size and free space of the data drive (ONB-002); null when it cannot be read. */

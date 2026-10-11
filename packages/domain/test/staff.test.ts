@@ -3,10 +3,8 @@ import {
   ASSIGNABLE_ROLES,
   decideStaffChange,
   isAssignableRole,
-  isManagerRole,
+  isEasilyGuessedPin,
   isValidPin,
-  mayGiveRole,
-  type RoleChoice,
   ROLES,
   rolesOffered,
   type StaffActor,
@@ -150,91 +148,6 @@ describe('[AUTH-006] creating or removing managers needs the Owner’s second fa
   });
 });
 
-describe('[AUTH-012] staff management with a custom role', () => {
-  const captain: RoleChoice = {
-    role: 'WAITER',
-    customRole: { added: ['BILL_PRINT_AND_PAYMENT'], removed: [] },
-  };
-  const headCashier: RoleChoice = {
-    role: 'CASHIER',
-    customRole: { added: ['STAFF_MANAGE'], removed: [] },
-  };
-  const shiftLead: RoleChoice = {
-    role: 'MANAGER',
-    customRole: { added: [], removed: ['STAFF_MANAGE'] },
-  };
-  const holding = (staffId: string, choice: RoleChoice, active = true): StaffTarget => ({
-    staffId,
-    ...choice,
-    active,
-  });
-
-  it('follows what the actor’s custom role adds or takes away', () => {
-    const kiran: StaffActor = { staffId: 'kiran', ...headCashier, secondFactorFresh: false };
-    expect(decide(kiran, waiter, { kind: 'SET_PIN' })).toBe('ALLOWED');
-    expect(decide(kiran, null, { kind: 'CREATE', ...captain })).toBe('ALLOWED');
-    // Managers, and anyone else who manages staff, stay the Owner's.
-    expect(decide(kiran, otherManager, { kind: 'SET_PIN' })).toBe('OWNER_ONLY');
-    expect(decide(kiran, holding('mohan', headCashier), { kind: 'EDIT' })).toBe('OWNER_ONLY');
-    expect(decide(kiran, null, { kind: 'CREATE', role: 'MANAGER' })).toBe('OWNER_ONLY');
-
-    const lead: StaffActor = { staffId: 'vikram', ...shiftLead, secondFactorFresh: false };
-    expect(decide(lead, waiter, { kind: 'EDIT' })).toBe('DENIED');
-    expect(rolesOffered(lead)).toEqual([]);
-  });
-
-  it('gives a custom role like its base role', () => {
-    const ravi = holding('ravi', captain);
-    expect(decide(manager, null, { kind: 'CREATE', ...captain })).toBe('ALLOWED');
-    expect(decide(manager, waiter, { kind: 'CHANGE_ROLE', ...captain })).toBe('ALLOWED');
-    expect(decide(manager, ravi, { kind: 'CHANGE_ROLE', role: 'WAITER' })).toBe('ALLOWED');
-    expect(decide(manager, ravi, { kind: 'DEACTIVATE' })).toBe('ALLOWED');
-    expect(mayGiveRole(manager, null, captain)).toBe(true);
-    // The person's built-in base role is a change from their custom role, so it is decided.
-    expect(rolesOffered(manager, ravi)).toEqual(['CASHIER', 'WAITER', 'KITCHEN']);
-  });
-
-  it('[AUTH-006] treats a custom role that makes someone a manager or a staff manager as a manager’s', () => {
-    expect(isManagerRole(captain)).toBe(false);
-    expect(isManagerRole(headCashier)).toBe(true);
-    expect(isManagerRole(shiftLead)).toBe(true);
-    expect(isManagerRole({ role: 'MANAGER' })).toBe(true);
-    expect(isManagerRole({ role: 'CASHIER' })).toBe(false);
-
-    const changes: [StaffTarget | null, StaffChange][] = [
-      [null, { kind: 'CREATE', ...headCashier }],
-      [null, { kind: 'CREATE', ...shiftLead }],
-      [person('kiran', 'CASHIER'), { kind: 'CHANGE_ROLE', ...headCashier }],
-      [holding('kiran', headCashier), { kind: 'CHANGE_ROLE', role: 'CASHIER' }],
-      [holding('kiran', headCashier), { kind: 'DEACTIVATE' }],
-      [holding('kiran', headCashier, false), { kind: 'REACTIVATE' }],
-      // Staff management taken away from a manager, or given back.
-      [otherManager, { kind: 'CHANGE_ROLE', ...shiftLead }],
-      [holding('meera', shiftLead), { kind: 'CHANGE_ROLE', role: 'MANAGER' }],
-      // A staff manager made a full manager.
-      [holding('kiran', headCashier), { kind: 'CHANGE_ROLE', role: 'MANAGER' }],
-    ];
-    for (const [target, change] of changes) {
-      expect(decide(manager, target, change)).toBe('OWNER_ONLY');
-      expect(decide(owner, target, change)).toBe('SECOND_FACTOR_REQUIRED');
-      expect(decide(confirmedOwner, target, change)).toBe('ALLOWED');
-    }
-    expect(mayGiveRole(manager, null, headCashier)).toBe(false);
-    expect(mayGiveRole(owner, null, headCashier)).toBe(true);
-    // Their name, PIN and lock are the Owner's, or their own, to change.
-    expect(decide(manager, holding('kiran', headCashier), { kind: 'SET_PIN' })).toBe('OWNER_ONLY');
-    expect(decide(owner, holding('kiran', headCashier), { kind: 'SET_PIN' })).toBe('ALLOWED');
-  });
-
-  it('lets nobody change their own custom role', () => {
-    const kiran: StaffActor = { staffId: 'kiran', ...headCashier, secondFactorFresh: true };
-    expect(
-      decide(kiran, holding('kiran', headCashier), { kind: 'CHANGE_ROLE', role: 'CASHIER' }),
-    ).toBe('OWN_RECORD');
-    expect(decide(kiran, holding('kiran', headCashier), { kind: 'SET_PIN' })).toBe('ALLOWED');
-  });
-});
-
 describe('[AUTH-001] PINs', () => {
   it('have exactly the configured number of digits', () => {
     expect(isValidPin('1234', 4)).toBe(true);
@@ -244,5 +157,36 @@ describe('[AUTH-001] PINs', () => {
     expect(isValidPin('12a4', 4)).toBe(false);
     expect(isValidPin(' 123', 4)).toBe(false);
     expect(isValidPin('', 4)).toBe(false);
+  });
+});
+
+describe('[AUTH-001] [PC-S5] easily guessed PINs', () => {
+  it.each([
+    ['0000', 'one digit'],
+    ['999999', 'one digit'],
+    ['1212', 'a repeated block'],
+    ['123123', 'a repeated block'],
+    ['696969', 'a repeated block'],
+    ['1234', 'a run up'],
+    ['4321', 'a run down'],
+    ['7890', 'a run past 9'],
+    ['654321', 'a run down'],
+    ['1122', 'pairs'],
+    ['112233', 'pairs'],
+    ['1985', 'a year'],
+    ['2024', 'a year'],
+    ['2580', 'a keypad line'],
+    ['147258', 'keypad columns'],
+  ])('refuses %s (%s)', (pin) => {
+    expect(isEasilyGuessedPin(pin)).toBe(true);
+  });
+
+  it.each(['4831', '7305', '2468', '9157', '482915', '730146'])('accepts %s', (pin) => {
+    expect(isEasilyGuessedPin(pin)).toBe(false);
+  });
+
+  it('leaves a malformed PIN to the length check', () => {
+    expect(isEasilyGuessedPin('12a4')).toBe(false);
+    expect(isEasilyGuessedPin('')).toBe(false);
   });
 });

@@ -1,0 +1,23 @@
+{
+  "input": {
+    "type": "object",
+    "properties": {
+      "issued": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+      "paymentDue": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+      "grace": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+      "restricted": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+    },
+    "required": ["issued", "paymentDue", "grace", "restricted"]
+  },
+  "output": {
+    "type": "object",
+    "properties": {
+      "issued": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+      "paymentDue": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+      "grace": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+      "restricted": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+    },
+    "required": ["issued", "paymentDue", "grace", "restricted"],
+    "additionalProperties": false
+  }
+}

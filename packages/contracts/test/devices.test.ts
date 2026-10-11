@@ -4,11 +4,13 @@ import {
   DeviceRevoked,
   DeviceTokenRequest,
   deviceTokenMessage,
+  HTTP_DEVICE_TYPES,
   PairDeviceRequest,
   PairingCode,
   PairingCodeResponse,
   pairingProofMessage,
   parsePairingQr,
+  STAFF_DEVICE_TYPES,
 } from '../src/index.js';
 
 const id = '0199a000-0000-7000-8000-000000000001';
@@ -35,6 +37,21 @@ describe('[AUTH-007] device pairing contracts', () => {
         .success,
     ).toBe(true);
     expect(CreatePairingCodeRequest.safeParse({ type: 'POS', name: '  ' }).success).toBe(false);
+  });
+
+  it('[SEC-012] [PGR-012] makes no pairing code for a pager, which has its MQTT credential', () => {
+    expect(
+      CreatePairingCodeRequest.safeParse({ type: 'PAGER', name: 'Pager 1', staffId: id }).success,
+    ).toBe(false);
+    expect(CreatePairingCodeRequest.safeParse({ type: 'KDS', name: 'Kitchen 1' }).success).toBe(
+      true,
+    );
+  });
+
+  it('[AUTH-009] [SEC-003] keeps pagers off HTTPS and staff sign-ins off table tablets', () => {
+    expect(HTTP_DEVICE_TYPES).not.toContain('PAGER');
+    expect(STAFF_DEVICE_TYPES).not.toContain('TABLE_TABLET');
+    expect(STAFF_DEVICE_TYPES.every((type) => HTTP_DEVICE_TYPES.includes(type))).toBe(true);
   });
 
   it('accepts only the supported key algorithms and base64 keys, and nothing extra', () => {

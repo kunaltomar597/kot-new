@@ -1,0 +1,4 @@
+# Written by `next build` / `next dev`
+next-env.d.ts
+# Playwright state written by e2e/global-setup.ts
+e2e/.state.json

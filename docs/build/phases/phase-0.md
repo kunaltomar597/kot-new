@@ -339,6 +339,62 @@ People needed: someone runs the installer on a clean Windows 11 PC and reports r
 Acceptance: installer builds in CI; on a clean PC it installs, services start at boot before login,
 killing the server process is recovered ≤ 10 s, and an update from the channel installs.
 
+Split (2026-10-04). Everything but the check on a real PC is built without Windows:
+
+- **P0-16a Electron shell (`apps/desktop`).**
+  - Hardened per SEC-011: context isolation, the sandbox, no Node.js, no preload, no IPC.
+  - Opens only this PC's server. On a loopback address it trusts a certificate signed by the
+    installation's CA (`<RP_DATA_DIR>/tls/ca.crt`) and refuses any other.
+  - Shows a start-up page until the server answers.
+  - Starts with Windows, reopens when it is closed and reloads a crashed page (NFR-A04).
+  - One shell per PC.
+  - Tested without Electron.
+- **P0-16b The services' runtime and set-up commands (server, testable without Windows).**
+  - The DPAPI secret store (`RP_SECRET_STORE=dpapi`), with the database logins' passwords kept
+    apart from the secrets a backup carries.
+  - The service host: the program the server's Windows service runs. It runs a restore asked for
+    on the System page with the administrator's login (which the server never gets), applies
+    pending migrations, then starts the server and keeps it running: restarted at once when it
+    exits, ended and restarted when it stops answering (NFR-A04). Its state file (the PIDs, the
+    phase, a heartbeat) replaces the PID file.
+  - The watchdog service: starts the database and server services when they stop and restarts a
+    server service whose host stopped beating, except during maintenance.
+  - The set-up commands the installer runs, idempotent so repair runs them again: the installation
+    file, the secrets, `initdb` with the managed `postgresql.conf` (localhost only, UTC, WAL
+    archiving) and `pg_hba.conf`, the database logins (`rp_migrator`, `rp_server`, `rp_purger`,
+    `rp_backup`), the migrations without the Prisma CLI, and the WinSW definitions.
+  - Tested on a real PostgreSQL (logins, grants, migrations as a non-superuser) and with a stand-in
+    server process (crash, hang, restore restart, stop).
+- **P0-16c Windows set-up scripts (`infra/installer/windows`).**
+  - PowerShell: the data-drive choice (ONB-002), the folders' permissions, PostgreSQL registered
+    as a service, the WinSW services with their accounts and recovery, firewall rules for the
+    staff network, repair, and uninstall that keeps the data (deleting it needs the Owner's
+    password and second factor, NFR-I02).
+  - Pester tests for the PowerShell helpers, run on `windows-latest`.
+  - As built: `RestaurantPlatform.Setup.psm1` with `Install-`, `Uninstall-RestaurantPlatform.ps1`
+    and `Get-DataDriveChoice.ps1` (JSON for the installer's drive page), for Windows PowerShell
+    5.1. The Owner allows deleting the data on the System page (`POST /api/v1/system/data-deletion`,
+    DATA_ADMIN, 30 minutes, audited); the uninstaller asks `setup-cli data-deletion`. `setup-cli
+paths` gives the scripts the folders and ports. 84 Pester tests run anywhere (`pnpm
+installer:test`); 6 more, tagged Windows, run icacls, the firewall and `sc.exe` for real in the
+    CI job "Windows set-up scripts". See `docs/runbooks/windows-installer.md`.
+- **P0-16d Packaging and CI.** (Was P0-16c before the split of 2026-10-04.)
+  - electron-builder NSIS with the data-drive page, fuses, and bundling Node, the server,
+    PostgreSQL and WinSW.
+  - The `windows-latest` workflow: build, install silently, check that the services start and that
+    a killed server is back within 10 s, uninstall. Signing sits behind a secret.
+  - The person's checklist on a clean PC (`manual-tasks/14-windows-installer.md`, already listed
+    in `MANUAL_TASKS.md`).
+  - As built: `apps/desktop/src/packaging/` (stage and package steps, electron-builder's
+    configuration, the pinned downloads) and `apps/desktop/installer/installer.nsh` (the drive
+    page, stopping the services before files are replaced, the set-up scripts on install, update,
+    repair and uninstall). `Stop-` and `Start-RestaurantPlatform.ps1` joined the set-up scripts.
+    The POS window reads the installation file for the port and the CA. The CI job "Windows
+    installer" stages, builds, installs, kills the server, repairs and uninstalls on
+    `windows-latest` (`infra/installer/windows/ci/Test-Installer.ps1`). Updates go through this
+    installer, run by the update agent (P7-04c), not electron-updater. See
+    `docs/runbooks/windows-installer.md`.
+
 ## P0-17 Minimal Vendor Control Plane
 
 Goal: the smallest cloud service needed for Phase 0: heartbeats and update channels.

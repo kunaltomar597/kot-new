@@ -1,10 +1,18 @@
 import { Injectable } from '@nestjs/common';
-import type { SectionRequest, SectionView, TableRequest, TableView } from '@rp/contracts';
+import {
+  type FloorLayoutRequest,
+  type SectionRequest,
+  type SectionView,
+  TableLayout,
+  type TableRequest,
+  type TableView,
+} from '@rp/contracts';
+import { firstOverlap, type TablePlace } from '@rp/domain';
 import { AuditService } from '../audit/audit.service.js';
 import type { Principal } from '../auth/principal.js';
 import { PrismaService, type TransactionClient } from '../database/prisma.service.js';
 import { AppError } from '../errors/app-error.js';
-import type { DiningTable, Section } from '../generated/prisma/client.js';
+import { Prisma, type DiningTable, type Section } from '../generated/prisma/client.js';
 import { announceSetupChange, lockSetup } from '../restaurant/setup-changes.js';
 
 /** Active table tablets bound to a table (AUTH-009). */
@@ -17,6 +25,12 @@ const TABLE_ORDER = [{ displayOrder: 'asc' }, { createdAt: 'asc' }] as const;
 type TableRow = DiningTable & { devices: { id: string }[] };
 type SectionRow = Section & { tables: TableRow[] };
 
+/** A table's place on the plan as stored, or null when it has none (or an unreadable one). */
+function layoutOf(table: DiningTable): TablePlace | null {
+  const parsed = TableLayout.safeParse(table.layout);
+  return parsed.success ? parsed.data : null;
+}
+
 function toTableView(table: TableRow): TableView {
   return {
     id: table.id,
@@ -26,6 +40,7 @@ function toTableView(table: TableRow): TableView {
     state: table.state,
     displayOrder: table.displayOrder,
     tabletDeviceIds: table.devices.map((device) => device.id),
+    layout: layoutOf(table),
     archivedAt: table.archivedAt?.toISOString() ?? null,
     updatedAt: table.updatedAt.toISOString(),
   };
@@ -63,8 +78,15 @@ export class FloorService {
     private readonly audit: AuditService,
   ) {}
 
-  async floor(restaurantId: string): Promise<SectionView[]> {
-    const sections = await this.prisma.section.findMany({
+  floor(restaurantId: string): Promise<SectionView[]> {
+    return this.floorIn(this.prisma, restaurantId);
+  }
+
+  private async floorIn(
+    client: Pick<TransactionClient, 'section'>,
+    restaurantId: string,
+  ): Promise<SectionView[]> {
+    const sections = await client.section.findMany({
       where: { restaurantId },
       orderBy: [{ displayOrder: 'asc' }, { createdAt: 'asc' }],
       include: { tables: { orderBy: [...TABLE_ORDER], include: WITH_TABLETS } },
@@ -128,13 +150,10 @@ export class FloorService {
       }
       const tableCount = await tx.diningTable.count({ where: { sectionId, archivedAt: null } });
       if (tableCount > 0) {
-        // Managers read this as it is on the Floor page (P4-03d).
         throw new AppError(
           409,
           'SECTION_NOT_EMPTY',
-          tableCount === 1
-            ? 'The section still has a table. Move or archive it first.'
-            : `The section still has ${String(tableCount)} tables. Move or archive them first.`,
+          `The section still has ${String(tableCount)} tables. Move or archive them first.`,
           { tableCount },
         );
       }
@@ -215,7 +234,11 @@ export class FloorService {
       }
       const table = await tx.diningTable.update({
         where: { id: tableId },
-        data: after,
+        // A table moved to another section is taken off the old section's plan.
+        data: {
+          ...after,
+          ...(request.sectionId !== existing.sectionId && { layout: Prisma.DbNull }),
+        },
         include: WITH_TABLETS,
       });
       await this.record(tx, principal, 'TABLE_CHANGED', 'table', tableId, { before, after });
@@ -229,7 +252,7 @@ export class FloorService {
       await tx.$queryRaw`SELECT 1 AS locked FROM tables WHERE id = ${tableId}::uuid FOR UPDATE`;
       const existing = await this.findTable(tx, principal.restaurantId, tableId);
       if (existing.archivedAt !== null) return { changed: false, result: toTableView(existing) };
-      if (existing.state !== 'FREE') {
+      if (existing.state !== 'FREE' && existing.state !== 'NEEDS_CLEANING') {
         throw new AppError(
           409,
           'TABLE_IN_USE',
@@ -280,6 +303,64 @@ export class FloorService {
         after: { archivedAt: null },
       });
       return { changed: true, result: toTableView(table) };
+    });
+  }
+
+  /**
+   * Saves where tables sit on the floor plan (ONB-004 step 5, S). The active tables of each
+   * section touched may not overlap once the change is made; archived ones keep their place but
+   * are not drawn. One audit entry with every table's place before and after.
+   */
+  saveLayout(principal: Principal, request: FloorLayoutRequest): Promise<SectionView[]> {
+    return this.change(principal, async (tx) => {
+      const ids = [...new Set(request.tables.map((entry) => entry.tableId))];
+      const tables = await tx.diningTable.findMany({
+        where: { id: { in: ids }, restaurantId: principal.restaurantId },
+      });
+      if (tables.length !== ids.length) throw tableNotFound();
+      const wanted = new Map(request.tables.map((entry) => [entry.tableId, entry.layout]));
+      const changed = tables.filter(
+        (table) => JSON.stringify(layoutOf(table)) !== JSON.stringify(wanted.get(table.id) ?? null),
+      );
+      if (changed.length === 0) {
+        return { changed: false, result: await this.floor(principal.restaurantId) };
+      }
+      const sections = [...new Set(tables.map((table) => table.sectionId))];
+      const neighbours = await tx.diningTable.findMany({
+        where: { sectionId: { in: sections }, archivedAt: null },
+      });
+      for (const sectionId of sections) {
+        const placed = neighbours
+          .filter((table) => table.sectionId === sectionId)
+          .flatMap((table) => {
+            const place = wanted.has(table.id) ? (wanted.get(table.id) ?? null) : layoutOf(table);
+            return place === null ? [] : [{ id: table.id, place }];
+          });
+        const clash = firstOverlap(placed);
+        if (clash !== undefined) {
+          const label = (id: string) => neighbours.find((table) => table.id === id)?.label ?? id;
+          throw new AppError(
+            422,
+            'LAYOUT_OVERLAP',
+            `${label(clash[0])} and ${label(clash[1])} overlap on the plan.`,
+            { tables: clash.map(label) },
+          );
+        }
+      }
+      for (const table of changed) {
+        const layout = wanted.get(table.id) ?? null;
+        await tx.diningTable.update({
+          where: { id: table.id },
+          data: { layout: layout === null ? Prisma.DbNull : { ...layout } },
+        });
+      }
+      await this.record(tx, principal, 'FLOOR_LAYOUT_CHANGED', 'floor', principal.restaurantId, {
+        before: Object.fromEntries(changed.map((table) => [table.label, layoutOf(table)])),
+        after: Object.fromEntries(
+          changed.map((table) => [table.label, wanted.get(table.id) ?? null]),
+        ),
+      });
+      return { changed: true, result: await this.floorIn(tx, principal.restaurantId) };
     });
   }
 

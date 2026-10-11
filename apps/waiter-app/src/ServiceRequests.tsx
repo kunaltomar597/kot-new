@@ -15,7 +15,7 @@ type Action = 'acknowledge' | 'resolve';
 
 /** Events after which the open requests are read again: their own, and a table moved or closed. */
 export const affectsRequests = (eventType: string) =>
-  /^(ServiceRequest|TableMoved$|TableClosed$)/.test(eventType);
+  /^(ServiceRequest|TableMoved$|OrdersMoved$|TableClosed$)/.test(eventType);
 
 /** "Table T2 · Water requested", as the alert for it says on the banner and the pager. */
 export function requestTitle(request: ServiceRequestView, t: Translator): string {

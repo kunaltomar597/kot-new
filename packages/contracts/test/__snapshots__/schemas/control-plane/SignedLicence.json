@@ -1,0 +1,22 @@
+{
+  "input": {
+    "type": "object",
+    "properties": {
+      "payload": { "type": "string", "minLength": 2, "maxLength": 8000 },
+      "signature": { "type": "string", "maxLength": 100, "pattern": "^[A-Za-z0-9+/]+={0,2}$" },
+      "keyId": { "type": "string", "pattern": "^[0-9a-f]{16}$" }
+    },
+    "required": ["payload", "signature", "keyId"],
+    "additionalProperties": false
+  },
+  "output": {
+    "type": "object",
+    "properties": {
+      "payload": { "type": "string", "minLength": 2, "maxLength": 8000 },
+      "signature": { "type": "string", "maxLength": 100, "pattern": "^[A-Za-z0-9+/]+={0,2}$" },
+      "keyId": { "type": "string", "pattern": "^[0-9a-f]{16}$" }
+    },
+    "required": ["payload", "signature", "keyId"],
+    "additionalProperties": false
+  }
+}

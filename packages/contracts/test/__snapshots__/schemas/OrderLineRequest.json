@@ -57,10 +57,7 @@
       "recommendation": {
         "type": "object",
         "properties": {
-          "layer": {
-            "type": "string",
-            "enum": ["PINNED", "RULE", "LEARNED", "BOOSTED", "BEST_SELLER"]
-          },
+          "layer": { "type": "string", "enum": ["RULE", "LEARNED", "BEST_SELLER"] },
           "ruleId": {
             "anyOf": [
               {
@@ -74,7 +71,8 @@
         },
         "required": ["layer", "ruleId"],
         "additionalProperties": false
-      }
+      },
+      "hold": { "type": "boolean" }
     },
     "required": ["clientLineId", "itemId", "quantity"],
     "additionalProperties": false
@@ -137,10 +135,7 @@
       "recommendation": {
         "type": "object",
         "properties": {
-          "layer": {
-            "type": "string",
-            "enum": ["PINNED", "RULE", "LEARNED", "BOOSTED", "BEST_SELLER"]
-          },
+          "layer": { "type": "string", "enum": ["RULE", "LEARNED", "BEST_SELLER"] },
           "ruleId": {
             "anyOf": [
               {
@@ -154,7 +149,8 @@
         },
         "required": ["layer", "ruleId"],
         "additionalProperties": false
-      }
+      },
+      "hold": { "type": "boolean" }
     },
     "required": ["clientLineId", "itemId", "quantity", "modifiers"],
     "additionalProperties": false

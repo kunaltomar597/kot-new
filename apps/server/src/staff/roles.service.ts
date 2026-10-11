@@ -1,261 +1,172 @@
 import { Injectable } from '@nestjs/common';
-import type { CustomRoleRequest, CustomRoleView, RoleListResponse } from '@rp/contracts';
-import {
-  type AssignableRole,
-  CAPABILITIES,
-  checkCustomRole,
-  grantOf,
-  isAssignableRole,
-  type RoleCustomisation,
-} from '@rp/domain';
+import type { RoleListResponse, RoleRequest, RoleView } from '@rp/contracts';
+import { checkCustomRole, type CustomRoleProblem, extraCapabilitiesOf } from '@rp/domain';
 import { AuditService } from '../audit/audit.service.js';
 import { authErrors } from '../auth/auth-errors.js';
 import { AuthSettingsService } from '../auth/auth-settings.js';
-import { customisationOf, holderOf } from '../auth/custom-roles.js';
 import type { Principal } from '../auth/principal.js';
 import { hasFreshStepUp } from '../auth/step-up.js';
 import { newId } from '../common/ids.js';
 import { PrismaService, type TransactionClient } from '../database/prisma.service.js';
-import type { StaffRole } from '../generated/prisma/enums.js';
+import { AppError } from '../errors/app-error.js';
+import type { Role } from '../generated/prisma/client.js';
 import { announceSetupChange, lockSetup } from '../restaurant/setup-changes.js';
-import { roleErrors } from './role-errors.js';
-import { takeOffSections } from './sections.js';
 
-/** Names everyone already knows roles by (BRD §4.2): a custom role never takes one. */
+const PROBLEM_MESSAGES: Readonly<Record<CustomRoleProblem, string>> = {
+  NAME_REQUIRED: 'Give the role a name.',
+  NAME_TAKEN: 'Another role has this name. Choose another name.',
+  BASE_ROLE_INVALID: 'A custom role is built on the cashier, waiter or kitchen role.',
+  CAPABILITY_NOT_GRANTABLE:
+    'Managing staff and the Owner’s own actions cannot be given to a custom role.',
+  NOTHING_ADDED: 'Choose at least one thing the base role cannot already do.',
+};
+
 const BUILT_IN_NAMES = ['Owner', 'Manager', 'Cashier', 'Waiter', 'Kitchen'];
 
-/** Active people, the ones a role's changes reach. */
-const ACTIVE_STAFF = { active: true, archivedAt: null } as const;
+const roleErrors = {
+  invalid: (problem: CustomRoleProblem) =>
+    new AppError(422, `ROLE_${problem}`, PROBLEM_MESSAGES[problem]),
+  notFound: () => new AppError(404, 'ROLE_NOT_FOUND', 'There is no such custom role.'),
+  builtIn: () =>
+    new AppError(409, 'ROLE_BUILT_IN', 'Built-in roles cannot be changed. Create a custom role.'),
+  archived: () => new AppError(409, 'ROLE_ARCHIVED', 'This role is archived.'),
+  inUse: (count: number) =>
+    new AppError(
+      409,
+      'ROLE_IN_USE',
+      'People have this role. Give them another role first, then try again.',
+      { staffCount: count },
+    ),
+};
 
-const ROLE_SELECT = {
-  id: true,
-  name: true,
-  baseRole: true,
-  capabilities: true,
-  removedCapabilities: true,
-  archivedAt: true,
-  updatedAt: true,
-  _count: { select: { staff: { where: ACTIVE_STAFF } } },
-} as const;
+type RoleWithCount = Role & { readonly _count: { readonly staff: number } };
 
-interface RoleViewRow {
-  readonly id: string;
-  readonly name: string;
-  readonly baseRole: StaffRole;
-  readonly capabilities: readonly string[];
-  readonly removedCapabilities: readonly string[];
-  readonly archivedAt: Date | null;
-  readonly updatedAt: Date;
-  readonly _count: { readonly staff: number };
-}
-
-/** A custom role's base role; the Owner's role is never one (`CustomRoleRequest`). */
-function baseRoleOf(role: Pick<RoleViewRow, 'baseRole'>): AssignableRole {
-  if (!isAssignableRole(role.baseRole)) throw new Error('A custom role is built on the Owner');
-  return role.baseRole;
-}
-
-function customisation(role: RoleViewRow): RoleCustomisation {
-  return customisationOf({ ...role, builtIn: false }) ?? { added: [], removed: [] };
-}
-
-function view(role: RoleViewRow): CustomRoleView {
-  const { added, removed } = customisation(role);
+function view(role: RoleWithCount): RoleView {
   return {
     id: role.id,
     name: role.name,
-    baseRole: baseRoleOf(role),
-    added: [...added],
-    removed: [...removed],
+    baseRole: role.baseRole,
+    builtIn: role.builtIn,
+    capabilities: role.builtIn ? [] : extraCapabilitiesOf(role.baseRole, role.capabilities),
     staffCount: role._count.staff,
     archivedAt: role.archivedAt?.toISOString() ?? null,
-    updatedAt: role.updatedAt.toISOString(),
   };
 }
 
-/** What the audit keeps of a role: its name, base role and permissions. */
-function described(role: RoleViewRow) {
-  const { added, removed } = customisation(role);
-  return { name: role.name, baseRole: role.baseRole, added, removed };
-}
-
-/** In the permission matrix's order, so a role reads the same however it was sent. */
-function inMatrixOrder(capabilities: readonly string[]): string[] {
-  return CAPABILITIES.filter((capability) => capabilities.includes(capability));
-}
+const COUNT_ACTIVE_STAFF = {
+  _count: { select: { staff: { where: { active: true, archivedAt: null } } } },
+} as const;
 
 /**
- * Custom roles (P4-02e, AUTH-012): the Owner combines permissions into a named role on top of a
- * base role (`checkCustomRole` in `@rp/domain` says what may be added or taken away). Creating,
- * changing, archiving and restoring one needs the Owner with a fresh second factor (AUTH-006),
- * since a role decides who manages staff and who is a manager. Roles are archived, never deleted,
- * and only when no active person has them. People who have a role work with its new permissions
- * from their next request; their live connections close (the gateway compares permission keys).
- * Every change is audited and announced as `RestaurantChanged` `STAFF`.
+ * Custom roles (P4-02e, AUTH-012): the Owner combines capabilities into a named role on top of
+ * the cashier, waiter or kitchen role. The permission guard and the services apply them through
+ * `@rp/domain` `actorGrant`, which only ever honours what `extraCapabilitiesOf` accepts. Only the
+ * Owner, with a fresh second factor (AUTH-006), creates, changes or archives one; every change is
+ * audited and announced as `RestaurantChanged` `STAFF`. A role people have keeps its base role
+ * and cannot be archived.
  */
 @Injectable()
 export class RolesService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly settings: AuthSettingsService,
     private readonly audit: AuditService,
+    private readonly settings: AuthSettingsService,
   ) {}
 
-  /** Every custom role, archived ones included, by name (managers offer them to people). */
   async list(principal: Principal): Promise<RoleListResponse> {
     const roles = await this.prisma.role.findMany({
-      where: { restaurantId: principal.restaurantId, builtIn: false },
-      select: ROLE_SELECT,
-      orderBy: { name: 'asc' },
+      where: { restaurantId: principal.restaurantId },
+      include: COUNT_ACTIVE_STAFF,
+      orderBy: [{ builtIn: 'desc' }, { name: 'asc' }],
     });
     return { roles: roles.map(view) };
   }
 
-  async create(principal: Principal, request: CustomRoleRequest): Promise<CustomRoleView> {
+  async create(principal: Principal, request: RoleRequest): Promise<RoleView> {
     await this.requireOwner(principal);
-    this.requireValid(request);
-    const { restaurantId } = principal;
-    const role = await this.prisma.transaction(async (tx) => {
+    return this.prisma.transaction(async (tx) => {
       await lockSetup(tx);
-      await this.requireNameFree(tx, restaurantId, request.name, null);
-      const id = newId();
-      const created = await tx.role.create({
+      await this.check(tx, principal.restaurantId, request, null);
+      const capabilities = extraCapabilitiesOf(request.baseRole, request.capabilities);
+      const role = await tx.role.create({
         data: {
-          id,
-          restaurantId,
-          key: `custom:${id}`,
+          restaurantId: principal.restaurantId,
+          key: `custom:${newId()}`,
           name: request.name,
           baseRole: request.baseRole,
           builtIn: false,
-          capabilities: inMatrixOrder(request.added),
-          removedCapabilities: inMatrixOrder(request.removed),
+          capabilities,
         },
-        select: ROLE_SELECT,
+        include: COUNT_ACTIVE_STAFF,
       });
-      await this.record(tx, principal, 'ROLE_CREATED', id, null, described(created));
-      await announceSetupChange(tx, restaurantId, 'STAFF', { type: 'role', id });
-      return created;
+      await this.record(tx, principal, 'ROLE_CREATED', role.id, null, {
+        name: role.name,
+        baseRole: role.baseRole,
+        capabilities,
+      });
+      await announceSetupChange(tx, principal.restaurantId, 'STAFF', { type: 'role', id: role.id });
+      return view(role);
     });
-    return view(role);
   }
 
-  /**
-   * Name, base role and permissions. People who have the role and no longer take orders leave
-   * today's sections, as when someone is given such a role (P4-02a).
-   */
-  async update(
-    principal: Principal,
-    roleId: string,
-    request: CustomRoleRequest,
-  ): Promise<CustomRoleView> {
+  async update(principal: Principal, roleId: string, request: RoleRequest): Promise<RoleView> {
     await this.requireOwner(principal);
-    this.requireValid(request);
-    const { restaurantId } = principal;
-    const role = await this.prisma.transaction(async (tx) => {
+    return this.prisma.transaction(async (tx) => {
       await lockSetup(tx);
-      const before = await this.locked(tx, restaurantId, roleId);
-      if (before.archivedAt !== null) throw roleErrors.archived();
-      await this.requireNameFree(tx, restaurantId, request.name, roleId);
-      const added = inMatrixOrder(request.added);
-      const removed = inMatrixOrder(request.removed);
-      const unchanged =
-        before.name === request.name &&
-        before.baseRole === request.baseRole &&
-        added.join() === inMatrixOrder(before.capabilities).join() &&
-        removed.join() === inMatrixOrder(before.removedCapabilities).join();
-      if (unchanged) return before;
-
-      const after = await tx.role.update({
-        where: { id: roleId },
-        data: {
-          name: request.name,
-          baseRole: request.baseRole,
-          capabilities: added,
-          removedCapabilities: removed,
-        },
-        select: ROLE_SELECT,
-      });
-      const tookOrders = grantOf(this.holder(before), 'ORDER_CREATE') !== 'DENY';
-      const takesOrders = grantOf(this.holder(after), 'ORDER_CREATE') !== 'DENY';
-      let leftSections = 0;
-      if (tookOrders && !takesOrders) {
-        const holders = await tx.staff.findMany({
-          where: { restaurantId, roleId, ...ACTIVE_STAFF },
-          select: { id: true },
-        });
-        leftSections = await takeOffSections(
-          tx,
-          restaurantId,
-          holders.map((person) => person.id),
-        );
+      const existing = await this.customRole(tx, principal.restaurantId, roleId);
+      if (existing.archivedAt !== null) throw roleErrors.archived();
+      // People's own role is the base role: it never changes under them.
+      if (existing.baseRole !== request.baseRole && existing._count.staff > 0) {
+        throw roleErrors.inUse(existing._count.staff);
       }
-      await this.record(tx, principal, 'ROLE_CHANGED', roleId, described(before), {
-        ...described(after),
-        staffCount: after._count.staff,
-        ...(leftSections > 0 && { leftSections }),
+      await this.check(tx, principal.restaurantId, request, roleId);
+      const capabilities = extraCapabilitiesOf(request.baseRole, request.capabilities);
+      const before = {
+        name: existing.name,
+        baseRole: existing.baseRole,
+        capabilities: extraCapabilitiesOf(existing.baseRole, existing.capabilities),
+      };
+      const after = { name: request.name, baseRole: request.baseRole, capabilities };
+      if (JSON.stringify(before) === JSON.stringify(after)) return view(existing);
+      const role = await tx.role.update({
+        where: { id: roleId },
+        data: after,
+        include: COUNT_ACTIVE_STAFF,
       });
-      await announceSetupChange(tx, restaurantId, 'STAFF', { type: 'role', id: roleId });
-      return after;
+      await this.record(tx, principal, 'ROLE_CHANGED', roleId, before, after);
+      await announceSetupChange(tx, principal.restaurantId, 'STAFF', { type: 'role', id: roleId });
+      return view(role);
     });
-    return view(role);
   }
 
-  /** Only a role no active person has; deactivated people keep it in their records. */
-  async archive(principal: Principal, roleId: string, reason: string): Promise<CustomRoleView> {
+  async archive(principal: Principal, roleId: string, reason: string): Promise<RoleView> {
     await this.requireOwner(principal);
-    const { restaurantId } = principal;
-    const role = await this.prisma.transaction(async (tx) => {
-      const before = await this.locked(tx, restaurantId, roleId);
-      if (before.archivedAt !== null) throw roleErrors.alreadyArchived();
-      if (before._count.staff > 0) throw roleErrors.inUse(before._count.staff);
-      const after = await tx.role.update({
+    return this.prisma.transaction(async (tx) => {
+      await lockSetup(tx);
+      const existing = await this.customRole(tx, principal.restaurantId, roleId);
+      if (existing.archivedAt !== null) return view(existing);
+      if (existing._count.staff > 0) throw roleErrors.inUse(existing._count.staff);
+      // Deactivated people keep the role on their record for the audit trail.
+      const role = await tx.role.update({
         where: { id: roleId },
         data: { archivedAt: new Date() },
-        select: ROLE_SELECT,
+        include: COUNT_ACTIVE_STAFF,
       });
       await this.record(
         tx,
         principal,
         'ROLE_ARCHIVED',
         roleId,
-        { archived: false },
-        { archived: true, name: after.name },
+        { archivedAt: null },
+        { archivedAt: role.archivedAt?.toISOString() ?? null },
         reason,
       );
-      await announceSetupChange(tx, restaurantId, 'STAFF', { type: 'role', id: roleId });
-      return after;
+      await announceSetupChange(tx, principal.restaurantId, 'STAFF', { type: 'role', id: roleId });
+      return view(role);
     });
-    return view(role);
   }
 
-  async restore(principal: Principal, roleId: string): Promise<CustomRoleView> {
-    await this.requireOwner(principal);
-    const { restaurantId } = principal;
-    const role = await this.prisma.transaction(async (tx) => {
-      await lockSetup(tx);
-      const before = await this.locked(tx, restaurantId, roleId);
-      if (before.archivedAt === null) throw roleErrors.notArchived();
-      await this.requireNameFree(tx, restaurantId, before.name, roleId);
-      const after = await tx.role.update({
-        where: { id: roleId },
-        data: { archivedAt: null },
-        select: ROLE_SELECT,
-      });
-      await this.record(
-        tx,
-        principal,
-        'ROLE_RESTORED',
-        roleId,
-        { archived: true },
-        { archived: false, name: after.name },
-      );
-      await announceSetupChange(tx, restaurantId, 'STAFF', { type: 'role', id: roleId });
-      return after;
-    });
-    return view(role);
-  }
-
-  /** The Owner, having confirmed password and second factor within `auth.stepUpMinutes`. */
+  /** Only the Owner, having confirmed password and authenticator just now (AUTH-006). */
   private async requireOwner(principal: Principal): Promise<void> {
     if (principal.role !== 'OWNER') throw authErrors.ownerOnly();
     const settings = await this.settings.get(principal.restaurantId);
@@ -264,53 +175,36 @@ export class RolesService {
     }
   }
 
-  private requireValid(request: CustomRoleRequest): void {
-    const issues = checkCustomRole(request.baseRole, request);
-    if (issues.length > 0) throw roleErrors.permissionsInvalid(issues);
-  }
-
-  /** Names are unique, ignoring case, among active custom roles and the built-in roles. */
-  private async requireNameFree(
+  private async check(
     tx: TransactionClient,
     restaurantId: string,
-    name: string,
-    exceptId: string | null,
+    request: RoleRequest,
+    selfId: string | null,
   ): Promise<void> {
-    const taken =
-      BUILT_IN_NAMES.some((builtIn) => builtIn.toLowerCase() === name.toLowerCase()) ||
-      (await tx.role.findFirst({
-        where: {
-          restaurantId,
-          builtIn: false,
-          archivedAt: null,
-          name: { equals: name, mode: 'insensitive' },
-          ...(exceptId !== null && { id: { not: exceptId } }),
-        },
-        select: { id: true },
-      })) !== null;
-    if (taken) throw roleErrors.nameTaken(name);
+    const others = await tx.role.findMany({
+      where: { restaurantId, archivedAt: null, ...(selfId !== null && { NOT: { id: selfId } }) },
+      select: { name: true },
+    });
+    // The built-in roles' names are taken even before anyone has the role.
+    const [problem] = checkCustomRole(request, [
+      ...BUILT_IN_NAMES,
+      ...others.map((other) => other.name),
+    ]);
+    if (problem !== undefined) throw roleErrors.invalid(problem);
   }
 
-  /**
-   * The custom role, locked for the rest of the transaction: giving it to someone (which locks it
-   * for share) waits, so nobody gets a role while it changes or is archived.
-   */
-  private async locked(
+  private async customRole(
     tx: TransactionClient,
     restaurantId: string,
     roleId: string,
-  ): Promise<RoleViewRow> {
-    await tx.$queryRaw`SELECT 1 AS locked FROM roles WHERE id = ${roleId}::uuid FOR UPDATE`;
+  ): Promise<RoleWithCount> {
     const role = await tx.role.findFirst({
-      where: { id: roleId, restaurantId, builtIn: false },
-      select: ROLE_SELECT,
+      where: { id: roleId, restaurantId },
+      include: COUNT_ACTIVE_STAFF,
     });
     if (role === null) throw roleErrors.notFound();
+    if (role.builtIn) throw roleErrors.builtIn();
     return role;
-  }
-
-  private holder(role: RoleViewRow) {
-    return holderOf({ ...role, builtIn: false });
   }
 
   private record(
@@ -318,8 +212,8 @@ export class RolesService {
     principal: Principal,
     action: string,
     roleId: string,
-    before: unknown,
-    after: unknown,
+    before: Record<string, unknown> | null,
+    after: Record<string, unknown>,
     reason?: string,
   ): Promise<unknown> {
     return this.audit.record(tx, {

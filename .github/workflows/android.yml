@@ -42,21 +42,21 @@ jobs:
     env:
       APP_ENV: development
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - uses: pnpm/action-setup@v6
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
 
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: .nvmrc
           cache: pnpm
 
-      - uses: actions/setup-java@v6
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
         with:
           distribution: temurin
           java-version: '17'
 
-      - uses: gradle/actions/setup-gradle@v6
+      - uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
 
       - run: pnpm install --frozen-lockfile
 
@@ -69,9 +69,16 @@ jobs:
       - name: Generate the Android project
         run: pnpm --filter @rp/${{ matrix.app }} prebuild
 
+      # --stacktrace: a packaging failure otherwise hides its cause (one waiter-app run, 2026-10-11).
       - name: Assemble the debug APK
         working-directory: apps/${{ matrix.app }}/android
-        run: ./gradlew assembleDebug --no-daemon
+        run: ./gradlew assembleDebug --no-daemon --stacktrace
+
+      - name: Disk and memory when the build failed
+        if: failure()
+        run: |
+          df -h
+          free -m
 
       # The waiter phone's background alerts (P2-06b) need notifications and a foreground service;
       # the table tablet alerts nobody and blocks them (SEC-002 least privilege).
@@ -88,6 +95,27 @@ jobs:
               [ "${{ matrix.app }}" != waiter-app ] || { echo "::error::The waiter app lacks $permission"; exit 1; }
             fi
           done
+          # The tablet's kiosk (P3-01b): its device-admin receiver, bindable only by the system.
+          if [ "${{ matrix.app }}" = table-tablet ]; then
+            grep -A8 'com.rp.mobilenative.RpDeviceAdminReceiver' manifest.txt | tee admin.txt
+            grep -q 'android.permission.BIND_DEVICE_ADMIN' admin.txt || {
+              echo '::error::The device-admin receiver is not protected by BIND_DEVICE_ADMIN'
+              exit 1
+            }
+          fi
+          # The in-app updater (P7-04e2): both apps may install their own new APK from the PC,
+          # and Android's answers reach only the app's own receivers.
+          grep -q "android.permission.REQUEST_INSTALL_PACKAGES'" permissions.txt || {
+            echo '::error::The app cannot install its own updates (REQUEST_INSTALL_PACKAGES)'
+            exit 1
+          }
+          for receiver in RpApkInstallReceiver RpPackageReplacedReceiver; do
+            grep -B4 -A4 "com.rp.mobilenative.$receiver" manifest.txt | tee receiver.txt
+            grep -q -E 'exported.*(0x0$|false)' receiver.txt || {
+              echo "::error::$receiver must not be exported"
+              exit 1
+            }
+          done
           if [ "${{ matrix.app }}" = waiter-app ]; then
             grep -A6 'com.rp.mobilenative.RpAlertService' manifest.txt | tee service.txt
             grep -q -E 'foregroundServiceType.*(0x40000000|1073741824|specialUse)' service.txt || {
@@ -97,7 +125,7 @@ jobs:
           fi
 
       - name: Keep the APK
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: ${{ matrix.app }}-debug-apk
           path: apps/${{ matrix.app }}/android/app/build/outputs/apk/debug/*.apk

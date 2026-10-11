@@ -1,0 +1,26 @@
+{
+  "input": {
+    "type": "object",
+    "properties": {
+      "x": { "type": "integer", "minimum": 0, "maximum": 38 },
+      "y": { "type": "integer", "minimum": 0, "maximum": 22 },
+      "w": { "type": "integer", "minimum": 2, "maximum": 10 },
+      "h": { "type": "integer", "minimum": 2, "maximum": 10 },
+      "shape": { "type": "string", "enum": ["RECT", "ROUND"] }
+    },
+    "required": ["x", "y", "w", "h", "shape"],
+    "additionalProperties": false
+  },
+  "output": {
+    "type": "object",
+    "properties": {
+      "x": { "type": "integer", "minimum": 0, "maximum": 38 },
+      "y": { "type": "integer", "minimum": 0, "maximum": 22 },
+      "w": { "type": "integer", "minimum": 2, "maximum": 10 },
+      "h": { "type": "integer", "minimum": 2, "maximum": 10 },
+      "shape": { "type": "string", "enum": ["RECT", "ROUND"] }
+    },
+    "required": ["x", "y", "w", "h", "shape"],
+    "additionalProperties": false
+  }
+}

@@ -72,9 +72,8 @@ describe('[MGR-007] [UPD-010] settings catalogue', () => {
       'kds.readyNotCollectedMinutes': 3, // KDS-006
       'kds.autoEscalateNotCollected': false, // KDS-006 (S)
       'devices.lowBatteryAlertPercent': 20, // TAB-015
-      'devices.offlineAfterSeconds': 60, // NTF-003 (our default: a reload raises nothing)
       'pager.lowBatteryPercent': 15, // PGR-013
-      'pagers.heartbeatSeconds': 30, // PGR-007
+      'pager.heartbeatSeconds': 30, // PGR-007
       'qr.submissionsPerWindow': 5, // QR-006
       'qr.rateLimitWindowMinutes': 10, // QR-006
       'qr.pickupTimeoutSeconds': 60, // QR-007
@@ -110,7 +109,6 @@ describe('[MGR-007] [UPD-010] settings catalogue', () => {
         'licence.graceDays',
         'qr.pickupTimeoutSeconds',
         'controlPlane.heartbeatSeconds',
-        'pagers.heartbeatSeconds',
       ]),
     );
   });
@@ -142,25 +140,5 @@ describe('[MGR-007] [UPD-010] settings catalogue', () => {
       'The red age must be later than the amber age.',
     ]);
     expect(crossSettingProblems({ ...defaults, 'storage.criticalPercent': 80 })).toHaveLength(1);
-  });
-
-  it('[NTF-002] [PGR-006] takes a rule change with its vibration, and refuses one that cannot work', () => {
-    const rules = settingDefinition('notifications.rules')?.schema;
-    const accepts = (value: unknown) => rules?.safeParse(value).success;
-    expect(accepts({ ITEM_READY: { recipients: ['SECTION_WAITERS'], vibration: 'THREE' } })).toBe(
-      true,
-    );
-    expect(accepts({ MANAGER_NUDGE: { pagerText: 'BOSS: {message}' } })).toBe(true);
-    // An Appendix C row that is not an alert, someone the event cannot reach, a nudge that
-    // loses the manager's message, a pattern the pager does not know.
-    expect(accepts({ ORDER_CHANGED: { escalate: true } })).toBe(false);
-    expect(accepts({ WATER_REQUEST: { recipients: ['SELECTED'] } })).toBe(false);
-    expect(accepts({ MANAGER_NUDGE: { pagerText: 'MGR CALLING' } })).toBe(false);
-    expect(accepts({ ITEM_READY: { vibration: 'BUZZ' } })).toBe(false);
-    const refused = rules?.safeParse({ ITEM_READY: { channels: ['TABLET'] } });
-    expect(refused?.error?.issues.map((issue) => [issue.path, issue.message])).toEqual([
-      [['ITEM_READY'], 'NO_CHANNEL'],
-    ]);
-    expect(settingDefinition('pagers.vibration')).toBeUndefined();
   });
 });

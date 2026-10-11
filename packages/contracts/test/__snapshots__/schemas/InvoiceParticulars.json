@@ -25,7 +25,8 @@
       "placeOfSupply": { "type": ["string", "null"] },
       "phone": { "type": ["string", "null"] },
       "headerLines": { "type": "array", "items": { "type": "string" } },
-      "footerLines": { "type": "array", "items": { "type": "string" } }
+      "footerLines": { "type": "array", "items": { "type": "string" } },
+      "amountInWords": { "default": false, "type": "boolean" }
     },
     "required": [
       "displayName",
@@ -65,7 +66,8 @@
       "placeOfSupply": { "type": ["string", "null"] },
       "phone": { "type": ["string", "null"] },
       "headerLines": { "type": "array", "items": { "type": "string" } },
-      "footerLines": { "type": "array", "items": { "type": "string" } }
+      "footerLines": { "type": "array", "items": { "type": "string" } },
+      "amountInWords": { "default": false, "type": "boolean" }
     },
     "required": [
       "displayName",
@@ -76,7 +78,8 @@
       "placeOfSupply",
       "phone",
       "headerLines",
-      "footerLines"
+      "footerLines",
+      "amountInWords"
     ],
     "additionalProperties": false
   }

@@ -1,4 +1,5 @@
-import type { NextFunction, Request, Response } from 'express';
+import { NotFoundException } from '@nestjs/common';
+import type { NextFunction, Request, RequestHandler, Response } from 'express';
 import { runWithRequestContext } from '../common/request-context.js';
 import { isBodyParserError, mapError } from '../errors/error-mapping.js';
 import { CORRELATION_HEADER, resolveCorrelationId } from '../logging/correlation.js';
@@ -38,4 +39,26 @@ export function bodyParserErrorHandler(
   const id = (request as RequestWithId).id;
   const mapped = mapError(error, typeof id === 'string' ? id : undefined);
   response.status(mapped.status).json(mapped.body);
+}
+
+/**
+ * Last: a path outside the API that nothing before served (the console's files, the CA) is a 404
+ * in the ApiError shape, with the security headers already set. Nest answers unknown paths only
+ * under its prefix; without this, Express's own HTML page would answer the rest and replace the
+ * CSP (found by the DAST scan, P8-03c1).
+ */
+export function notFoundOutsideApi(prefix: string): RequestHandler {
+  const root = `/${prefix}`;
+  return (request, response, next) => {
+    if (request.path === root || request.path.startsWith(`${root}/`)) {
+      next();
+      return;
+    }
+    const id = (request as RequestWithId).id;
+    const mapped = mapError(
+      new NotFoundException(`Cannot ${request.method} ${request.path}`),
+      typeof id === 'string' ? id : undefined,
+    );
+    response.status(mapped.status).json(mapped.body);
+  };
 }

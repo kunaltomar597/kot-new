@@ -12,11 +12,13 @@ import {
   OVERRIDE_TOKEN_HEADER,
   PrintInvoiceRequest,
   type PrintInvoiceResponse,
+  type PrintTableBillResponse,
   ReopenInvoiceRequest,
   RevokeDiscountRequest,
   ServiceChargeRequest,
   SplitBillRequest,
   type SplitBillResponse,
+  TableSessionParams,
   VoidInvoiceRequest,
 } from '@rp/contracts';
 import { authErrors } from '../auth/auth-errors.js';
@@ -158,7 +160,7 @@ export class InvoicesController {
 
   @Post(':id/reopen')
   @HttpCode(200)
-  @RequireCapability('BILL_EDIT_AFTER_PRINT')
+  @RequireCapability('BILL_EDIT_AFTER_PRINT', { record: 'id' })
   reopen(
     @Req() request: AuthenticatedRequest,
     @Param(new ZodValidationPipe(InvoiceParams)) params: InvoiceParams,
@@ -169,7 +171,7 @@ export class InvoicesController {
 
   @Post(':id/void')
   @HttpCode(200)
-  @RequireCapability('INVOICE_VOID')
+  @RequireCapability('INVOICE_VOID', { record: 'id' })
   void(
     @Req() request: AuthenticatedRequest,
     @Param(new ZodValidationPipe(InvoiceParams)) params: InvoiceParams,
@@ -185,5 +187,22 @@ export class InvoicesController {
     @Param(new ZodValidationPipe(InvoiceParams)) params: InvoiceParams,
   ): Promise<InvoiceView> {
     return this.invoices.view(principalOf(request).restaurantId, params.id);
+  }
+}
+
+/** A table's bill printed from the waiter app (WTR-008). */
+@Controller('table-sessions')
+export class TableBillsController {
+  constructor(private readonly actions: InvoiceActionsService) {}
+
+  // Waiters hold BILL_REQUEST; the service checks they may print (`bills.waiterMayPrint`).
+  @Post(':sessionId/print-bill')
+  @HttpCode(200)
+  @RequireCapability('BILL_REQUEST')
+  printBill(
+    @Req() request: AuthenticatedRequest,
+    @Param(new ZodValidationPipe(TableSessionParams)) params: TableSessionParams,
+  ): Promise<PrintTableBillResponse> {
+    return this.actions.printTableBill(principalOf(request), params.sessionId);
   }
 }

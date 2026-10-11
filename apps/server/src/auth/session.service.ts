@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
-import type { CurrentSessionResponse, LoginResponse } from '@rp/contracts';
-import type { Role } from '@rp/domain';
+import { type CurrentSessionResponse, type LoginResponse, STAFF_DEVICE_TYPES } from '@rp/contracts';
+import { type Capability, extraCapabilitiesOf, type Role } from '@rp/domain';
 import { AuditService } from '../audit/audit.service.js';
 import { PrismaService, type TransactionClient } from '../database/prisma.service.js';
 import type { AppError } from '../errors/app-error.js';
@@ -8,15 +8,13 @@ import type { Prisma } from '../generated/prisma/client.js';
 import { authErrors } from './auth-errors.js';
 import { type AuthSettings, AuthSettingsService } from './auth-settings.js';
 import type { AuthenticatedDevice } from './device.js';
-import {
-  customisationOf,
-  holderOf,
-  permissionKey,
-  type SignedInCustomRole,
-  signedInCustomRole,
-} from './custom-roles.js';
 import type { Principal } from './principal.js';
 import { AccessTokenError, randomToken, sha256Hex, TokenService } from './tokens.js';
+
+/** Whether people sign in on this kind of device (AUTH-001, AUTH-009). */
+function isStaffDevice(device: AuthenticatedDevice): boolean {
+  return (STAFF_DEVICE_TYPES as readonly string[]).includes(device.type);
+}
 
 /** Writes of `lastActiveAt` are skipped within this interval to save a write per request. */
 const TOUCH_INTERVAL_MS = 30_000;
@@ -28,7 +26,17 @@ export interface SessionStaff {
   readonly id: string;
   readonly displayName: string;
   readonly role: Role;
-  readonly customRole: SignedInCustomRole;
+  /** What the person's custom role adds (AUTH-012); empty for a built-in role. */
+  readonly capabilities: readonly Capability[];
+}
+
+/** A custom role's capabilities as the rules allow them; none once it is archived. */
+export function roleCapabilities(role: {
+  readonly baseRole: Role;
+  readonly capabilities: readonly string[];
+  readonly archivedAt: Date | null;
+}): Capability[] {
+  return role.archivedAt === null ? extraCapabilitiesOf(role.baseRole, role.capabilities) : [];
 }
 
 interface SessionRow {
@@ -96,6 +104,8 @@ export class SessionService {
       now: Date;
     },
   ): Promise<{ session: SessionRow; refreshToken: string }> {
+    // The sign-in routes admit only these devices; this keeps any other way in shut too.
+    if (!isStaffDevice(input.device)) throw authErrors.deviceNotAllowed();
     const refreshToken = randomToken();
     const session = await tx.session.create({
       data: {
@@ -154,7 +164,7 @@ export class SessionService {
         id: input.staff.id,
         displayName: input.staff.displayName,
         role: input.staff.role,
-        customRole: input.staff.customRole,
+        capabilities: [...input.staff.capabilities],
       },
       secondFactorValidUntil: this.stepUpValidUntil(session.secondFactorAt, settings, now),
     };
@@ -181,7 +191,7 @@ export class SessionService {
         id: session.staffId,
         displayName: session.staff.displayName,
         role: session.staff.role.baseRole,
-        customRole: signedInCustomRole(session.staff.role),
+        capabilities: roleCapabilities(session.staff.role),
       },
       secondFactorValidUntil: this.stepUpValidUntil(session.secondFactorAt, settings, now),
     };
@@ -201,11 +211,13 @@ export class SessionService {
   /**
    * Checks an access token on every request: signature and expiry, the device it was issued to,
    * and the session behind it (not revoked, not expired, not idle, person still active). Renews
-   * the inactivity timer.
+   * the inactivity timer as of the person's last touch: `idleMs` before now, as the app says
+   * (MOBILE-E3), so a call the app made by itself while they were away keeps nothing alive.
    */
   async authenticate(
     token: string,
     device: AuthenticatedDevice | undefined,
+    idleMs = 0,
   ): Promise<AccessResult> {
     let claims;
     try {
@@ -225,35 +237,38 @@ export class SessionService {
     const settings = await this.settings.get(session.restaurantId);
     const failure = await this.check(session, device, settings, now);
     if (failure !== undefined) return { failure };
-    const idleFor = now.getTime() - session.lastActiveAt.getTime();
-    if (idleFor > TOUCH_INTERVAL_MS) {
-      await this.prisma.session.update({ where: { id: session.id }, data: { lastActiveAt: now } });
+    const activeAt = now.getTime() - idleMs;
+    if (activeAt - session.lastActiveAt.getTime() > TOUCH_INTERVAL_MS) {
+      await this.prisma.session.update({
+        where: { id: session.id },
+        data: { lastActiveAt: new Date(activeAt) },
+      });
     }
     return {
       principal: {
         staffId: session.staffId,
         // The current role applies at once, even if it changed since the token was issued.
         role: session.staff.role.baseRole,
-        customRole: customisationOf(session.staff.role),
         restaurantId: session.restaurantId,
         deviceId: session.deviceId,
         sessionId: session.id,
         secondFactorAt: session.secondFactorAt,
+        // Read with the session on every request, so a changed custom role applies at once.
+        capabilities: roleCapabilities(session.staff.role),
       },
     };
   }
 
   /**
-   * The sessions among `entries` that can still be used, with the `permissionKey` of the person's
-   * current role. Live sockets are re-checked with this (P0-12): a sign-out, revocation, expiry,
-   * inactivity timeout, role change or change to their custom role (P4-02e) ends them. Does not
-   * count as activity.
+   * The sessions among `entries` that can still be used, with the person's current role. Live
+   * sockets are re-checked with this (P0-12): a sign-out, revocation, expiry, inactivity timeout or
+   * role change ends them. Does not count as activity.
    */
   async liveSessions(
     entries: readonly { readonly sessionId: string; readonly device: AuthenticatedDevice }[],
     now: Date = new Date(),
-  ): Promise<Map<string, string>> {
-    const live = new Map<string, string>();
+  ): Promise<Map<string, Role>> {
+    const live = new Map<string, Role>();
     if (entries.length === 0) return live;
     const sessions = await this.prisma.session.findMany({
       where: { id: { in: [...new Set(entries.map((entry) => entry.sessionId))] } },
@@ -270,7 +285,7 @@ export class SessionService {
         settingsOf.set(session.restaurantId, settings);
       }
       if ((await this.check(session, device, settings, now)) === undefined) {
-        live.set(sessionId, permissionKey(holderOf(session.staff.role)));
+        live.set(sessionId, session.staff.role.baseRole);
       }
     }
     return live;
@@ -289,6 +304,8 @@ export class SessionService {
     if (session.revokedAt !== null || session.deviceId !== device.deviceId) {
       return authErrors.sessionRevoked();
     }
+    // A session on a table tablet or a pager counts for nothing (AUTH-009, SEC-003).
+    if (!isStaffDevice(device)) return authErrors.deviceNotAllowed();
     const idleFor = now.getTime() - session.lastActiveAt.getTime();
     if (session.expiresAt <= now || idleFor > this.inactivityMs(settings, device)) {
       await this.revoke(session.id, session.expiresAt <= now ? 'EXPIRED' : 'INACTIVITY');
@@ -303,9 +320,14 @@ export class SessionService {
 
   /**
    * Rotates the refresh token and issues a new access token. Presenting an already rotated
-   * refresh token means it leaked: the whole session is revoked (AUTH-005).
+   * refresh token means it leaked: the whole session is revoked (AUTH-005). Activity counts as of
+   * the person's last touch, as in `authenticate`.
    */
-  async refresh(refreshToken: string, device: AuthenticatedDevice): Promise<LoginResponse> {
+  async refresh(
+    refreshToken: string,
+    device: AuthenticatedDevice,
+    idleMs = 0,
+  ): Promise<LoginResponse> {
     const now = new Date();
     const hash = sha256Hex(refreshToken);
     const session = await this.prisma.session.findUnique({
@@ -347,10 +369,15 @@ export class SessionService {
     }
 
     const nextToken = randomToken();
+    const activeAt = Math.max(session.lastActiveAt.getTime(), now.getTime() - idleMs);
     // Conditional on the old hash, so two concurrent refreshes cannot both succeed.
     const rotated = await this.prisma.session.updateMany({
       where: { id: session.id, tokenHash: hash, revokedAt: null },
-      data: { tokenHash: sha256Hex(nextToken), previousTokenHash: hash, lastActiveAt: now },
+      data: {
+        tokenHash: sha256Hex(nextToken),
+        previousTokenHash: hash,
+        lastActiveAt: new Date(activeAt),
+      },
     });
     if (rotated.count !== 1) throw authErrors.sessionRevoked();
     return this.issue({
@@ -360,7 +387,7 @@ export class SessionService {
         id: session.staffId,
         displayName: session.staff.displayName,
         role: session.staff.role.baseRole,
-        customRole: signedInCustomRole(session.staff.role),
+        capabilities: roleCapabilities(session.staff.role),
       },
       device,
       settings,

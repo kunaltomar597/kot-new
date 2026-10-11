@@ -1,5 +1,5 @@
 import { Controller, Get, HttpCode, Post, Req } from '@nestjs/common';
-import { CAPABILITIES } from '@rp/domain';
+import { CAPABILITIES, OVERRIDE_RECORD_TYPES } from '@rp/domain';
 import { RequireCapability, RequireSession } from '../../src/auth/decorators.js';
 import type { AuthenticatedRequest } from '../../src/auth/principal.js';
 
@@ -13,7 +13,11 @@ export class AuthProbeController {
   }
 }
 
-/** One route per capability (`POST /api/v1/probe-matrix/<CAPABILITY>`), for table-driven tests. */
+/**
+ * One route per capability (`POST /api/v1/probe-matrix/<CAPABILITY>`), for table-driven tests; a
+ * capability a manager approves for one record takes the record's id after it
+ * (`.../<CAPABILITY>/<id>`, PC-T2).
+ */
 @Controller('probe-matrix')
 export class MatrixProbeController {}
 
@@ -29,7 +33,8 @@ for (const capability of CAPABILITIES) {
   };
   const descriptor = Object.getOwnPropertyDescriptor(prototype, key)!;
   Req()(prototype, key, 0);
-  Post(capability)(prototype, key, descriptor);
+  const record = OVERRIDE_RECORD_TYPES[capability] === undefined ? undefined : 'recordId';
+  Post(record === undefined ? capability : `${capability}/:${record}`)(prototype, key, descriptor);
   HttpCode(200)(prototype, key, descriptor);
-  RequireCapability(capability)(prototype, key, descriptor);
+  RequireCapability(capability, record === undefined ? {} : { record })(prototype, key, descriptor);
 }

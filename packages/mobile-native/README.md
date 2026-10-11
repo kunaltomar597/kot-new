@@ -51,6 +51,32 @@ The Android pieces shared by the waiter app and the table tablet (P2-01c, P2-01d
   - The library's manifest adds the service, the receiver and their permissions to both apps; the
     table tablet blocks the permissions in its app config, and the Android CI job checks both APKs.
 
+- The table tablet's kiosk and health (P3-01b, TAB-001, TAB-015):
+  - `RpKioskModule.kt`: lock-task mode, with what Android allows and the mode it is in; the screen
+    kept on; battery, charging, network and Wi-Fi signal (no extra permission beyond the normal
+    network state); and a tone on the alarm stream for "Locate".
+  - As device owner, entering kiosk mode first allows its own package to lock, takes away the lock
+    screen and the status bar, and keeps the screen on while plugged in.
+  - `RpDeviceAdminReceiver.kt`: the device-admin component MDM (or `dpm set-device-owner`)
+    activates. Only the system may bind it, and it uses no admin policies. It is in both apps'
+    manifests and never activated on a waiter phone.
+  - `AndroidKiosk`: that module as `@rp/mobile-core`'s `Kiosk` and `DeviceHealthSource`.
+
+- `ExpoOtaUpdates` (P7-04e1, UPD-001, UPD-007): `expo-updates` as `@rp/mobile-core`'s
+  `OtaUpdateSource`. It reads the client API an update was published with from its manifest
+  (`extra.expoClient.extra.clientApi`), and says when a downloaded update failed to start.
+  `expo-updates` checks each update's code signature against the certificate in the APK.
+- The in-app APK updater (P7-04e2, WTR-001, UPD-007), a local Expo module:
+  - `ApkInstalls.kt`: downloads the APK from the restaurant PC with the device's token over the
+    pinned CA (`LanTrust`), keeps it only if its size, SHA-256, package and `versionName` are the
+    expected ones, and hands it to Android's `PackageInstaller` (`REQUEST_INSTALL_PACKAGES`).
+    Android installs it only over an app signed with the same key.
+  - `RpApkInstallReceiver.kt`: Android's answer; it opens Android's confirmation on a phone and
+    passes on a cancel or a refusal. `RpPackageReplacedReceiver.kt`: after the update a
+    device-owner tablet opens the app again, in kiosk mode. Neither is exported.
+  - `RpApkInstallerModule.kt` and `AndroidApkInstaller`: the app's own version, whether it owns
+    its device, Android's "Install unknown apps" setting, as `@rp/mobile-core`'s `ApkInstaller`.
+
 Tests run with Vitest and fake native modules; the Kotlin is compiled by the Android CI job.
 Background alerts are checked on a phone or emulator with the waiter app's Maestro flow
 `background-alert.yaml`; `docs/runbooks/waiter-phone.md` covers setting a phone up.

@@ -1,10 +1,8 @@
 import { Body, Controller, Get, HttpCode, Param, Post, Put, Query, Req } from '@nestjs/common';
 import {
+  type BestSellersResponse,
   ArchiveRequest,
-  type RecommendationPreferenceListResponse,
-  RecommendationPreferenceParams,
-  RecommendationPreferenceRequest,
-  type RecommendationPreferenceView,
+  type LearnedRecommendationsResponse,
   type RecommendationRuleListResponse,
   RecommendationRuleParams,
   RecommendationRuleRequest,
@@ -20,7 +18,7 @@ import { RequireCapability, RequireDevice } from '../auth/decorators.js';
 import type { AuthenticatedDevice } from '../auth/device.js';
 import type { AuthenticatedRequest, Principal } from '../auth/principal.js';
 import { ZodValidationPipe } from '../validation/zod-validation.pipe.js';
-import { RecommendationPreferencesService } from './recommendation-preferences.service.js';
+import { LearnedAssociations } from './learned-associations.service.js';
 import { RecommendationRulesService } from './recommendation-rules.service.js';
 import { RecommendationsService } from './recommendations.service.js';
 
@@ -61,7 +59,7 @@ export class RecommendationsController {
 
 /** The table tablet's suggestions for its own table (TAB-011, AUTH-009); its screens are P3-05. */
 @Controller('devices/current/recommendations')
-@RequireDevice()
+@RequireDevice(['TABLE_TABLET'])
 export class TabletRecommendationsController {
   constructor(private readonly recommendations: RecommendationsService) {}
 
@@ -84,7 +82,7 @@ export class TabletRecommendationsController {
   }
 }
 
-/** The restaurant's recommendation rules (REC-002), edited on the Recommendations page (P4-03c). */
+/** The restaurant's recommendation rules (REC-002); the editor on the dashboard is P4-03. */
 @Controller('recommendation-rules')
 @RequireCapability('OPERATIONS_CONFIGURE')
 export class RecommendationRulesController {
@@ -123,25 +121,32 @@ export class RecommendationRulesController {
   }
 }
 
-/** The manager's pinned, boosted and blocked dishes (REC-009), on the Recommendations page. */
-@Controller('recommendation-preferences')
+/** What the restaurant's orders taught the engine, and learning again now (P6-02, REC-003). */
+@Controller('recommendations/learned')
 @RequireCapability('OPERATIONS_CONFIGURE')
-export class RecommendationPreferencesController {
-  constructor(private readonly preferences: RecommendationPreferencesService) {}
+export class LearnedRecommendationsController {
+  constructor(private readonly learned: LearnedAssociations) {}
 
   @Get()
-  list(@Req() request: AuthenticatedRequest): Promise<RecommendationPreferenceListResponse> {
-    return this.preferences.list(principalOf(request).restaurantId);
+  status(@Req() request: AuthenticatedRequest): Promise<LearnedRecommendationsResponse> {
+    return this.learned.status(principalOf(request).restaurantId);
   }
 
-  @Put(':itemId')
-  set(
-    @Req() request: AuthenticatedRequest,
-    @Param(new ZodValidationPipe(RecommendationPreferenceParams))
-    { itemId }: RecommendationPreferenceParams,
-    @Body(new ZodValidationPipe(RecommendationPreferenceRequest))
-    body: RecommendationPreferenceRequest,
-  ): Promise<RecommendationPreferenceView> {
-    return this.preferences.set(principalOf(request), itemId, body);
+  @Post('run')
+  @HttpCode(200)
+  run(@Req() request: AuthenticatedRequest): Promise<LearnedRecommendationsResponse> {
+    return this.learned.learn(principalOf(request).restaurantId);
+  }
+}
+
+/** The bestseller badge and filter on the tablet and QR menu (TAB-005, P3-03a). */
+@Controller('menu')
+@RequireDevice(['TABLE_TABLET'])
+export class BestSellersController {
+  constructor(private readonly recommendations: RecommendationsService) {}
+
+  @Get('bestsellers')
+  list(@Req() request: AuthenticatedRequest): Promise<BestSellersResponse> {
+    return this.recommendations.bestSellerIds(deviceOf(request).restaurantId);
   }
 }

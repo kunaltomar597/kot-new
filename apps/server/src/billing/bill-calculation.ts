@@ -12,6 +12,8 @@ import {
 /** An order item as the bill needs it, from what was stored when it was ordered. */
 export interface BillableItem {
   readonly id: string;
+  /** The dish on the menu. */
+  readonly itemId: string;
   readonly name: string;
   readonly variantName: string | null;
   readonly modifiers: readonly { readonly name: string; readonly quantity: number }[];

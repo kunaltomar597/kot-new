@@ -75,6 +75,7 @@ describe('[BILL-001] [BILL-005] [AUTH-011] the bill', () => {
     expect(screen.getByText('Paneer Tikka (Full)')).toBeInTheDocument();
     expect(screen.getByText('CGST 2.5%')).toBeInTheDocument();
     expect(screen.getByText('₹704.00')).toBeInTheDocument();
+    expect(screen.getByText('Rupees Seven Hundred Four Only')).toBeInTheDocument();
     await expectNoAxeViolations(container);
 
     await user.click(screen.getByRole('button', { name: t('billing.addDiscount') }));
@@ -331,5 +332,210 @@ describe('[BILL-013] the cashier’s shift', () => {
     await user.type(screen.getByLabelText(t('shift.counted')), '1396');
     await user.click(screen.getByRole('button', { name: t('shift.close') }));
     expect(await screen.findByText(t('shift.closed', { variance: '-₹4.00' }))).toBeInTheDocument();
+  });
+  it('[BILL-013] closes by counting the notes and coins, totalled as they are typed', async () => {
+    const fake = cashier()
+      .on('GET', '/api/v1/shifts/current', () => ({ status: 200, body: { shift: shiftView() } }))
+      .on('POST', `/api/v1/shifts/${B.shift}/close`, () => ({
+        status: 200,
+        body: shiftView({
+          status: 'CLOSED',
+          countedCash: 139_600,
+          variance: -400,
+          closedAt: '2026-09-26T20:00:00.000Z',
+        }),
+      }));
+    const { user } = await renderConsole({ fake, signedIn: 'CASHIER', path: '/pos/shift' });
+    await user.click(await screen.findByLabelText(t('shift.byNotes')));
+    await user.type(screen.getByLabelText(t('shift.noteCount', { note: '500' })), '2');
+    await user.type(screen.getByLabelText(t('shift.noteCount', { note: '100' })), '3');
+    await user.type(screen.getByLabelText(t('shift.noteCount', { note: '50' })), '1');
+    await user.type(screen.getByLabelText(t('shift.noteCount', { note: '20' })), '2');
+    await user.type(screen.getByLabelText(t('shift.noteCount', { note: '2' })), '3');
+    expect(screen.getByText(t('shift.notesTotal', { total: '₹1,396.00' }))).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: t('shift.close') }));
+    expect(await screen.findByText(t('shift.closed', { variance: '-₹4.00' }))).toBeInTheDocument();
+    expect(fake.callsTo('POST', `/api/v1/shifts/${B.shift}/close`)[0]?.body).toEqual({
+      countedCash: null,
+      denominations: { '500': 2, '100': 3, '50': 1, '20': 2, '2': 3 },
+    });
+  });
+
+  it('[BILL-016] [AUD-006] opens the drawer without a sale, with a reason', async () => {
+    const fake = cashier()
+      .on('GET', '/api/v1/shifts/current', () => ({ status: 200, body: { shift: shiftView() } }))
+      .on(
+        'POST',
+        '/api/v1/cash-drawer/open',
+        () => ({
+          status: 200,
+          body: {
+            opened: false,
+            error: 'No printer answers.',
+            printerId: B.printer,
+            shiftId: B.shift,
+          },
+        }),
+        () => ({
+          status: 200,
+          body: { opened: true, error: null, printerId: B.printer, shiftId: B.shift },
+        }),
+      );
+    const { user } = await renderConsole({ fake, signedIn: 'CASHIER', path: '/pos/shift' });
+    expect(await screen.findByText(t('shift.noSaleNote'))).toBeVisible();
+    await user.type(screen.getByLabelText(t('shift.noSaleReason')), 'Change for a 500 note');
+    await user.click(screen.getByRole('button', { name: t('shift.noSaleOpen') }));
+    expect(
+      await screen.findByText(t('shift.noSaleFailed', { error: 'No printer answers.' })),
+    ).toBeVisible();
+    await user.click(screen.getByRole('button', { name: t('shift.noSaleOpen') }));
+    expect(await screen.findByText(t('shift.noSaleOpened'))).toBeVisible();
+    expect(fake.callsTo('POST', '/api/v1/cash-drawer/open')[1]?.body).toEqual({
+      reason: 'Change for a 500 note',
+    });
+  });
+});
+
+describe('[BILL-012] [BILL-011] digital bills on the POS', () => {
+  const sentAt = '2026-10-04T08:35:00.000Z';
+  const entry = {
+    id: '0199a0e0-0000-7000-8000-000000000799',
+    invoiceId: B.invoice,
+    channel: 'WHATSAPP' as const,
+    phone: '+91 ******3210',
+    status: 'SENT' as const,
+    attempts: 1,
+    nextAttemptAt: null,
+    lastError: null,
+    link: 'https://cloud.example.in/v1/bills/abc',
+    expiresAt: '2026-11-03T08:35:00.000Z',
+    requestedBy: null,
+    createdAt: sentAt,
+    sentAt,
+  };
+
+  it('shows that the settled bill went on WhatsApp, and sends it again', async () => {
+    const fake = cashier()
+      .on('GET', `/api/v1/bills/${B.bill}`, () => ({
+        status: 200,
+        body: billView({ status: 'INVOICED', invoiceIds: [B.invoice] }),
+      }))
+      .on('GET', `/api/v1/invoices/${B.invoice}`, () => ({
+        status: 200,
+        body: invoiceView({ status: 'SETTLED' }),
+      }))
+      .on(
+        'GET',
+        `/api/v1/invoices/${B.invoice}/digital-bills`,
+        () => ({
+          status: 200,
+          body: { channel: 'WHATSAPP', phone: '+91 ******3210', bills: [entry] },
+        }),
+        () => ({
+          status: 200,
+          body: {
+            channel: 'WHATSAPP',
+            phone: '+91 ******3210',
+            bills: [
+              {
+                ...entry,
+                id: '0199a0e0-0000-7000-8000-000000000798',
+                status: 'QUEUED',
+                sentAt: null,
+              },
+              entry,
+            ],
+          },
+        }),
+      )
+      .on('POST', `/api/v1/invoices/${B.invoice}/digital-bills`, () => ({
+        status: 202,
+        body: { ...entry, status: 'QUEUED', sentAt: null },
+      }));
+    const { user, container } = await renderConsole({
+      fake,
+      signedIn: 'CASHIER',
+      path: `/pos/bill/${B.bill}`,
+    });
+    expect(
+      await screen.findByText(
+        t('billing.digitalBill.sent', {
+          channel: 'WhatsApp',
+          phone: '+91 ******3210',
+          time: '14:05',
+        }),
+      ),
+    ).toBeInTheDocument();
+    await expectNoAxeViolations(container);
+    await user.click(
+      screen.getByRole('button', {
+        name: t('billing.digitalBill.sendFor', { number: 'INV/26-27/000012', channel: 'WhatsApp' }),
+      }),
+    );
+    expect(
+      await screen.findByText(
+        t('billing.digitalBill.queuedToast', { phone: '+91 ******3210', channel: 'WhatsApp' }),
+      ),
+    ).toBeInTheDocument();
+    expect(fake.callsTo('POST', `/api/v1/invoices/${B.invoice}/digital-bills`)).toHaveLength(1);
+    expect(
+      await screen.findByText(t('billing.digitalBill.queued', { phone: '+91 ******3210' })),
+    ).toBeInTheDocument();
+  });
+
+  it('shows nothing while the restaurant has digital bills off', async () => {
+    const fake = cashier()
+      .on('GET', `/api/v1/bills/${B.bill}`, () => ({
+        status: 200,
+        body: billView({ status: 'INVOICED', invoiceIds: [B.invoice] }),
+      }))
+      .on('GET', `/api/v1/invoices/${B.invoice}`, () => ({
+        status: 200,
+        body: invoiceView({ status: 'SETTLED' }),
+      }))
+      .on('GET', `/api/v1/invoices/${B.invoice}/digital-bills`, () => ({
+        status: 200,
+        body: { channel: 'OFF', phone: '+91 ******3210', bills: [] },
+      }));
+    await renderConsole({ fake, signedIn: 'CASHIER', path: `/pos/bill/${B.bill}` });
+    expect(await screen.findByText(t('billing.settled'))).toBeInTheDocument();
+    await waitFor(() => {
+      expect(fake.callsTo('GET', `/api/v1/invoices/${B.invoice}/digital-bills`)).toHaveLength(1);
+    });
+    expect(screen.queryByRole('button', { name: /WhatsApp/ })).toBeNull();
+  });
+
+  it('says on settling that the bill goes to the diner', async () => {
+    const fake = cashier()
+      .on('GET', `/api/v1/invoices/${B.invoice}/payments`, () => ({
+        status: 200,
+        body: paymentsView(),
+      }))
+      .on('POST', `/api/v1/invoices/${B.invoice}/payments`, () => ({
+        status: 200,
+        body: paymentsView({ status: 'SETTLED', paid: 70_400, remaining: 0 }),
+      }))
+      .on('GET', `/api/v1/invoices/${B.invoice}/digital-bills`, () => ({
+        status: 200,
+        body: { channel: 'WHATSAPP', phone: '+91 ******3210', bills: [] },
+      }))
+      .on('GET', `/api/v1/bills/${B.bill}`, () => ({
+        status: 200,
+        body: billView({ status: 'INVOICED' }),
+      }));
+    const { user } = await renderConsole({
+      fake,
+      signedIn: 'CASHIER',
+      path: `/pos/pay/${B.invoice}?bill=${B.bill}`,
+    });
+    await screen.findByLabelText(t('payment.amount'));
+    await user.selectOptions(screen.getByLabelText(t('payment.mode')), t('payment.modes.UPI'));
+    await user.click(screen.getByRole('button', { name: t('payment.add') }));
+    await user.click(screen.getByRole('button', { name: t('payment.record') }));
+    expect(
+      await screen.findByText(
+        t('billing.digitalBill.queuedToast', { phone: '+91 ******3210', channel: 'WhatsApp' }),
+      ),
+    ).toBeInTheDocument();
   });
 });

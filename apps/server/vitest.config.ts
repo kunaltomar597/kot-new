@@ -6,7 +6,7 @@ import { defineConfig } from 'vitest/config';
 export default defineConfig({
   plugins: [swc.vite({ module: { type: 'es6' } })],
   test: {
-    setupFiles: ['reflect-metadata'],
+    setupFiles: ['reflect-metadata', 'test/setup/http-agent.ts'],
     projects: [
       {
         extends: true,
@@ -20,6 +20,18 @@ export default defineConfig({
           globalSetup: ['test/setup/global-setup.ts'],
           testTimeout: 30_000,
           hookTimeout: 60_000,
+        },
+      },
+      {
+        extends: true,
+        // Reports over a generated year at design capacity (P4-05c, RPT-018); skipped without
+        // RP_PERF=1 because the year takes minutes to generate.
+        test: {
+          name: 'performance',
+          include: ['test/performance/**/*.perf.test.ts'],
+          globalSetup: ['test/setup/global-setup.ts'],
+          testTimeout: 120_000,
+          hookTimeout: 3_600_000,
         },
       },
       {

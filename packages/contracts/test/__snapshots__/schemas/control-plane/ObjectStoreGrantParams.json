@@ -1,0 +1,14 @@
+{
+  "input": {
+    "type": "object",
+    "properties": { "grant": { "type": "string", "minLength": 1, "maxLength": 2000 } },
+    "required": ["grant"],
+    "additionalProperties": false
+  },
+  "output": {
+    "type": "object",
+    "properties": { "grant": { "type": "string", "minLength": 1, "maxLength": 2000 } },
+    "required": ["grant"],
+    "additionalProperties": false
+  }
+}

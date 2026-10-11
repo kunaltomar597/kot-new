@@ -19,22 +19,38 @@ export function createTestDatabase(): Promise<TestDatabase> {
 
 export function testConfig(databaseUrl: string, overrides: Partial<CpConfig> = {}): CpConfig {
   return Object.freeze({
-    ...CpConfigSchema.parse({ databaseUrl, logLevel: 'silent' }),
+    // No billing or fleet timers in tests: they run them themselves.
+    ...CpConfigSchema.parse({
+      databaseUrl,
+      logLevel: 'silent',
+      billingIntervalMinutes: 0,
+      fleetSweepSeconds: 0,
+      // Tests share one address and make many calls; the limit has tests of its own.
+      requestBurst: 0,
+    }),
     ...overrides,
   });
 }
 
-/** Boots the real Control Plane module against a test database. */
+/** Boots the real Control Plane module against a test database, optionally replacing providers. */
 export async function createTestApp(
   databaseUrl: string,
   overrides: Partial<CpConfig> = {},
+  providers: readonly { provide: symbol | string; useValue: unknown }[] = [],
 ): Promise<INestApplication> {
-  const moduleRef = await Test.createTestingModule({
+  let builder = Test.createTestingModule({
     imports: [ControlPlaneModule.forRoot(testConfig(databaseUrl, overrides))],
-  }).compile();
+  });
+  for (const provider of providers) {
+    builder = builder.overrideProvider(provider.provide).useValue(provider.useValue);
+  }
+  const moduleRef = await builder.compile();
   const app = moduleRef.createNestApplication(NEST_APP_OPTIONS);
   configureControlPlaneApp(app);
   await app.init();
+  // On a port of its own at 127.0.0.1, so supertest never shares a port number with another
+  // process (see apps/server/test/helpers/test-app.ts).
+  await app.listen(0, '127.0.0.1');
   return app;
 }
 

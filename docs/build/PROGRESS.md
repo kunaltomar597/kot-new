@@ -6,7 +6,7 @@ person, `[B]` blocked (reason given).
 
 ## Current state
 
-Last updated: 2026-10-11.
+Last updated: 2026-10-11 (P8-06b).
 
 What exists:
 
@@ -20,14 +20,17 @@ What exists:
   who is not alerted (P2-06d), recommendations: rules, best sellers by daypart, filters,
   course order and reasons (P3-04), the live order feed's late dishes, filters and summary
   (P4-01), who may add, change, unlock or deactivate whom, with the roles each person may give
-  (P4-02a), planning the day's sections: the assignments a plan gives, the tables without a
-  waiter and an earlier day's sections given again (P4-02b), the low-battery level of each
-  device type and a pager's Locate topic (P4-02c), and custom roles: a base role with what it
-  adds and takes away, applied by `grantOf` to every permission decision, checked by
-  `checkCustomRole`, a custom role that manages staff counting as a manager's, and discounts that
-  follow it (P4-02e), each notification rule's pager vibration, what a manager may choose for
-  each alert, what stops a rule from working and a change kept to what differs from the factory
-  rule (P4-03b), and pinned, boosted and blocked dishes in the suggestions (P4-03c). 245 tests.
+  (P4-02a), and planning the day's sections: the assignments a plan gives, the tables without a
+  waiter and an earlier day's sections given again (P4-02b); when a software update may install
+  (P7-04c); client API versions, N-1 and the component version matrix (P7-04d); which
+  over-the-air update a phone or tablet takes, and when it restarts on it (P7-04e1); which APK
+  from the PC a phone or tablet takes, and when a kiosk tablet installs it by itself (P7-04e2);
+  when the PC offers its pager firmware to a pager, and when it gives up (P2-04b1); the PINs
+  guessed first, counting wrong secrets towards a lock, and the kind of record each approval is
+  for (P8-03b2a); a pager's heartbeat too soon after the last, and firmware that would lower the
+  anti-rollback version (P8-03b2b); which licence tampering reports call for a person at the
+  vendor (P8-03b3a); how a PC checks its updates, and the alert for one that takes unsigned ones
+  (P8-03b3b). 409 tests.
 - `packages/contracts`: common scalars/enums, menu, orders, KOT, API error, domain events, auth,
   devices, the real-time protocol, health, version and the LAN CA; route registry with generated
   OpenAPI/AsyncAPI docs; the Vendor Control Plane API as a separate entry point
@@ -44,16 +47,29 @@ What exists:
   suggestions, their tracking, the rules and the suggestion an order line came from (P3-04);
   the manager dashboard's live order feed (P4-01); staff records, PINs, deactivation and the
   Owner's sign-in security summary, with `RestaurantChanged` for staff (P4-02a); `RestaurantChanged`
-  for devices and the low-battery level with the pager list (P4-02b); each device's state now
-  (connected, battery, firmware, serial), renaming, and Locate with `DeviceLocateRequested` and the
-  pager's locate message (P4-02c); the editor's draft with combos, stock counts and whether
-  publishing would show something new, and `MenuDraftChanged` (P4-02d); custom roles, their
-  routes and the custom role on sign-in, staff records and tiles (P4-02e); a settings catalogue
-  with one pager heartbeat (set by the vendor) and one disk warning level (P4-03a); notification
-  rules with each alert's pager vibration, and a rule change that cannot work refused (P4-03b);
-  the dishes' suggestion preferences, their routes and the PINNED and BOOSTED layers (P4-03c);
-  the grace before a kitchen screen or table tablet is reported offline (P4-04a).
-  559 tests.
+  for devices and the low-battery level with the pager list (P4-02b); the update agent's state on
+  the System page and the backup made before an update (P7-04c); the client API version, the
+  `x-rp-client` identity, the version matrix with each release, the apps to update on the Devices
+  and System pages, and `pnpm contracts:compat` with the frozen versions in `docs/api/compat/`
+  (P7-04d, ADR-0016); the phone and tablet APKs a PC serves, `apps.json`, the device's own build
+  and its download, and the builds on the System page (P7-04e2); pager firmware: the
+  `PAGER_FIRMWARE` release component, what the heartbeat says and hears about it, the offer on the
+  pager's own `ota` topic and its answer in the pager's heartbeat, and the Pagers page's firmware
+  with "Update now" (P2-04b1); a pager's QR code, `RP-PAGER:<serial>` (P2-04b2); the kinds of
+  device each device endpoint serves (`devices`, `x-devices`), `HTTP_DEVICE_TYPES`,
+  `STAFF_DEVICE_TYPES` and `PairableDeviceType`, and the docs generator refusing a device endpoint
+  without its devices or a public one that does not say why (P8-03a); the `SIGN_IN_LOCKED` alert,
+  a device's PIN lock with `unlockDevicePins`, `IDLE_HEADER` (`x-rp-idle-seconds`) and the
+  settings `auth.deviceLockoutMaxFailures`, `auth.tabletLockoutMaxFailures` and
+  `auth.refuseEasyPins` (P8-03b2a); a pager's sign-ins with a wrong secret on `PagerView`, and
+  the firmware problem `SECURE_VERSION_LOWER` (P8-03b2b); the orders, bills and invoices an
+  erasure reached, on `EraseDinerContactResponse` (P8-03b2c); the reactivation code a PC took, on
+  its heartbeat, and the `LICENCE_TAMPERING` fleet alert (P8-03b3a); how the PC checks its
+  updates, `updateSigning` on its heartbeat, and the `UNSIGNED_UPDATES` fleet alert (P8-03b3b);
+  a Super Admin's reset asked for on `VendorUserView` and its 202 answer
+  (`VendorResetRequestedView`), `CLOUD_BACKUPS_PER_DAY`, `CLOUD_BACKUP_CLOCK_MARGIN_MS` and
+  `DIAGNOSTICS_KEEP_DAYS` (P8-03b4a); the socket's `TOO_MANY_CONNECTIONS` refusal (P8-03c2a).
+  965 tests.
 - `apps/server`: NestJS 12 skeleton with config, request pipeline, JSON logging with correlation
   IDs, error mapping, validation pipe, health/version, Prisma 7 + PostgreSQL, integration-test
   harness; core data model (64 tables after the later migrations), least-privilege roles,
@@ -91,30 +107,93 @@ What exists:
   (P4-01); staff management with audit: add, change, new PIN, unlock, deactivate (sessions,
   pager, phone and sections taken back at once) and reactivate, managers kept to the Owner with a
   fresh second factor (P4-02a); pager changes announced to every screen and the low-battery level
-  with the pager list (P4-02b); device management: whether each device is connected, its battery
-  against its type's level, renaming, Locate sent to that device alone, device changes announced,
-  an unpaired pager cut off at once and when a screen was last connected (P4-02c); the menu
-  editor's draft with combos, stock counts and its publish state, draft edits announced to the
-  other menu editors, and a combo choice's items kept from becoming combos (P4-02d); custom
-  roles: the Owner's roles API with a fresh second factor, audited and announced, given to people
-  like their base role, applied by the guard, the override approver check, socket rooms per
-  capability, order, table and discount rules, a change reaching its people on their next request
-  with their screens signed in again, and people who stop taking orders taken off today's
-  sections (P4-02e); the disk alert at `storage.warnPercent` (P4-03a); the pager's vibration
-  from each notification rule (P4-03b); pinned, boosted and blocked dishes, audited and applied
-  to the next suggestions at once (P4-03c); kitchen screens and table tablets reported offline
-  once away longer than a grace and online as soon as they connect, also after a restart
-  (P4-04a). 758 tests (4 skipped without a real install).
+  with the pager list (P4-02b); the device list with live connections, rename, and device changes
+  announced, with every database session in UTC (P4-02c); the Windows services' runtime: the
+  service host that prepares and supervises the server, the watchdog, the DPAPI secret store and
+  the installer's set-up commands with a migration runner that needs no Prisma CLI (P0-16b); the
+  Owner's audited permission for the uninstaller to delete the data, and `setup-cli paths` and
+  `data-deletion` for the set-up scripts (P0-16c); the update agent: the download in the
+  background with its SHA-256 and Authenticode checks, the maintenance window and "Install now",
+  the backup and integrity check before an update, the hand-off to the updater through the
+  watchdog, the database copy and the switch back after a failed update, and each outcome
+  recorded, audited and reported (P7-04c); the N-1 check of apps (426 `CLIENT_TOO_OLD` over REST
+  and the socket), each device's app version and client API, and the apps an offered update would
+  leave behind (P7-04d); the release's phone and tablet APKs (`RP_APPS_DIR`), checked against
+  `apps.json` before a phone or tablet downloads its own, also when refused (P7-04e2); pager
+  firmware through the PC: the vendor's release downloaded and checked (the ESP-IDF image and its
+  secure boot v2 signature against the keys built in), offered on each free pager's `ota` topic,
+  downloaded with a one-time token, progress and rollbacks from the heartbeats, "Update now"
+  (P2-04b1, ADR-0018); the Phase 7 exit scenarios S8, S9 and S10 against a real Control Plane
+  and across two PCs, and the backup keys of the PCs a PC was restored from, so the old PC's
+  archives still open in the archive viewer (P7-10); the load test at design capacity
+  (`test/load/`, ADR-0020) with what it found fixed: audit entries written when their
+  transaction ends (no deadlock through the chain's lock), kitchen screens, the order feed and
+  the not-collected sweep found from the dishes still live, an index for a combo line's parts,
+  and the GST and source reports in one pass each (P8-01a); the same rush with diners ordering on
+  QR pages through the relay behind simulated internet lines, measuring NFR-P05 and NFR-P06
+  (P8-01b); device endpoints refusing the kinds of device they do not serve, sign-in only on staff
+  devices, no pairing code for a pager, and the authorisation sweep over every endpoint (P8-03a);
+  payments, cash movements and day-ends that the server's own database role cannot change, an
+  unpaired pager cut off at once with its wearer released, no start in production without TLS,
+  and a manager's approval token kept out of the request log (P8-03b1); wrong PINs and passwords
+  counted against the device as well as the person (a device stops taking them after ten in ten
+  minutes), against a table tablet only, never its managers, easily guessed PINs refused, every
+  lockout alerting the managers and the Owner until lifted, a manager's approval good only for
+  the record it names, and sessions kept alive only as of the person's last touch, as the app
+  says (P8-03b2a); the pager broker's limits (connections per address and in all, 10 s to sign
+  in, packet sizes at their header before and after sign-in, Argon2id checks at once), heartbeats
+  no faster than half the interval, retained, QoS 2 and will messages refused, a pager's button
+  acknowledging only alerts sent to that pager and recorded with it, a pager connected only once
+  the broker has it, failed sign-ins logged and counted per pager, no more pagers than the
+  licence allows, and no firmware with a lower anti-rollback version (P8-03b2b); the device token
+  checked before any body is read, so a caller without a paired device sends 16 KB at most, a
+  menu workbook inflated by the server with a limit on what comes out and given to its reader
+  stored, formulas neutralised in the data export's CSV files and the invoice register, and a
+  diner's number erased on orders and bills too, with the invoices' consent withdrawn
+  (P8-03b2c); the licence judged by the server's own running time and the issue times the vendor
+  signed, so a clock held back no longer holds the licence's end off, a clock held back reported,
+  an older licence put back counted as tampered, a fingerprint read of fewer than three
+  identifiers neither kept nor judged, and reactivation codes reaching 60 days at most, the last
+  one reported to the vendor (P8-03b3a); an installer whose product version is not the release's
+  refused with its signature after the download, and each heartbeat saying how the PC checks its
+  updates (P8-03b3b); security headers on every answer, the API's JSON 404 outside it, Trusted
+  Types in the console's CSP and only Node.js's major line on `/version` (P8-03c1); limits on
+  floods from the LAN: connections per address counted before their TLS handshake and how fast
+  they come, requests per address (429 and the connection closed), the handshake and the headers
+  within 10 s, every connection closed when the server stops, and on the socket 16 connections
+  and 60 handshakes a minute per device and a connection that stops reading cut off, with the
+  PC's own address never limited (P8-03c2a). 1274 tests (28 skipped: Windows only, a real
+  install, or the performance runs).
 - `apps/control-plane`: the Vendor Control Plane service (P0-17a, ADR-0012): installation
   enrolment with one-time codes, Ed25519-signed requests with replay protection, heartbeat ingest,
-  release channels and update offers, audited admin CLI. 34 tests. Not deployed yet (hosting
-  account pending).
+  release channels and update offers, audited admin CLI. Later WPs added licences, the fleet,
+  rollouts, backups, diagnostics and more (Phase 7); pager firmware is a release component with
+  the same rollouts, and PCs report what their pagers did with it (P2-04b1); its routes checked
+  against the registry and its authorisation sweep (P8-03a); licences bound and renewed only on a
+  fingerprint of three identifiers or more, the reactivation codes issued kept and the one a PC
+  took checked against them, and a licence tampering alert, in the vendor web app too, closed by
+  Support with a reason (P8-03b3a); an alert for a PC that takes unsigned updates, closing by
+  itself once a signed build replaces it (P8-03b3b); vendor sign-in that counts each try before
+  checking it, spends a code once and answers an unknown or disabled account as a wrong password,
+  a Super Admin reset only by two other Super Admins (shown on the Staff page), cloud backups kept
+  by the days the Control Plane stored them, dated no later than its clock and 8 a day per PC,
+  diagnostics deleted after 30 days, every outside service on https outside development, bill
+  links and storage grants masked in the request log, daily limits counted under a lock, and a
+  test that calls every PC endpoint with another restaurant's ids (ADR-0021) (P8-03b4a); security
+  headers on every answer, the API's JSON 404 outside it, Trusted Types in the vendor web app's
+  CSP and the bill page's one style allowed by its hash (P8-03c1). 183 tests. Not deployed yet
+  (hosting account pending).
 - `packages/mobile-core`: secure credential persistence, the persistent outbox and the menu cache
   for the React Native apps (P2-01a); `DeviceSession` and the `testing` entry point (P2-01c); the
   order outbox, with the device session owning the menu cache and the outbox (P2-02b); finding
   the server from the pairing QR code and pinning its CA before the code is sent (P2-01d); the
   waiter phone's alert centre (P2-06a), which tells the Android notifier whom to listen for on its
-  first read and sends Acknowledge pressed on a notification (P2-06b). 61 tests.
+  first read and sends Acknowledge pressed on a notification (P2-06b); `OtaUpdater`, the apps'
+  over-the-air updates: an EAS update only when the server speaks its client API, applied while
+  the device is free (P7-04e1, ADR-0017); `ApkUpdater`, new APKs from the restaurant PC: offered
+  to a person on a phone, installed by a kiosk tablet between guests (P7-04e2); the person's last
+  touch, sent with every call so the phone's own reads keep no idle session alive (P8-03b2a).
+  103 tests.
 - `packages/ui-native`: the React Native component library with the same props and tokens as
   `@rp/ui-web` (Button, Money, StatusChip, PinPad, Sheet, toasts, menu item, quantity and option
   pickers) (P2-01b), table tiles and a segmented control (P2-02a), a text field (P2-02b).
@@ -128,7 +207,13 @@ What exists:
   and the fingerprint check for a typed address (P2-01d); the alert banner and list on every
   screen (P2-06a); the waiter phone's background alerts: a `specialUse` foreground service
   running a keep-alive JavaScript task, a notification per alert with Acknowledge, the ring and
-  vibration in the foreground, and `POST_NOTIFICATIONS` (P2-06b). Shell 34 tests, mobile-native 29.
+  vibration in the foreground, and `POST_NOTIFICATIONS` (P2-06b); `ExpoOtaUpdates` (`expo-updates`
+  with each update's client API) and the shell's `useAppUpdate`, `useAppUpdateWhenFree` and an
+  "Update this app" screen that says when an update is on its way (P7-04e1); the in-app APK
+  updater: `AndroidApkInstaller` (download over the pinned CA with the SHA-256, package and
+  version checked, Android's `PackageInstaller`, the reopening after `MY_PACKAGE_REPLACED`) and
+  the shell's `ApkOffer` on the sign-in screen and "Update this app" (P7-04e2); every touch in the
+  app counting as the person's activity (P8-03b2a). Shell 49 tests, mobile-native 41.
 - `apps/waiter-app` and `apps/table-tablet`: Expo SDK 57 development builds that pair, sign in
   (waiter) and show live data, with EAS profiles, Maestro flows and a CI job building debug APKs
   (P2-01c). The waiter app's home is "My tables" or all tables, with open, move and request bill,
@@ -143,24 +228,58 @@ What exists:
   the lock screen; it asks for notifications at sign-in and says when they are off; the table
   tablet blocks those permissions (P2-06b). The tables screen lists the open requests from the
   tables shown, and each table's screen its own, with Acknowledge and Resolve (P2-06d). A pager
-  the manager gives shows on the waiter's phone at once (P4-02b). Item actions and Move follow
-  the person's custom role (P4-02e). Waiter app 53 tests.
+  the manager gives shows on the waiter's phone at once (P4-02b). Both apps take EAS updates only
+  when their server speaks the update's client API, never check by themselves, restart on one only
+  when free (the phone with nobody signed in, the tablet between guests), and build for preview or
+  production only with the update signing certificate (P7-04e1). A new APK from the PC is offered
+  on the phone's sign-in screen and installed when the person confirms; a device-owner tablet
+  installs it between guests and opens again in kiosk mode, another tablet offers it in its staff
+  panel (P7-04e2). Waiter app 70 tests, table tablet 31.
 - `packages/ordering`: the ordering helpers the POS and the phones share (floor sections and tiles,
   "my tables", cart lines, the menu tree), moved out of the console (P2-02a); choices in words,
   "Again", live checks of cart lines and KOT delivery (P2-02b); what a person may do with a sent
   line and dishes ready on the tiles (P2-02c); what an alert says on a screen (P2-06a); the
   reason shown with a suggestion and the suggestion a cart line came from (P3-04); "my tables"
-  from the domain's planning helper (P4-02b); a sent line's actions with the person's custom role
-  (P4-02e); "Our pick" for a pinned or boosted dish (P4-03c); a printer's error and the tickets
-  waiting for it, and how full the data drive is, with sizes as Windows writes them (P4-04a).
-  43 tests.
+  from the domain's planning helper (P4-02b); `liveRefresh`, when a live screen reads again
+  (P8-01a). 87 tests.
 - `packages/test-postgres`: the throwaway PostgreSQL harness for integration tests, shared by the
-  server and the Control Plane.
+  server, the Control Plane and the relay (Prisma or Supabase CLI migrations, optional prelude).
+- `infra/supabase` (`@rp/relay`): the QR relay's database (P5-01, ADR-0015). It has:
+  - a private `relay` schema with RLS on every table for three roles;
+  - hashed table tokens and local-server credentials, and the provisioning functions;
+  - the order rules as triggers, and hourly retention;
+  - Supabase CLI config, and 75 tests (cross-tenant isolation, roles and grants, tokens, order
+    rules, retention) on PostgreSQL, also run against local Supabase in CI.
+  - The diners' edge functions (P5-02a): `qr-menu`, `submit-order` (the restaurant's own line
+    check, rate limits per table and per browser, idempotent) and `order-status`. They are
+    bundled for Deno and smoke-tested there; the expiry job runs every minute. `qr-menu` does not
+    read the menu for a browser that has the latest (P8-01b).
+  - The local server's function `server` (P5-02b): a Realtime session, presence with the QR
+    settings, menu publishing, the tables with their code hashes, pickup and status reports.
+  - The threat model's fixes (P8-03b4b): orders the restaurant rejected no longer count against
+    their table; service requests limited per table (10) and per browser (6) in 10 minutes under
+    locks; bodies read with a cap (512 KB for diners, refused by their announced length first,
+    nothing read without a token or credential of the right form); no CORS on `server`; the
+    Control Plane's own login `relay_control_plane`, the functions' login no longer a
+    provisioner; menu photos WebP only in `config.toml` and the photos table too.
+  - Security headers on every answer, preflights included (P8-03c1).
+    157 tests in all, 4 of them under Deno and 2 only on Supabase.
+  - `@rp/relay/testing`: the relay in-process for other packages' tests (P5-03a).
+- `apps/qr-menu` (P5-05a): the public QR menu site on Next.js 16, a table's menu from the relay
+  with search, filters, options, cart, sending and following orders, read-only when the restaurant
+  is absent, and privacy and terms. Tested on a phone (Playwright, Pixel 7) against a real relay.
+  An open page asks for the menu every 20 s and when the diner comes back to it, and stops
+  following an order once every dish is served (P8-01b). A CSP with a nonce per request and no
+  inline script without it, every page rendered for its request, and HSTS (P8-03c1). 8 tests, 12
+  Playwright steps.
+- `apps/server/src/relay`: the QR relay sync agent's publishing side (P5-03a). It sends presence
+  with the QR settings, and the tables and the QR menu by content hash. It backs off while offline
+  and catches up after. The credential is sealed (`relay:credential`). The System page shows its
+  state.
 - `apps/console`: the web console shell (pairing with a WebCrypto key, staff tiles and PIN login,
   role modes `/pos`, `/kds`, `/manage`, connection banner, inactivity sign-out), served by the
   local server, with a Playwright end-to-end test in CI (P0-14b); the live POS floor with open and
-  move table (P1-08a); order entry with options, combos, cart, send and takeaway (P1-08b); freeing
-  a table opened by mistake, with a reason (P1-08c); the
+  move table (P1-08a); order entry with options, combos, cart, send and takeaway (P1-08b); the
   kitchen display with steps, bump, recall, notify manager, sounds and resync (P1-09b); bills,
   discounts with manager approval, payments and shifts on the POS (P1-12a); split bills, void,
   edit after print and the day-end screen (P1-12b); the alert centre on the POS and the
@@ -172,51 +291,131 @@ What exists:
   second factor asked for when an action needs it, and sign-in tiles that follow staff changes
   (P4-02a); the Staff area's Today's sections page (sections and single tables per person, the
   tables nobody looks after, the last day's sections given again) and Pagers page (register,
-  give, take back, a new credential, connection and battery) (P4-02b); the Devices page (pair
-  with a one-time code and QR code, rename, move a tablet, Locate, unpair with a reason), the
-  Locate notice with a chime on every console, and a console header that follows a rename
-  (P4-02c); the menu editor: items by category with search, an item page with photo, sizes,
-  modifier groups and combo, availability and stock counts, categories, modifier groups and
-  publishing, kept up to date while another manager edits (P4-02d); Staff → Roles with the
-  Owner's role editor, custom roles offered in the staff editor and shown on rows and tiles, and
-  modes and dashboard pages that follow the custom role (P4-02e); the Settings page: every
-  setting of the catalogue by area with its value in its unit, its default and who changes it, an
-  editor chosen from its validation, "use the default", a reason for the audit log, vendor
-  settings read-only and the Owner's second factor (P4-03a); the Notifications page: N, R and the
-  nudge messages, and a rule per alert saying whom it alerts, where it shows, what the pager shows
-  and how it buzzes, how it repeats and whether it goes on to the managers, edited with checks and
-  "Back to the factory rule" (P4-03b); the Suggestions page: the rules with pause and remove, the
-  pinned, boosted and blocked dishes with their words, and a preview of what a table is suggested
-  now (P4-03c); the Floor page (sections and tables: add, change, archive with a reason, restore)
-  and the Stations and printers page (printers with whether they print, a test page and sending
-  their tickets elsewhere; stations shown, printed or both) (P4-03d); the Restaurant page (name,
-  contact and logo, opening hours, when the business day ends) and the Tax and invoice page
-  (invoice particulars with the GSTIN checked, tax groups with rates as percentages, invoice
-  series with their first number as it is typed), changed by the Owner after the second factor
-  and read only for managers (P4-03e); the alert centre with a kitchen screen gone offline,
-  printer and disk alerts in words (P4-04a). 415 tests, and 25 Playwright steps.
+  give, take back, a new credential, connection and battery) (P4-02b); the Devices page (pair with
+  a QR code, the code, addresses and CA fingerprint; rename; move a tablet; unpair) (P4-02c); the
+  menu editor (dishes with photos, sizes, option groups, combos, stock; categories; option
+  groups; publish) (P4-02d); the Roles page and custom roles for people, with screens that show
+  what a custom role adds (P4-02e); the Settings page with an editor for every catalogue
+  setting (P4-03a); the notification rules page (P4-03b); the Suggestions page with the
+  recommendation rules and the pinned, boosted and blocked dishes (P4-03c); the kitchen stations
+  and printers with test print and redirect (P4-03d); the Restaurant page with the profile, and
+  the Owner's invoice particulars, tax groups and invoice series behind the second factor
+  (P4-03e); the System page with the services, the data drive by kind of data, devices, the
+  update on offer with "Install now", and placeholders for backups, the licence and diagnostics
+  (P4-04); the Reports area: one range for every report (presets or dates, kept in the address),
+  each report as headline figures, a bar chart where one helps and tables, CSV export, and
+  drill-down from a row to everything about its order (P4-05d, Recharts); export of every report
+  as CSV, Excel or PDF (P4-06); the audit trail with filters, paging, export and the chain check
+  (P4-07a); the Suspicious activity report and the POS shift screen's "Open the drawer (no sale)"
+  (P4-07b); "Removing the software" on the System page, where the Owner allows the uninstaller to
+  delete the data for 30 minutes (P0-16c); the update agent's state and the last update's outcome
+  on the System page (P7-04c); the apps to update on the Devices and System pages, and a console
+  older than its server that loads the new one (P7-04d); the phone and tablet app versions the PC
+  serves, or a damaged one, on the System page (P7-04e2); on the Pagers page, the firmware this PC
+  passes on to its pagers, a release on its way or refused, each pager's update and "Update now"
+  (P2-04b1); registering a pager by reading its QR code with the device's camera (P2-04b2; the
+  Playwright run scans one through Chromium's fake camera); the kitchen screen's sound made ready
+  before the first touch, and a Playwright speed test of taps and screen changes (NFR-P07) on a
+  restaurant of the design capacity's size (P8-01b); on the Devices page, a device that takes no
+  PINs after too many wrong ones, until when, and "Take PINs again" (P8-03b2a); on the Pagers
+  page, a pager's sign-ins with a wrong secret and the last one (P8-03b2b); every screen run
+  under Trusted Types, with Zod's compiled parsers off (P8-03c1). 385 tests, and 26 Playwright
+  steps.
+- `apps/desktop` (`@rp/desktop`): the Electron shell on the restaurant PC (P0-16a). It opens the
+  console from the PC's own server with context isolation, the sandbox, no Node.js, no preload and
+  no IPC, pins the installation's CA for the loopback address, and starts with Windows. It shows a
+  start-up page until the server answers, reopens a closed window and reloads a crashed page. It
+  reads the port and the CA's folder from the installation file. The Windows installer (P0-16d):
+  electron-builder's NSIS installer, per machine, with Electron's fuses, the data-drive page, the
+  server (`pnpm deploy`, trimmed, with third-party notices), the console, Node.js 24, PostgreSQL
+  16.15 and WinSW 2.12 pinned by SHA-256, and hooks that run the set-up scripts on install,
+  update, repair and uninstall; it keeps itself for going back after a failed update (P7-04c).
+  The release's APKs with `apps.json` in the payload's `apps` folder (`package:stage --apk`,
+  P7-04e2). The camera for the console without the microphone (P2-04b2). The release guard
+  (`release-guard.ts`): a signed build names the updates' signer, never takes unsigned updates,
+  is staged on Windows and carries the vendor's licence key and pager firmware key, read from the
+  staged server (P8-03b3b). 46 tests without Electron; the CI job "Windows installer" builds,
+  installs, kills the server, repairs and uninstalls on `windows-latest`.
+- `infra/installer/windows` (P0-16c): the PowerShell the installer runs, for Windows PowerShell
+  5.1: the data-drive choice (ONB-002), folder permissions by SID, the services' accounts and
+  recovery, firewall rules for the staff network (SEC-008), install and repair, and uninstall that
+  keeps the data unless the Owner allowed deleting it (NFR-I02). The drive page's INI file, and
+  stopping and starting the services around an update (P0-16d). The updater (P7-04c): a SYSTEM
+  scheduled task that installs a checked update and goes back to the previous version and its
+  database when the new one fails its health check (scenario S9 in the CI job), and refuses an
+  installer whose product version is not the one asked for (P8-03b3b). 139 Pester tests
+  anywhere
+  (`pnpm installer:test`, needs `pwsh`), 7 more on Windows only (CI job "Windows set-up scripts");
+  `windows/ci/Test-Installer.ps1` checks the built installer in the CI job "Windows installer".
 - `packages/i18n` (typed English catalogue, `t()` with ICU plural/select, lint rule against JSX text
   literals) and `packages/api-client` (REST client typed from the contracts with token renewal and
-  error mapping, and the resuming Socket.io connection) (P0-14a).
+  error mapping, and the resuming Socket.io connection) (P0-14a), which retries a device refused
+  for too many connections (P8-03c2a).
 - `packages/design-tokens` and `packages/ui-web`: themes (light, dark, KDS), tokens as TS and CSS,
   React 19 component library with PinPad, dialogs, toasts, status chips, Money and state views;
   Storybook 10 workbench (P0-13, ADR-0009); QR codes drawn in the browser (P4-02a, ADR-0014);
-  a text area (P4-02d). ui-web 103 tests.
+  `QrScanner`, QR codes read with the device's camera and jsQR (P2-04b2, ADR-0019).
+  ui-web 120 tests.
 - CI security baseline: secret scan, dependency audit, licence policy, SBOM, CodeQL, Dependabot,
   generated OpenAPI/AsyncAPI docs (P0-06, ADR-0010).
+- `docs/security/`: the security documents of P8-03: `authorisation.md`, who may call what on
+  every surface and the tests that check it (P8-03a); `threat-models/`, a STRIDE model of each of
+  the eight components with 195 threats, their code, their tests and a dated plan for each one
+  left open, checked on every build by `pnpm security:threats` (P8-03b1). P8-03b2a mitigated six
+  (PIN guessing, lockouts, a tablet's PIN prompt, approvals used on another record, a phone left
+  signed in), P8-03b2b seven of the pager channel's and the PC's part of an eighth, P8-03b2c four
+  (large bodies before authentication, decompression bombs, formulas in exports, a diner's
+  number kept after erasure), P8-03b3a five of the licence's (the clock held back, an older
+  licence put back, a failed fingerprint read, forged reactivation codes, tampering nobody looks
+  at), P8-03b3b four of the update pipeline's and the licence's (Actions by tag, an older
+  installer under a newer name, a test build at a restaurant, a release without the vendor's
+  keys), P8-03b4a six of the Control Plane's and CP-T2 down from High to a plan for the bucket's
+  object lock (sign-in races, Super Admin resets, diagnostics kept 30 days, https and masked
+  links, tenant isolation, daily limits), P8-03b4b six of the QR relay's (floods of orders and
+  service requests, large bodies, the functions' login provisioning, CORS on the PCs' function,
+  other files in the photo bucket): 129 mitigated, 5 residual Highs, each planned. P8-03b is
+  done: no threat is planned for it any more. `dast.md`: the OWASP ZAP scans of the four
+  surfaces (P8-03c1), with P8-03c1's four threats mitigated (internals in answers, script in the
+  console under Trusted Types, in the POS window, and on the QR site under a nonce): 133
+  mitigated. P8-03c2a mitigated PC-D3 (floods from the LAN, `flood.int.test.ts`): 134
+  mitigated.
+- `docs/security/incident-response.md`, `incident-templates.md`, `pentest-pack.md` (P8-03e): the
+  incident response plan (severities, roles and on-call, CERT-In 6-hour report, DPDP breach steps,
+  playbooks for a stolen relay credential, a fake QR sticker, ransomware, leaked keys, bad updates,
+  a breached Control Plane, lost devices and a reported vulnerability, the annual tabletop
+  exercise), notice templates and restaurant guidance, and the pack for the testing firm (scope,
+  rules of engagement, environment and accounts, what to send back). Documents only; names,
+  the exercise and the firm are manual task 36.
+- `docs/security/checklists/` (P8-03d2b2d): OWASP ASVS L2 with the Top 10s (81 controls), MASVS-L1 with
+  resilience (31), ETSI EN 303 645 (13) and CIS for the Windows host (17); each control Met, N/A with a
+  reason, or a Finding with a dated plan. `pnpm security:checklists` (in `pnpm check`) checks that
+  every file and threat named exists. 21 findings, all waiting for a person, an account, the
+  pager firmware (P2-05) or P8-03e.
+- `infra/dast` (`@rp/dast`, P8-03c1): the DAST harness. It starts the QR site with its relay, the
+  relay's functions, the Control Plane with the vendor web app and the local server over HTTPS
+  with the console, each from its build and signed in, runs OWASP ZAP's Automation Framework on
+  each (pages spidered, OpenAPI operations imported and attacked, credentials renewed while it
+  scans) and judges every finding against `src/triage.json` (a High is never accepted).
+  `pnpm security:dast` with `ZAP_PATH` or `ZAP_DOCKER_IMAGE`; the `dast` job of `security.yml`.
+  12 tests, and 4 scans (none open).
+- CI signs the Windows installer only for a push to `main`, in the `release-signing` environment;
+  every other build is an unsigned test build (P8-03b1, `infra/ci/signing-policy.test.mjs`).
+  Every GitHub Action is pinned to a commit with its version in a comment, one commit per Action
+  (P8-03b3b, `infra/ci/pinned-actions.test.mjs`).
 - BRD catalogue (318 requirements) and traceability report (`docs/build/TRACEABILITY.md`).
 - The full plan: `docs/build/BUILD_PLAN.md` and `docs/build/phases/phase-0.md` to `phase-8.md`.
 
+Phase 7 is done (P7-10, 2026-10-09): S8, S9 and S10 pass on every build. Every NFR-P target of
+§7.1 is met at design capacity (P8-01a and P8-01b, `docs/build/performance.md`): the simulated rush
+with QR diners through the relay, the console's taps and screens, and the QR menu's first view.
+S1 on the lab rig with real devices is P8-01c [H].
+
 Recommended next WPs (dependencies met):
 
-- P4-04b System screen (P4-04a done; backups, the licence and the update agent arrive in P7 and
-  show placeholders until then).
-- P4-05 Full report suite (P1-13, P2-03 and P3-04 done).
-- P3-01 Table tablet app (P2-01 done; its kiosk check needs P0-H3 on the chosen tablet, the rest can
-  be built).
-- P2-04b Pager firmware OTA distribution (needs the Control Plane firmware release, P7).
-- P0-16 Windows packaging (prepared in the container, checked on the `windows-latest` CI runner;
-  the final check on a real PC needs a person).
+- Port from GitHub's main, dropped in the 2026-10-11 sync (see the session log): "free a table
+  opened by mistake" on the POS (GitHub commit `9dc5680`, PR #84), and the on-screen words for the
+  `PRINTER_OFFLINE` and `DISK_OR_BACKUP` alerts in `@rp/ordering` alert text (GitHub commit
+  `1b7c380`; device-offline alerts themselves already exist here).
 - P0-H1 Pager battery prototype firmware (Claude can write it, a person must run it).
 
 ## Work packages
@@ -239,7 +438,11 @@ Recommended next WPs (dependencies met):
 - [x] P0-14a API client and i18n
 - [x] P0-14b Web console shell
 - [x] P0-15 LAN TLS decision and implementation
-- [ ] P0-16 Windows packaging (needs a Windows PC for the final check) [H]
+- [ ] P0-16 Windows packaging (only the person's check on a clean PC remains, manual task 14) [H]
+  - [x] P0-16a Electron shell
+  - [x] P0-16b The services' runtime and set-up commands (service host, watchdog, DPAPI store)
+  - [x] P0-16c Windows set-up scripts (PowerShell, Pester)
+  - [x] P0-16d Packaging and the windows-latest CI job (runs on the first push; manual task 14)
 - [x] P0-17a Control Plane service (deployment waits for the hosting account)
 - [x] P0-17b Local server heartbeat client
 - [ ] P0-H1 Pager battery prototype [H]
@@ -263,7 +466,6 @@ Recommended next WPs (dependencies met):
 - [x] P1-07b Print queue, offline alert, redirect and reprint
 - [x] P1-08a POS floor: live table overview, open and move table
 - [x] P1-08b POS order entry, send KOT, takeaway, live item status
-- [x] P1-08c Free a table opened by mistake (POS)
 - [x] P1-09a KDS server support (station mode, tickets, bump, recall, notify manager)
 - [x] P1-09b KDS screen
 - [x] P1-10a Bill preview, discounts and invoice issue
@@ -290,7 +492,11 @@ Recommended next WPs (dependencies met):
 - [x] P2-03a Notification engine core
 - [x] P2-03b Nudges, breaks, device, printer and system alerts
 - [x] P2-04a Pager broker, credentials, delivery and heartbeats
-- [ ] P2-04b Pager firmware OTA distribution
+- [x] P2-04b Pager firmware OTA distribution and QR pairing
+  - [x] P2-04b1 Firmware distribution through the PC (the pager's side is P2-05; the signing key
+        is manual task 30)
+  - [x] P2-04b2 Scan a pager's QR code with a camera on the Pagers page (the PC's webcam and a
+        phone: manual task 14)
 - [ ] P2-05 Pager firmware [H]
 - [x] P2-06a Alerts in the waiter app
 - [x] P2-06b Background alerts on Android
@@ -300,12 +506,17 @@ Recommended next WPs (dependencies met):
 
 ### Phase 3: Table tablet and recommendations v1
 
-- [ ] P3-01 Table tablet app: kiosk, pairing, lifecycle, health
-- [ ] P3-02 Service requests on the tablet (server side in P2-06d)
-- [ ] P3-03 Customer ordering and waiter approval
+- [x] P3-01a Tablet server side: own table, health, offline, kiosk exit, accent colour
+- [x] P3-01b Table tablet app: kiosk, idle and session screens, wipe, health, staff exit
+- [x] P3-01c Locate a tablet from the dashboard (MGR-006, Should)
+- [x] P3-02 Service requests on the tablet (server side in P2-06d)
+- [x] P3-03a Diners' orders and approval: server
+- [x] P3-03b Approvals in the waiter app and the POS
+- [x] P3-03c Ordering on the table tablet
 - [x] P3-04 Recommendation engine v1
-- [ ] P3-05 Recommendation UI and feedback
-- [ ] P3-06 Phase 3 exit test (S6)
+- [x] P3-05a Suggestion rows and tracking (tablet, waiter app)
+- [x] P3-05b Feedback after the bill
+- [x] P3-06 Phase 3 exit test (S6)
 
 ### Phase 4: Manager dashboard and reports
 
@@ -315,55 +526,168 @@ Recommended next WPs (dependencies met):
 - [x] P4-02c Devices
 - [x] P4-02d Menu editor
 - [x] P4-02e Custom roles (S)
-- [x] P4-03a Settings from the catalogue
-- [x] P4-03b Notification rules
-- [x] P4-03c Recommendation rules with boost, pin and block
-- [x] P4-03d Floor, stations and printers
-- [x] P4-03e Tax and invoice
-- [x] P4-04a Device and system alerts
-- [ ] P4-04b System screen
-- [ ] P4-05 Full report suite
-- [ ] P4-06 Report exports
-- [ ] P4-07 Audit viewer, verification, suspicious-activity report
+- [x] P4-03a Settings page (every catalogue setting)
+- [x] P4-03b Notification rules editor
+- [x] P4-03c Recommendation rules editor with boost, pin and block
+- [x] P4-03d Stations and printers
+- [x] P4-03e Restaurant profile, tax groups and invoice series (Owner)
+- [x] P4-04 Alert centre and system screen
+- [x] P4-05a Report data I: sources, staff, discounts, cancellations, reprints
+- [x] P4-05b Report data II: kitchen, tables, recommendations
+- [x] P4-05c Twelve months at design capacity (RPT-018)
+- [x] P4-05d Reports area in the console with charts and drill-down
+- [x] P4-06 Report exports
+- [x] P4-07a Audit viewer and chain verification
+- [x] P4-07b Suspicious-activity report, daily job and the S12 fraud fixture
 
 ### Phase 5: QR menu and cloud relay
 
-- [ ] P5-01 Relay database, RLS, isolation tests (needs Supabase org)
-- [ ] P5-02 Relay edge functions
-- [ ] P5-03 Sync agent
-- [ ] P5-04 QR tokens and table tents
-- [ ] P5-05 Next.js QR menu site
-- [ ] P5-06 Phase 5 exit test
+- [x] P5-01 Relay database, RLS, isolation tests (deploying to Supabase: manual task 20)
+- [x] P5-02a Relay functions for diners (menu, submit order, order status, expiry)
+- [x] P5-02b Relay functions for local servers (session, presence, publishing, pickup)
+- [x] P5-03a Sync agent: publishing (presence, tables, QR menu) and the System page
+- [x] P5-03b Sync agent: orders (pickup, approval, status back)
+- [x] P5-03c Sync agent: photos to the relay's Storage
+- [x] P5-03d Sync agent: Realtime doorbell for new QR orders (polling slows down)
+- [x] P5-04 QR tokens and table tents
+- [x] P5-05a QR menu site: menu, cart, ordering, statuses, read-only, privacy
+- [x] P5-05b QR menu site: suggestions and the speed budget
+- [x] P5-05c QR menu site: call waiter / request bill (S)
+- [x] P5-06 Phase 5 exit test
 
 ### Phase 6: Advanced menu and intelligence
 
-- [ ] P6-01 Combo and modifier parity on every surface
-- [ ] P6-02 Learned recommendations
+- [x] P6-01 Combo and modifier parity on every surface
+- [x] P6-02 Learned recommendations
 - [ ] P6-03 Voice search [H]
-- [ ] P6-04 AI-assisted menu import
-- [ ] P6-05 Should-have operations batch
+- [x] P6-04 AI-assisted menu import
+  - [x] P6-04a Control Plane reading service
+  - [x] P6-04b Review and import on the restaurant PC
+  - [x] P6-04c Bulk photo upload (ONB-007)
+- [x] P6-05 Should-have operations batch
+  - [x] P6-05a Finishing what was half built (KDS-002, KDS-006, NTF-009, BILL-013)
+  - [x] P6-05b Hold and fire (ORD-016)
+  - [x] P6-05c Ordering (WTR-013, MENU-007)
+  - [x] P6-05d Tables (TBL-006, TBL-004)
+  - [x] P6-05e Billing (BILL-001, WTR-008)
+  - [x] P6-05f Setup: Manage → Floor with the drag-and-drop plan (ONB-004 step 5)
+  - [x] P6-05g Printer auto-discovery (ONB-004 step 6)
 
 ### Phase 7: Commercial readiness
 
-- [ ] P7-01 Licensing module
-- [ ] P7-02 Control Plane: tenants, subscriptions, licences
-- [ ] P7-03 Fleet monitoring
-- [ ] P7-04 Release management and remote updates
-- [ ] P7-05 Backup and restore
-- [ ] P7-06 Data lifecycle
-- [ ] P7-07 Onboarding wizard completion
-- [ ] P7-08 Diagnostics, support screen, remote config
-- [ ] P7-09 Digital bills
-- [ ] P7-10 Phase 7 exit test
+- [x] P7-01 Licensing module (two-person review pending, manual task 23)
+  - [x] P7-01a `@rp/licensing`: files, fingerprint, state, reactivation codes, clock guard
+  - [x] P7-01b Control Plane: issuing and renewing licences
+  - [x] P7-01c Local server: the licence agent and enforcement
+  - [x] P7-01d Screens: reminders, banners, the Owner's licence page
+- [x] P7-02 Control Plane: tenants, subscriptions, licences
+  - [x] P7-02a Vendor staff: accounts, MFA, roles, sessions, access reviews
+  - [x] P7-02b Vendor API for the fleet
+  - [x] P7-02c Subscriptions and payments
+  - [x] P7-02d Support notes, QR provisioning, access policy
+  - [x] P7-02e The web app: sign-in and restaurants
+  - [x] P7-02f The web app: billing, releases, audit and staff
+- [x] P7-03 Fleet monitoring
+  - [x] P7-03a Heartbeat health and alerts
+  - [x] P7-03b Fleet dashboard
+- [x] P7-04 Release management and remote updates (S9 and the device checks wait for the first
+      push and manual task 29; pager firmware distribution is P2-04b)
+  - [x] P7-04a Rollouts at the Control Plane
+  - [x] P7-04b Release management in the vendor web app
+  - [x] P7-04c The update agent on the restaurant PC (S9 runs in CI on the first push)
+  - [x] P7-04d Client compatibility (N-1) and the version matrix
+  - [x] P7-04e Phone and tablet updates (EAS Update, the in-app APK updater)
+    - [x] P7-04e1 EAS Update gated by the server's client API (manual task 29 for the account
+          and keys)
+    - [x] P7-04e2 The in-app APK updater through the restaurant PC (device checks: manual
+          task 29)
+- [x] P7-05 Backup and restore
+  - [x] P7-05a Encrypted local backups
+  - [x] P7-05b Restore
+  - [x] P7-05c Continuous WAL archiving
+  - [x] P7-05d Cloud backup
+  - [x] P7-05e Key escrow and restore from the cloud
+- [x] P7-06 Data lifecycle
+  - [x] P7-06a Automatic retention
+  - [x] P7-06b Archive-then-purge
+  - [x] P7-06c Archive viewer and full data export
+  - [x] P7-06d Data-volume test
+- [x] P7-07 Onboarding wizard completion
+  - [x] P7-07a Activation and the set-up checklist
+  - [x] P7-07b First run on a fresh install
+  - [x] P7-07c Go-live check, settings export, readiness checklist
+- [x] P7-08 Diagnostics, support screen, remote config
+  - [x] P7-08a Diagnostics bundle
+  - [x] P7-08b Support asks for diagnostics
+  - [x] P7-08c Remote configuration
+  - [x] P7-08d Error reporting
+- [x] P7-09 Digital bills
+  - [x] P7-09a Digital bills at the Control Plane
+  - [x] P7-09b Digital bills on the restaurant PC
+- [x] P7-10 Phase 7 exit test (S8, S9, S10)
 
 ### Phase 8: Hardening and pilot
 
-- [ ] P8-01 Load and capacity tests
+- [~] P8-01 Load and capacity tests (only the lab rig's S1 remains, P8-01c [H])
+  - [x] P8-01a The simulated rush at design capacity
+  - [x] P8-01b Online and on-screen targets (NFR-P05, P06, P07, P12)
+  - [ ] P8-01c S1 on the lab rig with real devices [H]
 - [ ] P8-02 Failure drills [H]
-- [ ] P8-03 Security hardening and pentest readiness
-- [ ] P8-04 UX polish and accessibility audit
-- [ ] P8-05 Runbooks, manuals, training
-- [ ] P8-06 Pilot readiness
+- [~] P8-03 Security hardening and pentest readiness
+  - [x] P8-03a Authorisation sweep (local server and Control Plane)
+  - [x] P8-03b STRIDE threat models
+    - [x] P8-03b1 The threat models of the eight components, their checks, the High finding fixed
+    - [x] P8-03b2 Threat-model fixes on the restaurant PC (server, pager broker, data, waiter app)
+      - [x] P8-03b2a Sign-in and approvals (PIN budgets per device, easy PINs, lockout alerts,
+            approvals bound to their record, the waiter phone's inactivity)
+      - [x] P8-03b2b The pager broker's limits, acknowledgements and sign-in log
+      - [x] P8-03b2c Bodies, uploads, exports and erasure
+    - [x] P8-03b3 Threat-model fixes to the licence and the update pipeline
+      - [x] P8-03b3a The licence (clock guard, older licences, fingerprint reads, reactivation
+            codes, the licence tampering alert)
+      - [x] P8-03b3b The update pipeline and the builds (pinned Actions, the updater's version
+            check, unsigned updates reported, the release guard)
+    - [x] P8-03b4 Threat-model fixes in the Control Plane and the QR relay
+      - [x] P8-03b4a The Control Plane (sign-in races, backups a PC cannot purge, diagnostics
+            kept 30 days, https and masked links, tenant isolation, daily limits under a lock,
+            Super Admin resets by two)
+      - [x] P8-03b4b The QR relay (order and service-request floods, body limits, the provisioning
+            login, the PCs' function without CORS, the photo bucket's types)
+  - [x] P8-03c DAST of the QR site, relay and Control Plane
+    - [x] P8-03c1 The ZAP scans of the four surfaces, security headers, the CSPs (nonces, Trusted
+          Types), `/version`
+    - [x] P8-03c2 Floods and rate limits
+      - [x] P8-03c2a Floods from the LAN (the HTTPS server and the socket, PC-D3)
+      - [x] P8-03c2b Floods at the cloud's edges (the Control Plane, the relay's reads; CP-D1,
+            RELAY-D4); the edge's own rules wait for the hosting accounts (manual task 32)
+  - [x] P8-03d Standards checklists, Electron review and MDM policy
+    - [x] P8-03d1 The Electron shell's hardening (DESKTOP-E2, E3, I3, R2, S1)
+    - [x] P8-03d2a Phones and tablets: backups, PIN screen capture, lock-screen alerts, kiosk
+          restrictions, manifest test, MDM policy (MOBILE-E2, E4, I3, I4, R2, S1, T3)
+    - [x] P8-03d2b1 The Control Plane: the authenticator asked again for sensitive actions, the
+          audit log's copy for the host, reads classified, the CLI's host (CP-S2, R1; T5 and R2
+          wait for manual task 34)
+    - [~] P8-03d2b2 The checklists (ASVS, MASVS, ETSI, CIS) and the PC, update and licence
+      threats still planned for P8-03d (PC-E2, I5, I6, S4, T7, D6; UPDATE-R3; LICENCE-T5;
+      DESKTOP-E4); split:
+      - [x] P8-03d2b2a UPDATE-S2: the update signer pinned by its issuer too
+      - [x] P8-03d2b2b UPDATE-R3 and LICENCE-T5, split:
+        - [x] P8-03d2b2b1 UPDATE-R3: attestation, SBOM and commit with each release
+        - [x] P8-03d2b2b2 LICENCE-T5: the server's files checked against the release's list; `CODE_MODIFIED` reported
+      - [x] P8-03d2b2c The PC's threats (PC-E2, I5, I6, S4, T7, D6; DESKTOP-E4), split:
+        - [x] P8-03d2b2c1 PC-I5, E2, T7, D6 and DESKTOP-E4: BitLocker warning, PC runbook, readiness line
+        - [x] P8-03d2b2c2 PC-I6 (the database's own service account) and PC-S4 (CA name constraints)
+      - [x] P8-03d2b2d The four checklists (ASVS, MASVS, ETSI, CIS; `pnpm security:checklists`)
+  - [x] P8-03e Incident response plan and penetration-test support (the plan and the pack are written; naming the people, the tabletop exercise and the external test are manual task 36 [H])
+- [~] P8-04 UX polish and accessibility audit
+  - [x] P8-04a The audit (`docs/usability/ux-audit.md`), the screen-states guard and the usability test scripts
+  - [x] P8-04b Contextual help and first-use tips (NFR-U07, Should): a Help button and a one-time tip on every dashboard page
+  - [ ] P8-04c Usability results from the pilot, TalkBack pass [H]
+- [x] P8-05 Runbooks, manuals, training (Business Owner review and filming the videos remain)
+- [~] P8-06 Pilot readiness
+  - [x] P8-06a The strict traceability gate, UAT plan, go-live checklist and KPI plan
+  - [x] P8-06b Pilot KPI views: approval time (R-04) and availability over time
+  - [ ] P8-06c The pilot itself: UAT, baselines, 4 weeks live [H]
 
 ## Decisions
 
@@ -607,319 +931,2879 @@ Decided 2026-09-26 (P1-08a):
 Standing instruction (2026-09-26, the Business Owner): build everything without stopping; Claude
 decides, records decisions here and moves straight to the next WP. Recorded in CLAUDE.md.
 
-Decided 2026-10-05 (P4-03b):
+Decided 2026-10-11 (PR #85, the Mac build's CI):
 
-251. Each notification rule carries its pager vibration (PGR-006), so a manager shapes an alert in
-     one place: whom it alerts, where, what the pager shows and how it buzzes. `pagers.vibration`
-     is gone; a value stored under it is ignored (its only editor was to be this page, so no
-     restaurant has one). An alert sent on to the managers still buzzes three times.
-252. The factory vibrations follow PGR-006's examples: food ready one long buzz; a new order to
-     approve and the table requests (water, waiter, bill) two short; what calls the manager (food
-     waiting at the pass, a nudge, a waiter nobody can reach) three; devices and the system one
-     short.
-253. Two Appendix C rows always happen and have no rule to change: order changes go to the
-     kitchen's screen and a printed slip (from the order engine), and a waiter nobody can reach
-     has their alerts go straight to the managers (NTF-007, NTF-009). The page shows them as
-     "Always", without a Change button, and the server refuses a change to them.
-254. Whom an alert may go to depends on the alert: a table's alerts go to its waiter, its
-     section's waiters, every waiter, the managers on duty or the cashier; a nudge always to the
-     waiters the manager picks; a device's alert to the managers, the pager's wearer, the cashier
-     or the Owner; the system's to the managers, the cashier or the Owner. The kitchen station is
-     not offered: the kitchen gets its alerts on its own screen.
-255. Where an alert shows is two choices: "Pager and waiter app" (they show the same alerts,
-     WTR-006) and "POS and dashboard" (one console, MGR-008). An alert's own extra places (the
-     table tablet for food ready, the provider for disk and backups) are kept as Appendix C has
+793. The relay's Deno smoke tests run on Deno 2.1.4 in CI, the Deno of the edge runtime Supabase
+     runs the functions on (v1.77.4: deno_core 0.324, deno_http 0.180), not the newest 2.x. Deno
+     2.9's own HTTP/1 server reads a refused request body to its end whatever the handler does
+     (cancel before or after the answer, `connection: close`), so under it the body-cap test failed
+     on Linux now and then. When Supabase's edge runtime moves to Deno 2.9 or later, RELAY-D3 must be
+     checked again there (threat model).
+
+Decided 2026-10-10 (P8-03d2a):
+
+790. P8-03d2 is split again: d2a the phones and tablets, d2b the checklists and the other threats.
+791. No root detection in the app (MOBILE-E4 accepted): it runs on the attacker's device and the
+     server trusts nothing the app decides; the MDM's compliance check refuses rooted devices. An
+     app-side Play Integrity call is a later WP if the Business Owner wants it (SEC-010 Should).
+792. A locked phone shows only "Alerts for <name>" for an alert, and Acknowledge needs unlocking.
+     The kiosk sets safe-boot, debugging, factory-reset, add-user and account restrictions itself.
+     The Kotlin cannot be built here, so MOBILE-E2, R2, I4 and S1 stay "Partly mitigated" until
+     manual task 33 is run on a device.
+
+Decided 2026-10-10 (P8-03d1):
+
+788. P8-03d is split: P8-03d1 hardens the Electron shell (five of the 26 threats); P8-03d2 holds
+     the checklists, the MDM policy and the rest.
+789. The POS window never has developer tools, also in development (a developer uses the console in
+     a browser). The shell quits at start with any remote-debugging, inspector, debug-port or
+     `--js-flags` switch. On the PC's own address the CA pin decides even when Windows trusts the
+     certificate. The shell's log is `<data folder>/logs/desktop-shell.log`, 1 MB then one old file,
+     with addresses by origin only. DESKTOP-E4 (Assigned Access) stays with P8-03d2's CIS list.
+
+Decided 2026-10-10 (P8-03c2b):
+
+785. The Control Plane limits each client address itself (`CP_REQUEST_BURST` 300, then
+     `CP_REQUESTS_PER_SECOND` 30; digital bill pages `CP_PUBLIC_REQUEST_BURST` 60, then 5 a
+     second), because a flood must be stopped before bodies are read even where no edge exists
+     yet. Environment settings, not BRD ⚙ values. A burst of 0 is off (tests). Staging and
+     production refuse to start with the limits on and `CP_TRUST_PROXY` at 0, since behind the
+     load balancer every caller would share one address and one flood would stop everyone.
+786. The relay throttles reads in each function instance's memory (no query): per table token 40
+     then 5 a second, per address 120 then 20 (a table's phones read about 2 a second). The QR
+     site's server shares one read of the menu per table for 5 s. A throttled first view shows
+     the site's error page; the browser retries on its own timer.
+787. CP-D1 and RELAY-D4 stay "Partly mitigated" with their plan moved to manual task 32 (the edge
+     rules at the hosting provider), checked by `infra/edge/check-edge.mjs`.
+
+Decided 2026-10-10 (P8-03c2a):
+
+778. P8-03c2 is split into P8-03c2a (floods from the LAN: the local server's HTTPS port and its
+     socket, PC-D3) and P8-03c2b (the Control Plane's and the relay's edges, CP-D1 and RELAY-D4),
+     because the LAN and the cloud are limited in different places.
+779. The HTTPS port's limits are constants (`DEFAULT_SERVER_LIMITS`), not settings: the BRD gives
+     no ⚙ value, and they protect the POS server as the pager broker's do. Every TCP connection is
+     counted before its TLS handshake: 256 open per address (an access point that translates
+     addresses puts every phone and tablet behind one), 4,096 in all, 120 new at once then 20 a
+     second per address; past these the connection is closed at once. Requests: 400 at once then
+     100 a second per address, then 429 `RATE_LIMITED` with `Retry-After: 1` and
+     `Connection: close`, so a flooding host must open new connections, which are counted too.
+     Timers: the TLS handshake and a request's headers within 10 s (as the pager broker's
+     sign-in), checked every second; a whole request within 300 s (Node's default: a 55 MB AI
+     import over slow Wi-Fi); 5 s idle between requests (Node's default).
+780. The PC's own addresses (127.0.0.0/8, ::1) are never limited per address: the POS window, the
+     service host's checks, the load test and the DAST scan connect from there, and a host on the
+     LAN cannot appear as one of them.
+781. On the socket, per device: 16 live connections and 60 handshakes a minute, counted after the
+     device token's signature (HS256, cheap) and before the database is asked, refused with the
+     new connect error `TOO_MANY_CONNECTIONS`. The newest is refused rather than the oldest
+     closed, since closing the oldest makes a device with too many tabs reconnect in a loop. Apps
+     of this build retry it with their backoff; apps of the previous build stop their live
+     connection on a refusal they do not know until they restart, which no device within the
+     limits meets (an addition to the protocol; the client API is unchanged).
+782. A connection that stops reading is cut off when two sweeps in a row (every 3 s) find over
+     1,000 messages waiting for it and the operating system took no bytes of it in between, or
+     over 10,000 in any case. Its TCP connection is destroyed: Socket.io's polite close waits for
+     the waiting messages to go out first. The app reconnects and resyncs when it reads again.
+     (Changed 2026-10-11: it was "no flush since the previous sweep", which cut off a slow reader
+     still reading a large flush; CI showed it.)
+783. The server closes every open connection when it stops (Nest's `forceCloseConnections`):
+     Node stops timing out connections that never sent a request once its `close()` begins, so a
+     host holding a few kept an update, a restore's restart or a service stop waiting for ever
+     (found by the flood test). Clients reconnect and resync as after a restart (NFR-P11).
+784. Refusals are logged once a minute per kind and address (or device) with their count, as the
+     pager broker's are (PAGER-R3). There is no alert to the managers: the limits absorb a flood,
+     and an alert that a flooding host can raise would page the managers on its behalf.
+
+Decided 2026-10-10 (P8-03c1):
+
+768. P8-03c is split into P8-03c1 (the ZAP scans, the security headers and the CSPs: PC-I2, PC-I4,
+     DESKTOP-I1, RELAY-T5) and P8-03c2 (floods and rate limits: PC-D3, CP-D1, RELAY-D4).
+769. DAST runs OWASP ZAP 2.17.0's Automation Framework from `infra/dast`, which starts each surface
+     from its build, not ZAP's packaged baseline and API scripts: the surfaces need sign-in, a
+     paired device and data first. An installed ZAP (`ZAP_PATH`) on a developer's machine, the
+     container pinned by digest in CI. Credentials come from a request script reading a file the
+     run renews every half minute. Active scan at strength medium, with the rules for software
+     none of the surfaces has turned off (`RULES_OFF`). The CI job runs on `main`, weekly and by
+     hand, not on pull requests (the four scans take 10 to 50 minutes).
+770. Findings are judged against `infra/dast/src/triage.json`: a High is never accepted (fixed, or
+     a false positive with its reason); a Medium or Low needs an entry covering every place it
+     was seen; informational alerts are listed only.
+771. The local server sends no HSTS: its certificate comes from the installation's own CA, there is
+     no plain-http listener, and a browser that remembered HSTS could not open the console after a
+     replaced PC renews the CA (NFR-A01). Accepted in the triage. The cloud surfaces send it: the
+     Control Plane in staging and production (as before), the QR site now (`max-age=31536000`,
+     without `includeSubDomains`, which is the domain owner's to decide), the relay by Supabase.
+772. Every answer of the local server, the Control Plane and the relay carries `default-src 'none';
+base-uri 'none'; form-action 'none'; frame-ancestors 'none'`, `nosniff`, `X-Frame-Options:
+DENY` and `Referrer-Policy: no-referrer`; the server and the Control Plane also
+     `Cross-Origin-Resource-Policy: same-origin` and `Cache-Control: no-store`, as defaults the
+     handlers with files of their own replace. A path outside the API that nothing served is the
+     API's JSON 404 (not Express's page), and a folder of the web apps' files is not redirected.
+773. The QR site's CSP has a nonce per request: `script-src 'self' 'nonce-…'` with no
+     `'unsafe-inline'` and no `'strict-dynamic'` (in Chromium, `'strict-dynamic'` also runs an
+     inline script that running script creates; every script of the site is its own), `style-src
+'self' 'nonce-…'` and `style-src-attr 'unsafe-inline'` for the accent colour's style
+     attribute. Every page is rendered for its request (`connection()` in the root layout), and
+     the proxy runs on every request.
+774. The console and the vendor web app require Trusted Types with no policy (`trusted-types
+'none'`). Zod's compiled parsers are off in the three browser apps (`config({ jitless: true })`
+     before any schema is built): its `new Function` probe broke the CSP and Trusted Types on every
+     page load. The server and the Control Plane keep them.
+775. `/version` answers `node` as the major line only (`v24`); the field stays, since apps of client
+     API 1.0 require it.
+776. The digital bill page allows its one style block by its SHA-256 hash, not `'unsafe-inline'`.
+777. ZAP's "Private IP Disclosure" is a false positive on the web apps' scripts (example addresses in
+     the English catalogue) and on `/api/v1/printers` (the restaurant's own printers, for a person
+     who may manage them).
+
+Decided 2026-10-10 (P8-03b4b):
+
+762. Orders the restaurant rejected (`REJECTED`, the waiter's or the PC's) no longer count against
+     their table's QR limit, so junk blocks the real diners there only until it is rejected; they
+     still count against the browser that sent them. Expired orders still count (nobody judged
+     them). The runbook (`docs/runbooks/qr-relay.md`) says to reject the junk and give the table a
+     new code.
+763. QR service requests get their own limit in the relay, `relay.service_request_wait`: 10 in
+     10 minutes per table (rejected ones not counted, as for orders) and 6 per browser across the
+     restaurant (before: 6 per browser at one table only, without a lock), under per-table and
+     per-browser advisory locks. Constants in the migration, not settings: the BRD gives no ⚙
+     value for them (QR-006's ⚙ is for orders), and the one-open-per-kind rule already bounds a
+     table. A press over the limit that finds an open request of its kind still gets it back.
+764. Bodies are read with a cap: refused by their announced length before anything is read, and
+     as soon as more than the cap arrives in chunks. The diners' functions take 512 KB (the
+     largest order a diner could send, 100 lines with options, combos and 500-letter Devanagari
+     notes, is about 60 % of it), `server` 8 MB, a photo 2 MB. A call without a table code or a
+     credential of the right form has nothing of its body read. Bodies are still read before the
+     database transaction, so a slow sender holds no connection.
+765. The Control Plane's provisioning login is `relay_control_plane` (NOLOGIN NOINHERIT until
+     manual task 20 gives it a password), a member of `relay_provisioner` only; `relay_edge`
+     loses that role. The first relay migration was edited in place to stop granting it (the
+     relay has never been deployed: manual task 20 is open) as well as the new migration revoking
+     it, because roles are cluster-wide and a grant in one migration and a revoke in another would
+     flip it while CI's shared PostgreSQL migrates another relay database. ADR-0015 corrected.
+766. The `server` function sends no CORS headers and answers no preflight (a 405), since only PCs
+     call it; the diners' functions keep CORS for the QR site's origins.
+767. Menu photos are WebP only in `config.toml` too, and the photos table's type check allows
+     only `image/webp`; the migration also sets the bucket's types where a bucket already exists.
+
+Decided 2026-10-10 (P8-03b4a), ADR-0021:
+
+754. P8-03b4 is split into P8-03b4a (the Control Plane: CP-S1, T2, I2, I3, I4, D3, E3) and
+     P8-03b4b (the QR relay: RELAY-D1, D2, D3, E3, I5, T8), by component, as P8-03b2 and P8-03b3
+     were.
+755. Vendor sign-in counts each try in one `UPDATE ... RETURNING` before the password is checked;
+     a try that finds the count past five locks the account and is answered as locked. A code's
+     step is spent with a conditional update (only if no later step was spent), so two sign-ins
+     with one code give one session. An unknown email, a disabled account and one not set up are
+     answered exactly as a wrong password (401, the same message, the Argon2 time) and lock after
+     five tries too, counted in each instance's memory (several instances allow five each); the
+     lock itself still says so, as staff need to know to wait. The audit entry keeps the real
+     reason (`UNKNOWN_EMAIL`, `CANNOT_SIGN_IN`, `PASSWORD`, `CODE`, `CODE_USED`).
+756. A Super Admin's account is reset only when two other Super Admins do it within 24 hours
+     (`VENDOR_RESET_REQUEST_HOURS`): the first gets 202 and nothing changes (audited
+     `vendor.user_reset_requested`); the second gets the setup link (audited `vendor.user_reset`
+     with `requestedBy`). Asking again neither moves the 24 hours nor audits twice; a lapsed
+     request, or one whose asker is no longer an active Super Admin, is replaced by the next
+     asker's. Other roles' accounts need one Super Admin, as before. Nobody resets their own
+     account (new: 409 `VENDOR_SELF_CHANGE`). With two Super Admins only, the operator creates a
+     third with the CLI; the access policy says to keep three.
+757. Cloud backup retention goes by `completed_at`, the time the Control Plane stored the backup,
+     not the date the PC gives (which stays what the vendor and the restore tool are shown). A
+     backup dated more than 10 minutes after the Control Plane's clock is refused (422
+     `CLOUD_BACKUP_DATE`); an old date is not refused, since retention no longer reads it and an
+     archived year can wait days for its upload. A PC starts 8 distinct files in 24 hours at most
+     (429 `CLOUD_BACKUP_LIMIT`, under an advisory lock per PC); the same file again is a retry and
+     always allowed. The bucket's versioning and a 35-day governance-mode object lock (with no
+     permission to delete versions) are manual task 26's, which CP-T2's plan now names.
+758. Diagnostics bundles are deleted (the rows, not just their content) 30 days after they arrive
+     (`DIAGNOSTICS_KEEP_DAYS`, the access policy's figure), checked hourly in each instance, and
+     audited per PC as `diagnostics.removed` by `system:retention`. A support request keeps the id
+     of the bundle that answered it; opening it then answers 404.
+759. Outside development, every outside service's address must be `https:` (AI provider,
+     WhatsApp, error service, alert webhook, S3, KMS, the public address): one list,
+     `OUTSIDE_SERVICES`. The request log masks the last part of `/v1/bills/<token>` and
+     `/v1/object-store/<grant>` and the `token`/`grant` path parameters (`REQUEST_LOG_REDACTION`),
+     and an unexpected error's logged and reported path is masked the same way.
+760. Tenant isolation in the Control Plane stays in the application, not Row-Level Security
+     (ADR-0021, substituting for SEC-005's RLS there; the relay keeps RLS): the installation guard
+     decides the tenant from the signature, every PC endpoint scopes by it, and
+     `tenant-isolation.int.test.ts` calls each of the 12 PC endpoints with another restaurant's
+     ids, failing for a PC endpoint of the registry it has no case for. A future tenant-scoped
+     path other than a PC (an Owner portal, a reporting login) gets RLS before it ships.
+761. The AI menu limit (per restaurant) and the digital bill limit (per PC) are counted under a
+     transaction-scoped advisory lock with the row they allow (`lockFor`, which the invoice
+     numbering now uses too).
+
+Decided 2026-10-10 (P8-03b3b):
+
+748. Every GitHub Action is pinned to the commit its floating tag pointed at on 2026-10-10, so CI
+     runs what it ran, with the release in a comment, one commit per Action in all workflows
+     (`security.yml`'s setup-node and upload-artifact moved to the same releases as `ci.yml`'s).
+     Dependabot's Actions updates wait 5 days (14 for a major), as for packages. The PostgreSQL
+     service containers of CI's test jobs stay by tag (`postgres:16`): they get no secrets and no
+     checkout, and a digest would freeze their fixes, which Dependabot does not move.
+749. An installer's version is the ProductVersion string of its version resource, which
+     electron-builder writes as the build's full version, pre-release included (read from a test
+     installer built on this Mac). It must equal the version asked for exactly; an installer
+     without one is refused. The agent checks it in the same PowerShell call as the signature
+     (Windows only; off Windows only the updater does), the updater again before it stops
+     anything. The previous version's installer for going back is not checked again: the updater
+     kept it at install, in the administrators-only folder.
+750. The heartbeat's `updateSigning` (optional, so older PCs and Control Planes still talk): VENDOR,
+     UNSIGNED or NONE. Allowing unsigned installers wins over a publisher, since an unsigned one
+     passes there.
+751. `UNSIGNED_UPDATES` is a fleet alert opened from the heartbeat's state (red), closing by itself
+     once the PC says VENDOR or NONE. NONE alerts nobody: a build that installs no update is no
+     way in. The vendor's lab PCs on test builds alert too, on purpose: the vendor then sees
+     every test build enrolled.
+752. The release guard counts a build as signed as electron-builder does (`WIN_CSC_LINK` when set,
+     even empty, else `CSC_LINK`), also off Windows, where electron-builder skips signing. It
+     refuses a signed build staged off Windows even with `--any-platform`, without
+     `RP_UPDATE_PUBLISHER`, with unsigned updates allowed, without a licence key that is an
+     Ed25519 SPKI key, or without one to three lower-case SHA-256 pager key digests. It reads the
+     keys from the staged server, what the installer will carry, not from the sources.
+753. A signed release needs the pager firmware key too (manual task 30), as the threat plan said,
+     although a restaurant without pagers would run without it: pagers are part of the pilot, and
+     a release that cannot pass firmware on would need a second release to fix it.
+
+Decided 2026-10-10 (P8-03b3a):
+
+741. P8-03b3 is split into P8-03b3a (the licence: LICENCE-S3, T3, T4, D2, R3) and P8-03b3b (the
+     update pipeline and the builds: UPDATE-T1, T3, E3 and LICENCE-D3), by where the fix lives,
+     as P8-03b2 was.
+742. The licence is judged by the latest of the PC's clock, the last judged time moved on by the
+     server's monotonic running time since that check, and the issue times of the licence held and
+     of the newest accepted, which the vendor signed and renews daily while online. The heartbeat
+     answer's server time is not a floor: it is not signed, and a wrong or forged one would push
+     the PC's time years ahead and restrict the restaurant for good; it is still compared for
+     CLOCK_SKEW. While the server is stopped the judged time stands still (no clock nobody can set
+     runs then on a PC the customer administers): accepted in LICENCE-T3.
+743. A clock is reported (CLOCK_ROLLBACK) when it is more than 5 minutes behind where the last
+     check's reading says it should be by now, or more than an hour behind the judged time
+     (`CLOCK_HELD_BACK_TOLERANCE_MS`: the monotonic and an NTP-disciplined clock drift apart by
+     seconds a day). No new tamper kind, so Control Planes before this one still take the
+     heartbeats.
+744. A validly signed licence issued before the newest accepted counts as tampered (`TAMPERED`:
+     restricted from the next business day, LICENCE_TAMPERED reported), and the PC never keeps one
+     the Control Plane sends; the sealed record keeps the newest issue time (`newestIssuedAt`).
+     The heartbeat still names the file it holds, so online the Control Plane sends the newest
+     again. Putting back the whole sealed record with the file stays LICENCE-T2's accepted risk.
+745. A fingerprint read with fewer than three identifiers is unknown (`fingerprintKnown`): not
+     kept, the last read that said something stays in use, read again 5 minutes later; with none
+     since the server started, the licence does not judge the PC by it (no OTHER_PC). The Control
+     Plane binds, compares and renews nothing on an unknown fingerprint (no licence in the
+     answer), so a PC that never reads one runs out at its licence's end, as offline.
+746. Offline reactivation codes reach 60 days at most (`REACTIVATION_MAX_DAYS` in
+     `@rp/licensing`): the Control Plane issues none further, the PC takes none reaching more than
+     61 days past its judged today (a day for clocks and time zones) and refuses it as
+     `REACTIVATION_CODE_INVALID`. The PC reports the last code it took with each heartbeat until
+     one carrying it is answered; the Control Plane keeps each issued code's day and counter
+     (`licence_reactivation_codes`, backfilled from the audit log; never the code) and audits
+     `licence.reactivation_used` or `licence.reactivation_unknown`.
+747. A new fleet alert, `LICENCE_TAMPERING` (SEC-015's "repeated tamper events"): at once for
+     LICENCE_TAMPERED, RECORD_TAMPERED, OTHER_PC or a code never issued; for CLOCK_ROLLBACK and
+     CLOCK_SKEW once three are reported within seven days (`CLOCK_TAMPER_REPEATS`,
+     `CLOCK_TAMPER_WINDOW_DAYS` in `@rp/domain`; the PC reports each kind once a day at most, so
+     about three days in a week). Only a person closes it, with a reason (Support, like the audit
+     chain alert), and the reports count afresh from then. A PC whose clock is more than 10
+     minutes off therefore alerts after three days; the runbook says to have its clock fixed.
+
+Decided 2026-10-10 (P8-03b2c):
+
+737. A caller without a paired device may send a body of 16 KB at most (`ANONYMOUS_BODY_LIMIT`, a
+     constant: every public endpoint needs a few hundred bytes). A larger body announced without a
+     device token is answered 413 before a byte is read, and Node discards the rest; with a device
+     token that no longer verifies, the body is read off unparsed and the answer is 401
+     `DEVICE_NOT_RECOGNISED`, so the apps renew their token and send it again. Paired devices keep
+     1 MB, 7 MB on the upload paths and 55 MB for AI imports. The device check runs once per
+     request, before the parsers, and the authentication middleware reuses it.
+738. A menu workbook's XML parts are inflated by the server, each stopping one byte past the size
+     the ZIP's central directory gives: a part that comes out larger is refused as too large, one
+     that is shorter, fails its CRC, is encrypted, compressed another way or named twice as
+     damaged ("could not be read"). The reader gets the parts again in a stored ZIP, so it never
+     inflates; pictures and other parts are not inflated at all.
+739. The full data export's CSV files and the invoice register write text through `csvCell`: text
+     starting with `=`, `+`, `-`, `@`, a tab or a carriage return (other than a plain number) gets
+     a leading apostrophe; the JSON lines keep it as typed, and the export's README says so.
+740. Erasing a diner's number (DATA-011) also clears it on orders and bills, matched on its last ten
+     digits however it was typed (another number with the same last ten digits would be erased
+     too: erasure errs towards erasing), and withdraws the consent on the invoices that hold it.
+     Invoices keep the number for tax law, but no digital bill goes to it again, by hand or on
+     settling. A digital bill still queued is given up; one sent is left as it was. The response
+     and the audit entry give the counts (contacts, orders, bills, invoices, digital bills), never
+     the number.
+
+Decided 2026-10-10 (P8-03b2b):
+
+730. The pager broker's limits are constants of the server (`DEFAULT_PAGER_LIMITS`), not ⚙
+     settings: they protect the POS process, and the BRD sets none. 256 connections; 64 sign-ins
+     in progress in all and 4 from one address (the PC's own addresses are not limited per
+     address, for the load test and the set-up checks); 10 s for the TLS handshake and the
+     CONNECT; 1 KB per packet before sign-in, 4 KB after (a heartbeat with its firmware report is
+     under 400 bytes); 2 Argon2id checks at once with 64 waiting. A sign-in beyond that is answered
+     "server unavailable" (CONNACK 3) without a check and is not counted as a failure; the
+     firmware tries again after 1 to 5 s (`firmware/pager/README.md`).
+731. Failed pager sign-ins are logged at most once a minute per reason, address and pager, with
+     the count since the last line, and a wrong secret under a pager's name is counted on the
+     pager until its credential is replaced; the Pagers page shows the count and the last time.
+     Nothing locks a pager out: an attacker could then lock real pagers out, and a 192-bit secret
+     cannot be guessed.
+732. A pager's button acknowledges only alerts that reach its wearer on the pager and app
+     channels, whoever wears it: a manager's pager no longer has a manager's reach (only the POS,
+     the dashboard and the phone signed in as a manager do). Every acknowledgement records the
+     device it came from (`alerts.acknowledged_by_device_id`): the pager, the phone or the screen.
+     No screen shows it yet (none lists acknowledged alerts); it is kept for a dispute.
+733. Heartbeats less than half the interval after the last one taken are dropped, timed on a
+     monotonic clock per session (a new session's first is always taken), and acknowledgements
+     beyond a burst of ten, then one a second (each is a transaction). Retained and QoS 2 messages
+     end the connection, and a CONNECT with a will message is refused (CONNACK 5): the firmware
+     uses none of them.
+734. A pager the offline check marks offline has its session closed, so it signs in again; the
+     list of connected pagers then always matches the sessions, and what a closed session sent is
+     ignored (a heartbeat in flight no longer marks a revoked pager online).
+735. The PC refuses for good (`SECURE_VERSION_LOWER`) pager firmware whose anti-rollback version is
+     lower than that of the firmware it serves, whatever its version number. It keeps each served
+     image's secure version; for what an older PC kept, it reads it from the served image.
+736. Registering a pager checks the licence's pager limit under the same lock as pairing (409
+     `DEVICE_LIMIT_REACHED`), as for the other limited devices.
+
+Decided 2026-10-10 (P8-03b2a):
+
+723. P8-03b2 is split into three by the part of the PC each touches (`phase-8.md`): P8-03b2a
+     sign-in and approvals (this WP), P8-03b2b the pager broker, P8-03b2c bodies, uploads, exports
+     and erasure. The threats keep their date (2026-10-13) and name their part.
+724. Every wrong PIN or password counts against the device it was typed on as well as the person
+     (AUTH-003's "attempts are also rate-limited per device", read as a budget as well as a rate):
+     at `auth.deviceLockoutMaxFailures` (10, our default) within the lockout window the device
+     takes none for the lockout time, whoever they were for; a right PIN does not reset the count,
+     so a member of staff cannot clear it with their own sign-in. A manager lets the device take
+     PINs again at once from the Devices page (`unlockDevicePins`, audited `DEVICE_PINS_UNLOCKED`).
+     Refused attempts on a locked device are audited like any failure.
+725. Wrong PINs typed on a table tablet (leaving the kiosk, approving at the table) count against
+     the tablet only, never the person, so a diner cannot lock the managers out (MOBILE-D1); the
+     tablet stops taking PINs after `auth.tabletLockoutMaxFailures` (5, our default) and the
+     managers are alerted. Meanwhile waiters approve that table's orders from their phones.
+726. PINs guessed first are refused when a PIN is set, by default (`auth.refuseEasyPins`): one digit
+     or one block repeated (`0000`, `1212`, `123123`), runs up or down with 9→0 (`1234`, `4321`,
+     `7890`), digits in pairs (`1122`), 4-digit years 1900-2099, keypad lines (`2580`) and a few
+     favourites (`isEasilyGuessedPin`). PINs already set stay until changed (they are only stored
+     hashed). The first run refuses them too, by the catalogue's default.
+727. Every lockout raises `SIGN_IN_LOCKED` to the Owner and the managers on duty, on the POS and
+     the dashboard, without repeats or escalation: one open alert per person or device, with who,
+     where and until when; it clears when a manager unlocks the person, sets a new PIN or lets the
+     device take PINs again.
+728. An approval for an action about a record (`OVERRIDE_RECORD_TYPES`: a voided item, a reopened or
+     voided invoice, a discount above the limit) must name its record when it is given (422
+     `OVERRIDE_RECORD_REQUIRED`, before the PIN is checked) and is used only on that record; on
+     another it is refused and stays unused. The guard takes the record from the route's `record`
+     parameter; a route of such a capability that does not name one refuses every request. Before,
+     an approval without a record worked on any record, and the discount path spent it before
+     checking.
+729. The apps say on every call how long ago the person last touched them (`x-rp-idle-seconds`);
+     the server counts the person active as of then, so calls an app makes by itself no longer
+     keep an idle session alive (AUTH-005, MOBILE-E3). An app that does not send it (an N-1 build)
+     counts every call as activity, as before; a socket's (re)connection never counts. The mobile
+     shell counts any touch on the app; the console keeps its own inactivity sign-out (P0-14b) and
+     does not send the header.
+
+Decided 2026-10-10 (P8-03b1):
+
+713. P8-03b is split into four (`phase-8.md`): P8-03b1 the threat models (this WP), and three parts
+     for the fixes they plan: P8-03b2 the restaurant PC (server, pager broker, data, waiter app),
+     P8-03b3 the licence and the update pipeline, P8-03b4 the Control Plane and the QR relay. Each
+     open threat names the part that fixes it and a date: P8-03b2 by 2026-10-13, P8-03b3 by
+     2026-10-15, P8-03b4 by 2026-10-17, P8-03c by 2026-10-19, P8-03d by 2026-10-22, P8-03e by
+     2026-10-24; P2-05 (the pager's firmware, [H]) by 2026-12-15 and the manual tasks by
+     2026-11-30 are targets that hardware and accounts decide, reviewed in P8-06.
+714. How a threat is rated and closed (`docs/security/threat-models/README.md`): the residual risk
+     after the mitigations as built, from likelihood and impact by the OWASP Risk Rating matrix
+     (Low × High is Medium, Medium × High is High, High × High is Critical). A residual High or
+     Critical always has a dated plan; a Medium or Low threat not mitigated has a plan or a written
+     reason to accept it. `pnpm security:threats` (in `pnpm check` and CI) checks every file,
+     function and test title a model names, and refuses a plan whose work package is already
+     ticked, so finishing one means updating its threats.
+715. Code signing in CI only for a push to `main`, in the GitHub environment `release-signing`,
+     which holds the certificate's secrets and is deployable from `main` only; every other build
+     is an unsigned test build that takes unsigned updates. Before, every pull request's build
+     received the certificate, and a pull request's code would have been signed as the vendor's
+     and installed by every PC (UPDATE-E2, the only High that could be fixed in a day). Manual task
+     1 now requires branch protection, two-factor sign-in and that environment; manual task 31
+     covers the certificate, whose key stays in an HSM (SEC-006).
+716. Payments, cash movements and day-ends are append-only for the server's database role
+     (`20261010100000_money_records_append_only`): no code changes them, and a correction is a new
+     record. Before, the server's login could change a payment's mode or amount without a trace.
+717. Unpairing a pager on the Devices page drops its MQTT session at once, marks it offline and
+     releases its wearer (audited before and after), so NTF-007 escalates at once for a waiter
+     left without a way to hear alerts, and the offline check (now for active pagers only) never
+     alerts about it. Before, the pager kept its session until it signed in again.
+718. In production the server refuses to start without TLS (`RP_TLS`), as it already refused other
+     unsafe settings; the installer always turns it on.
+719. The request log redacts `x-override-token`, a manager's single-use approval (SEC-015).
+720. Diners' phone numbers stay unencrypted in the PC's database (SEC-007 makes encrypting them a
+     Should): the database listens on the PC only behind logins in the DPAPI store, and BitLocker
+     (PC-I5, P8-03d) protects the disk. Erasure (DATA-011) reaching orders and bills is P8-03b2.
+721. ADR-0015 is corrected: relay tables have Row-Level Security enabled, not forced (the
+     definer-rights functions need to bypass it). ADR-0018 is corrected: the pager firmware token
+     works for its 15 minutes, so a pager can resume a cut download.
+722. Question for the Business Owner (MANUAL_TASKS.md, OI-10): should a second vendor person
+     approve each release of a restaurant's backup key? Built today: Support alone, after verifying
+     the Owner, who is alerted (CP-I1, accepted until answered).
+
+Decided 2026-10-10 (P8-03a):
+
+706. P8-03 is split into five (`phase-8.md`): P8-03a the authorisation sweep (this WP), P8-03b
+     STRIDE threat models, P8-03c DAST, P8-03d the standards checklists with the Electron review
+     and the MDM policy, P8-03e the incident response plan and the pack for the penetration
+     testers (the external test itself needs the firm, [H]). What they produce goes in
+     `docs/security/`.
+707. "Automated authorisation tests" (SEC-017) are two sweeps: every endpoint in the local
+     server's and the Control Plane's registries is called the way an attacker would, and must
+     get the exact refusal from the guard before any work is done. Calls that would be allowed
+     are not made there; each feature's tests cover them, including the object-level checks, and
+     the permission matrix stays tested row by row through the probe controller. The lists of
+     public endpoints live in the sweep tests, so opening a new one is a deliberate change.
+708. Device endpoints name the kinds of device they serve (`@RequireDevice(devices)`, the
+     registry's `devices`, `x-devices` in the OpenAPI document), and the guard refuses every other
+     kind with 403 `DEVICE_NOT_ALLOWED` before validation. Each list is what that endpoint's
+     clients are: any device but a pager for the menu, the restaurant, the staff tiles, the device
+     itself and client errors; staff devices for sign-in and refresh; phones and tablets for their
+     app builds; kitchen screens, phones and tablets for health; the waiter phone for its alerts;
+     the table tablet for everything about its table (orders, approval at the table, service
+     requests, feedback, suggestions, best sellers, kiosk exit). The services' own "not a table
+     tablet" checks stay behind the guard.
+709. Staff sign in only on POS terminals, kitchen screens, waiter phones and managers' browsers
+     (`STAFF_DEVICE_TYPES`). A table tablet is in diners' hands and acts for its own table only
+     (AUTH-009): staff confirm things there with their PIN for that one action. Before, a person
+     could sign in with their PIN through a tablet's credential and get a session that reached the
+     whole restaurant. Sign-in and refresh now refuse tablets and pagers, and a session on one
+     counts for nothing (`SessionService`), so no other way in opens it.
+710. Pagers never use HTTPS: no pairing code is made for a pager (`PairableDeviceType`, 400).
+     Before, a manager could make one through the API (the console never offered it), and a
+     device paired with it would hold a device key that opened the device endpoints, including
+     the staff tiles. Pagers are registered on the Pagers page with an MQTT credential only.
+711. Found and fixed: the Control Plane served two public endpoints that were in neither its
+     registry nor its OpenAPI document, the development object store's signed URLs (`PUT` and
+     `GET /v1/object-store/:grant`). They are registered now (PUBLIC, saying why: the HMAC-signed
+     grant is the authorisation; 404 in staging and production, whose configuration refuses the
+     local store), and the grant is read through the registered schema. The Control Plane's routes
+     are now checked against its registry on every build, as the local server's are.
+712. The wrong kind of device gets 403 `DEVICE_NOT_ALLOWED`, which the apps treat as final (no
+     retry). A kitchen screen asking for an app build is now refused instead of told "no build".
+
+Decided 2026-10-10 (P8-01b):
+
+698. NFR-P05 and NFR-P06 are measured in the load run itself. The QR relay (`@rp/relay/testing`:
+     its schema, functions and the stand-in for Supabase Realtime) runs in the harness's process,
+     and the server syncs with it as on the restaurant PC (the built server with `RP_RELAY_URL`, its
+     own timings, the Realtime doorbell). Two simulated internet lines (`test/load/slow-line.ts`, a
+     TCP relay that delays every chunk each way): 20 ms each way for the restaurant's broadband to
+     Mumbai, 75 ms for diners' phones on 4G (Lighthouse's 150 ms there and back, as NFR-P12's
+     test). Supabase's own time (an edge function starting, its region) is not in the figures;
+     they are measured again on the deployed relay (manual task 20).
+699. The order mix gains QR orders: 35 % rounds from the waiter's phone, 15 % tablet orders, 15 %
+     QR orders from the tables without a tablet (T61 to T100), 25 % new parties, 10 % takeaway.
+     At a table without a tablet a diner opens the QR page when the table is seated (the waiter
+     takes the first order); the page asks for the menu every `QR_MENU_REFRESH_MS`, follows each
+     order every 3 s and closes when the bill is paid. One QR order in ten is sent twice with the
+     same key. The relay's orders are checked against the server's: each one made once, an
+     expired one never.
+700. What the figures are: NFR-P05 per availability change and per QR page open when it was made,
+     until that page shows it; a page that never showed it (the dish came back before it looked)
+     counts until it next looked, which is past the 30 s. The relay's own time (what a page opened
+     then shows) is in the breakdown. NFR-P06 from the diner's send (the POST to the relay) until
+     the dashboard hears the server's `OrderSubmitted` for it; the diner's page saying "received"
+     (it asks every 3 s) is in the breakdown.
+701. Found and fixed: an open QR page asked for the menu every 60 s, so a dish out of stock showed
+     there up to a minute and the sync later, against NFR-P05's 30 s (MENU-006: "the QR menu
+     within 30 s"). It now asks every 20 s (`QR_MENU_REFRESH_MS` in `@rp/ordering`) and at once
+     when the diner comes back to the page (`visibilitychange`). An unchanged menu (`?known=`)
+     answers in a few bytes, and the relay no longer reads the menu for it at all
+     (`restaurantState(…, known)`): before, every such call read the whole menu document (about
+     0.5 MB at 1,000 dishes) out of the database and parsed it in the function.
+702. Found and fixed: a QR page followed every order every 3 s for the rest of the visit, since
+     "sent to the kitchen" was never final. An order is now settled once every dish is served or
+     taken off, or it was rejected or expired (`qrOrderSettled` in `@rp/ordering`): fewer calls to
+     the relay's functions per order.
+703. NFR-P07 is measured by `apps/console/e2e/speed.e2e.ts` on a restaurant of the design
+     capacity's size (the development seed grown to 1,000 dishes and 100 tables), with the
+     browser's CPU slowed down 4 times (Lighthouse's mobile setting; the restaurant PC and kitchen
+     screens are slower than the build Mac): a cashier's order at a table, the kitchen's ticket and
+     a manager's walk through ten dashboard pages. A tap is the longest event of the interaction
+     from the input to the next painted frame (Event Timing; under 16 ms the browser does not
+     report it and it counts as 16). A screen change runs from the tap's input to the first frame
+     that shows a heading the screen did not have; until nothing on it is loading is recorded too.
+     Both are judged at p95, as the other targets, with the maximum reported. The phones and
+     tablets are measured on real devices in P8-01c.
+704. Found and fixed: the kitchen screen made its Web Audio context on the first touch (it unlocks
+     the sound, KDS-009), and that tap took 112 ms at 4×. The context is now made, silent, when the
+     browser is idle after the board is painted (`KitchenSounds.prepare`); the first touch only
+     resumes it, and the tap takes under 16 ms.
+705. NFR-P12 is recorded from the QR site's Playwright test (P5-05b): the 300-dish menu's LCP on a
+     Pixel 7 profile over Slow 4G with a CPU 4 times slower.
+
+Decided 2026-10-09 (P8-01a), ADR-0020:
+
+687. P8-01 is split: P8-01a, the simulated rush at design capacity (this WP); P8-01b, NFR-P05 and
+     NFR-P06 through the relay during the rush, NFR-P07 (tap feedback and screen transitions) with
+     the browser's Event Timing in Playwright, and NFR-P12 recorded; P8-01c, S1 on the lab rig with
+     real devices [H].
+688. The load test is a Node.js harness on the apps' own clients (`@rp/api-client`, its
+     `RealtimeConnection`, `mqtt`, raw TCP printers), not k6 (ADR-0020). It runs the built server
+     in a process of its own with TLS and the pager broker, on a PostgreSQL as durable as the
+     restaurant PC's (fsync, synchronous commit, full-page writes, WAL archived during the rush).
+     It is opt-in (`RP_PERF=1 pnpm --filter @rp/server test:perf load`, the rush's 25 minutes and
+     10 to 60 for the year of history); a small in-process run of the same harness is in the
+     integration suite.
+     `NODE_ENV=development` for the server: `production` insists on the nightly backup and a
+     licence, `test` turns the print queue off.
+689. What is simulated (`DESIGN_CAPACITY` in `test/load/plan.ts`): 100 tables in 4 sections given
+     to 20 waiters (phone and pager each), 1,000 dishes (one in ten with sizes, some with options)
+     on 6 stations, each with a kitchen screen in station mode and a ticket printer, 2 bill
+     printers, 60 tablets on the first 60 tables, 8 runners and 2 managers with pagers (30 pagers),
+     2 POS, 2 dashboards. The other 110 of the 200 live connections are console screens showing
+     the alert centre, signed in as managers: they hear every alert and read the alerts again
+     after each, the heaviest choice a console screen allows. 80 tables are seated first; then 20
+     minutes at 300 orders an hour, open-loop: 45 % another round from the waiter's phone, 20 %
+     diners' orders on the tablet approved by the waiter, 25 % new parties, 10 % takeaway; a bill
+     as often as a new party; 90 diners' calls and 1,800 looks at the suggestions an hour; a dish
+     out of stock every minute and back 30 s later; a twelve-month report every 2 minutes; one
+     order in ten sent twice with the same key. The kitchen cooks in 30 to 120 s so tables turn
+     over within the run. History: 365 days at 2,000 orders a day (the P4-05c generator), brought
+     to the state a year of service leaves (90 days of alerts, today's suggestions learned,
+     vacuumed and analysed).
+690. What each figure is: NFR-P01 from the request that sends the order (or approves the diner's
+     order) to the read of the station's kitchen screen that first shows the ticket, the screen's
+     250 ms wait included; NFR-P02 to the ticket's last byte at the station's printer; NFR-P03 from
+     the kitchen's "Ready" (the first of the table's since its last alert closed) or the tablet's
+     call to the alert on each recipient's pager; NFR-P04, per change, the last of the 200 devices
+     to hear it; NFR-P08 from opening the bill to its last byte at the counter's printer (preview,
+     invoice, print); NFR-P09 and NFR-P10 as the HTTP round trip; NFR-P11 from killing the
+     server's process (SIGKILL) to each client's resync, judged by the slowest. Percentiles are
+     nearest-rank.
+691. Found by the load test and fixed: a live screen read again 250 ms after the last event of a
+     burst, so a kitchen's steady stream of events kept a new ticket off its screen for up to 1.3 s.
+     It now reads 250 ms after the first (`@rp/ordering` `liveRefresh`, used by the console's and
+     the phones' `useLive`).
+692. Found and fixed: an order and a payment at the same table at once deadlocked (PostgreSQL
+     40P01, a 500 for both): the payment took the audit chain's lock and then the table's, the order
+     the table's and then the audit chain's. Audit entries are now written when their transaction
+     ends (`PrismaService.beforeCommit`), so the chain's lock is the last any transaction takes and
+     is held for milliseconds; `AuditService.record` returns only the entry's id. Entries keep the
+     time they were recorded; their order in the chain is the order transactions commit, as
+     before.
+693. Found and fixed: the kitchen screen read every ticket of its station that was never bumped,
+     so a kitchen that serves from the pass without bumping broke its own screen within months
+     (a year: 730,000 tickets, Prisma P2029). Open tickets now come from the dishes still at the
+     station (`order_items` by station and state); the not-collected sweep likewise.
+694. The simulated devices start with a device token signed at set-up: 200 challenges from one
+     address trip the limit of 60 a minute per address, which every device of a restaurant has to
+     itself. `tlsFetch` sends a request once more when the server closed the kept-alive
+     connection under it (its 5 s idle timeout), as browsers and OkHttp do.
+695. Found with `pg_stat_statements` and fixed: with a year of orders, a kitchen step took 0.7 s
+     and the live order feed 0.8 s, and the notification consumer fell 18 s behind (NFR-P03).
+     Three reasons. A combo line's parts were read by `parent_order_item_id`, which had no
+     index: migration `20261009090000_load_test_indexes`. The order feed checked every order the
+     restaurant ever took for a live item: it now starts from the live items by station and
+     state. And it counted each line's parts with Prisma's `_count`, which aggregates the whole
+     `order_items` table on every read: it now tells a combo line by its parts among the order's
+     items. Afterwards the database's busiest statements take 0.1 to 0.5 ms each.
+696. The full run can reuse a restaurant set up before (`RP_LOAD_BASE` with `RP_LOAD_ADMIN_URL`):
+     the first run keeps the database as `rp_load_base` and the devices' keys in
+     `restaurant.json`. Later runs copy it (`CREATE DATABASE … TEMPLATE`, about 30 s for 5 GB),
+     apply the migrations written since, and set up the day: printers, tables, tokens, learned
+     suggestions. A run then takes the rush's time, not the hour the history can take.
+697. NFR-P10 under the rush: the twelve-month source report took 5.1 s and the GST summary 4.4 s,
+     with the rush around them. Both now go over each table once and aggregate by hash, with the
+     same figures to the paisa on the generated year:
+     - the source report adds up each order's lines first, instead of counting distinct orders
+       over every line: 2.45 s to 1.56 s on its own;
+     - the GST summary keeps each tax cluster's components in one pass over the tax lines,
+       instead of joining them to themselves. It takes each invoice's SAC code per tax group as
+       `min(sac_code)`, what `DISTINCT ON … ORDER BY sac_code NULLS LAST` picked, and lets the
+       planner see the invoices it reads: 3.7 s to 2.3 s on its own.
+       In the rush of 2026-10-09 the slowest report then took 3.4 s (sources), staff 3.3 s and GST
+       3.2 s; the rest under 2.7 s.
+
+Decided 2026-10-09 (P7-10):
+
+682. The Phase 7 exit test is three integration files of the server's suite, run on every build:
+     `licence-exit` (S8) and `update-exit` (S9) against a real Control Plane in the same process,
+     and `data-exit` (S10) across two PCs (two databases and data folders) with the restore tool
+     between them. The clock moves with the process's `Date` (`vi.setSystemTime`) for the PC and
+     the Control Plane together, so the licence agent's clock guard never sees a clock set back
+     and the signed requests agree; the databases keep their own clocks, which these flows do not
+     compare.
+683. S8's internet outage is a TCP line between the PC and the Control Plane that the test cuts,
+     so the vendor's side goes on (its billing restricts the licence) while the PC judges the
+     grace over by itself, as on a real PC.
+684. S9 takes the updater's steps in TypeScript as `Invoke-RPUpdate` takes them: the services
+     stopped, `createUpdateSnapshot`, a new version that changes the database and never answers its
+     health check, the rollback request, `runPendingUpdateRollback` as the service host runs it,
+     the previous version started and answering `probeHealth`, the outcome file. The PowerShell
+     itself is covered by its Pester tests and the CI job "Windows installer" (`Test-Update.ps1`);
+     this scenario checks everything around it on every build: the agent's download, window and
+     backup, the reports, the Control Plane's automatic halt and fleet alert, and the next
+     morning's service.
+685. Found by S10: a PC restored from another PC's backup keeps its own backup key (decision 536),
+     so the archive viewer refused the old PC's archives, and decision 578's "open it on that PC"
+     is impossible once that PC is lost. The restore now keeps the backup's key, and the keys that
+     PC knew, in `system_meta` (`backups.earlier_keys`), sealed with a key derived from the new
+     PC's own backup key (HMAC), newest first, at most 20; the archive viewer opens a file with the
+     key its header names (`backupKeyFor`). They are for reading only: new backups and archives
+     use the PC's own key. A backup of the new PC carries them only for whoever holds its key,
+     who can read everything else in it already. Backups the old PC made are still restored with
+     the restore tool and the old recovery key (the one-click restore keeps refusing them and says
+     so).
+686. S10's history is made through the API on the days it happened (the clock set back to March
+     and April 2024), not with generated rows, because the audit chain must verify after the
+     purge and after the restore, and the generated rows' hashes are placeholders.
+
+Decided 2026-10-08 (P2-04b2), ADR-0019:
+
+677. A pager's QR code holds `RP-PAGER:<serial>` (upper case, so QR's alphanumeric mode keeps it
+     small). A bare serial (a supplier's label) is read too; any other code is "not a pager's"
+     and the camera keeps looking. P2-05 shows it on the pairing screen and prints it on the
+     label (`firmware/pager/README.md`). A barcode scanner that types the whole code into the
+     serial field leaves only the serial.
+678. QR codes are decoded with jsQR (Apache-2.0) in every browser rather than `BarcodeDetector`,
+     which Windows Chromium (the shell on the PC) lacks: frames at most 640 px every 150 ms,
+     dark-on-light and light-on-dark, no worker and no WebAssembly, so the console's CSP stays as
+     it is. The camera component is `@rp/ui-web` `QrScanner`, next to `QrCode`.
+679. "Scan the QR code" shows only where the browser has a camera API (a secure context: the
+     console over HTTPS or on the PC itself). A blocked, missing, busy or failed camera is
+     explained and the serial can still be typed. The camera turns off when the code is read,
+     scanning stops or the dialog closes; the serial read is put in its field, which takes focus.
+680. The Electron shell grants the console the camera without the microphone: a `media` request
+     or check that includes audio is refused.
+681. The console's Playwright run gives Chromium a fake camera showing a pager's QR code (a Y4M
+     written by `e2e/fake-camera.ts`), so the e2e registers its pager by scanning.
+
+Decided 2026-10-05 (P2-04b1), ADR-0018:
+
+668. P2-04b split: P2-04b1 (firmware distribution through the PC) and P2-04b2 (scanning a pager's
+     QR code with a camera on the Pagers page; typing or a barcode scanner works today).
+669. Pager firmware is a Control Plane release component (`PAGER_FIRMWARE`) with the PC's rollout
+     rules: channel, percentage, cohort, pause, halt, hotfix. Holding a PC at a version holds its
+     installer only. The security-critical flag means nothing for firmware (the web app hides it):
+     pagers update only when free.
+670. The signature is ESP-IDF secure boot v2 (RSA-3072), which the pagers' bootloader checks; the
+     PC checks it first against the key digests built into the software (`firmware-keys.ts`,
+     empty until manual task 30). `RP_PAGER_FIRMWARE_KEYS` adds keys outside production only. No
+     second vendor signature.
+671. A release that fails a check is refused for good and reported FAILED to the Control Plane; a
+     failed download is tried again with the update agent's back-off; without a trusted key the PC
+     waits for a software update. Firmware failures and rollbacks count in the rollout's health
+     (it halts by itself) but open no `UPDATE_FAILED` fleet alert, which is about the PC itself.
+672. A pager is free for an update when it is connected, has at least 30 % battery or is charging,
+     has no unacknowledged alert, and nobody wears it, or the maintenance window
+     (`updates.maintenanceWindow`) is open, or a manager pressed "Update now". Two at a time;
+     an offer unanswered for 15 minutes fails; a failure is tried again after 30 minutes, three
+     times; a rollback is never tried again by itself. Fixed values (`PAGER_FIRMWARE_RULES`), not
+     settings: the BRD gives no ⚙ for them.
+673. "Update now" needs `UPDATE_INSTALL_NOW` (Owner, Manager), like the PC's "Install now". It
+     starts a pager that was given up on again, is refused while the rollout is halted, and is
+     audited.
+674. The pager downloads from the PC with a random 256-bit token in the path, valid 15 minutes and
+     kept in memory (a restart drops it; the pager is offered again). The route is public because
+     pagers have no device token. Each offer of a version to a pager has a number that never
+     restarts (`offers`), which the pager echoes, so a stale report cannot change a newer offer;
+     a rollback counts only for a version the PC offered that pager, once.
+675. A halted rollout stops the PC offering that version to more pagers; a paused one does not
+     (the PC already holds it). Pagers already updated keep it.
+676. The pager's heartbeat may say it is charging; it is stored on its device row, as tablets'
+     are (TAB-015).
+
+Decided 2026-10-05 (P7-04e2), ADR-0017 addendum:
+
+661. The release's APKs travel in the restaurant PC's installer (`package:stage --apk`), each with
+     its app's `package.json` version, client API, size and SHA-256 in `apps.json`. The PC checks
+     each APK against `apps.json` before offering it, working the hash out again only when a file
+     changes; a damaged or missing APK is not offered and shows on the System page.
+662. `GET /api/v1/devices/current/app-build` and `…/apk` need the device token and no person. The
+     device's type picks the app (waiter phone, table tablet); other devices get none. Both, and
+     the device token's challenge and renewal, stay open to apps the server no longer serves
+     (N-1), so a refused app can update itself. Pairing stays closed.
+663. The device keeps a downloaded APK only if its size, SHA-256, package name and `versionName`
+     are the expected ones; Android refuses one signed with another key (UPD-007).
+664. A phone never installs by itself. The offer is on the sign-in screen and on "Update this app",
+     never while someone is signed in; the person presses Install, allows "Install unknown apps"
+     once, and confirms on Android's screen. A device-owner tablet installs by itself between
+     guests, or at once when refused, and opens again in kiosk mode; a tablet that is not device
+     owner offers it in the staff panel, after a manager's PIN.
+665. A build is offered when it is newer than the app installed (Android's `versionName`) and the
+     server speaks its client API. The device asks when it connects, when it is refused and every
+     30 minutes (`OTA_CHECK_INTERVAL_MS`, not a setting, as decision 659).
+666. A failed or cancelled install stays on offer ("Try again"); a kiosk tablet tries again at the
+     next check. Failures (not cancels) reach the vendor's error service.
+667. Both apps ask for `REQUEST_INSTALL_PACKAGES`; the install receivers are not exported. The
+     Android CI job checks both.
+
+Decided 2026-10-05 (P7-04e1), ADR-0017:
+
+654. Phones and tablets never look for an EAS update by themselves (`checkAutomatically:
+NEVER`). The `OtaUpdater` checks when the device connects to its server, when the server
+     refuses it, and every 30 minutes. It downloads an update only when the server serves the
+     update's client API (its own or N-1), and judges again what the download brought. An update
+     for a newer server waits for the PC. One the server no longer serves, or one published
+     without its client API, is never taken.
+655. A downloaded update restarts the app only while the device is free:
+     - a waiter phone: nobody signed in and the app on screen;
+     - a table tablet: no guests at its table and staff mode closed;
+     - either: at once when the server refuses the app as it is.
+
+     Otherwise it launches at the next cold start, which was gated at download time.
+
+656. A channel's "roll back to embedded" is followed without asking the server: it is the
+     vendor's own undo, and a refused app then shows "Update this app".
+657. A preview or production build with EAS Update (`EAS_PROJECT_ID`) refuses to configure without
+     `certs/update-signing-certificate.pem`, so no release build takes unsigned updates (UPD-007).
+658. Each update carries its client API in `extra.clientApi`. The app config reads it from
+     `@rp/contracts`' source, and the apps' config tests check it against `CLIENT_API_VERSION`.
+659. The 30-minute check is a constant (`OTA_CHECK_INTERVAL_MS`), not a setting: the BRD gives no
+     ⚙ value, and a check costs one request to Expo and one to the PC.
+660. P7-04e split: P7-04e1 (this one) and P7-04e2 (the in-app APK updater). The APKs travel in
+     the restaurant PC's installer, so each PC serves the builds of its own release, and phones
+     update after their PC (ADR-0017, item 8).
+
+Decided 2026-10-05 (P7-04d), ADR-0016:
+
+645. The client API has its own version, `<major>.<minor>` (`CLIENT_API_VERSION`, `1.0` now). It
+     is not the product's version: a minor release without contract changes must not narrow the
+     window. The minor goes up at a release whose contracts changed since the last frozen version;
+     `pnpm contracts:freeze` says so. A server serves its own minor and the one before (N-1). A
+     new major serves only itself (it would come with `/api/v2`).
+646. Every app sends `x-rp-client: <kind>/<version> api/<N>` (and `client` in the socket
+     handshake). The server refuses an app older than N-1 with 426 `CLIENT_TOO_OLD`, before
+     anything else runs.
+     - `/version`, `/health`, `/tls/ca` and `/client-errors` stay open, so an old app can still
+       find the server and report its errors.
+     - An app that does not say (tools, devices paired before P7-04d), and a malformed identity,
+       are served.
+     - An app newer than the server is served too. The server checks every request against its own
+       contracts, so the app cannot harm data. Refusing it would idle a phone updated in the
+       evening until the PC's maintenance window.
+647. A refused app:
+     - The phones show one "Update this app" screen. A table tablet asks its guests to call a
+       waiter.
+     - The console reloads itself, since the server serves the newer console. It does so at most
+       once in 10 minutes (session storage), then shows "This screen is out of date" with "Load
+       again".
+648. Each device's app version and client API are kept from its pairing and its hourly
+     device-token request, not from every request. The Devices page marks an app "Update soon"
+     (N-1), "Update needed" (refused) or "Newer than the server". Pagers show nothing: their
+     firmware reports no protocol yet (P2-04b, P2-05).
+649. The System page counts the apps by how they stand. Before an update, it says how many paired
+     apps the offered release would leave behind, from the release's matrix. It does not block the
+     update (UPD-004's timing is unchanged): the manager decides, and blocking could hold back a
+     security fix.
+650. The component version matrix of a release:
+     - what it contains: server, console, desktop, Node.js, PostgreSQL and WinSW;
+     - the client API it serves (current and oldest);
+     - each app's build, with the oldest build still served;
+     - the pagers' MQTT protocol (`PAGER_PROTOCOL_VERSION` 1).
+
+     How it is made and kept:
+     - Each app's version is its `package.json`'s; the Expo apps read it in `app.config.ts`, and
+       the release pipeline sets it.
+     - The oldest build served comes from `CLIENT_API_HISTORY` (the release that first spoke each
+       API), so it is null until the first release.
+     - The stage step writes `version-matrix.json`, and CI keeps it with the installer.
+     - The Control Plane stores it as JSONB. A release without one is still accepted, for
+       pipelines before P7-04d. A matrix of another version is refused (422 `MATRIX_MISMATCH`).
+
+651. `pnpm contracts:compat` compares the contracts with each frozen client API version still
+     served (`docs/api/compat/client-api-<N>.json`, minified and left out of Prettier):
+     - Requests must accept everything the old contract allowed; answers and events must read under
+       it. Zod drops unknown answer properties, so new ones are fine.
+     - Removed routes and events, new required inputs and new success statuses fail.
+     - Schemas it cannot reason about must be unchanged.
+     - Nothing is frozen before the first release. The release runbook freezes `1.0` then
+       (P8-06's pilot release).
+652. `VersionResponse.clientApi` is optional: an app newer than a server from before P7-04d must
+     still read `/version`. Other new fields are only read by the console, which the same server
+     serves.
+653. P7-04 split again: P7-04d (this one) and P7-04e (phone and tablet updates: EAS Update channels
+     gated by the server's client API, and the in-app APK updater through the local server).
+
+Decided 2026-10-05 (P7-04c):
+
+635. The update hand-off: the server's update agent (`NT SERVICE\RPServer`, which cannot install
+     software) leaves `<data>\run\update-request.json`. The watchdog (LocalSystem) starts the
+     scheduled task `\RestaurantPlatform\Update`, which runs `Update-RestaurantPlatform.ps1` as
+     SYSTEM outside every service, since the installer stops them all. The updater is Windows
+     PowerShell from `%ProgramData%\RestaurantPlatform\updater`, not Node.js from the install
+     folder: nothing it runs is a file the installer replaces. No path lets the server's account
+     start the task itself.
+636. The updater trusts nothing the server's account wrote, and only reads in the data folder:
+     that account could turn a folder there into a link and steer what SYSTEM writes or deletes.
+     - It checks the request's shape and copies the installer to
+       `%ProgramData%\RestaurantPlatform\installers`, where only administrators and SYSTEM may
+       write or read.
+     - It checks the SHA-256 and the Authenticode signer there (decision 641), and runs only that
+       copy. It never installs an older version than the installed one, except the one it goes
+       back to.
+     - It writes its outcome (`RUNNING`, then how it ended) and its rollback request in
+       `%ProgramData%\RestaurantPlatform`, which the server reads.
+     - Each request runs once, by its id (`updater\taken.json`). A run cut short by a restart ends
+       as FAILED at the next start.
+     - The watchdog starts the task again only when the request is not taken two minutes later.
+637. UPD-005's safety net has two parts:
+     - Before the hand-off, the agent makes a full encrypted backup (kind UPDATE, checked end to
+       end like the nightly one). The integrity check is that backup's check plus "no migration
+       left half done".
+     - With the server stopped, the updater copies the database (`CREATE DATABASE ... TEMPLATE ...
+STRATEGY FILE_COPY`) as the rollback point, so going back loses nothing written before the
+       update.
+       To go back, the updater runs the previous version's kept installer. That version's service
+       host swaps the copy back in before its server starts. The failed version's database is kept
+       as `restaurant_failed_update` (one at a time) for support, since orders taken while it ran are
+       there. The service host cannot remove the request, so it records the request id it ran in
+       `<data>\backups\update-rollback-outcome.json`.
+638. The health check after an update:
+     - `setup-cli health` says the host runs the server, the server answers over TLS (trusting the
+       installation's CA), and the installed version is the one expected;
+     - it then stays so for 2 minutes with the same process and no restart;
+     - the updater waits up to 10 minutes for the first good answer.
+       These are the updater's parameters, not settings: the BRD gives no value.
+639. UPD-004 timing (`updateTiming` in `@rp/domain`):
+     - an update installs in the window or after "Install now" for that version;
+     - open tables block it unless the release is security-critical and a manager approved;
+     - after a ROLLED_BACK or FAILED outcome the same version is not tried again by itself, and a
+       manager's "Install now" given after the failure tries again;
+     - after the backup, the timing is checked again, because tables may have opened meanwhile.
+640. Waits:
+     - a failed download is tried again after 5 minutes, then twice as long each time, up to 6
+       hours;
+     - a failed backup or integrity check after 30 minutes (5 while another backup runs);
+     - a request the updater never took fails after 10 minutes, and an update without an outcome
+       after 5 hours (the maintenance flag lasts 4).
+641. Update signing (UPD-007):
+     - The installer's build names the signer (`RP_UPDATE_PUBLISHER`, the certificate's subject),
+       stored in the installation file's `updates.publisher`.
+     - `RP_ALLOW_UNSIGNED_UPDATES=1` is for test builds only. A build signed with the certificate
+       refuses to package with it, or without a publisher.
+     - Without either, the PC refuses updates (System page: unavailable).
+     - The server checks Authenticode right after the download on Windows, so the System page can
+       say why an update waits. The updater checks again before running anything.
+     - CI builds are unsigned and accept unsigned updates while the repository variable is unset,
+       for scenario S9. Never install them at a restaurant (manual task 14, runbook).
+642. The installer keeps itself in `installers` at every install and repair (`-InstallerPath
+$EXEPATH`), so the first update can go back. After a successful update, only the new and the
+     previous installers are kept.
+643. Outcomes are recorded in `system_meta`, audited (UPDATE_STARTED with the approving manager as
+     actor or none for the window; UPDATE_INSTALLED, UPDATE_ROLLED_BACK, UPDATE_FAILED) and
+     reported with every heartbeat until one is answered. There is no restaurant alert beyond the
+     System page: the vendor gets the Control Plane's fleet alert and the rollout halts on
+     repeated failures (P7-04a).
+644. Known limitation: the installer closes the POS window on the restaurant PC; it opens again at
+     the next Windows sign-in, or from the Start menu. Reopening it in the signed-in user's session
+     after an update is left for P8-04 (UX polish).
+
+Decided 2026-10-05 (P0-16d):
+
+625. The installer is electron-builder's NSIS, assisted (not one-click), per machine in
+     `C:\Program Files\Restaurant Platform` (not changeable: nothing gains from moving it), with
+     administrator rights. Its app id `in.restaurantplatform.pos` must never change: updates find
+     the installed version by it. The server's programs go beside the POS window, in the layout
+     `installationPaths` describes, so the set-up scripts and services need no change.
+626. Updates and repairs go through this installer, run by the update agent (P7-04c), not
+     electron-updater: one signed file brings the shell, the server, Node.js and PostgreSQL to the
+     same version. electron-builder runs the installed version's uninstaller first; ours keeps the
+     services and data when it runs for an update (`--updated`). The services are stopped before
+     any file is touched (`Stop-RestaurantPlatform.ps1`); if the old files cannot be removed, the
+     old version is started again (`Start-RestaurantPlatform.ps1`) and the installer ends with 2.
+627. Bundled programs are pinned by version and SHA-256 and checked at every use: Node.js 24.21.0
+     (as `.nvmrc`), PostgreSQL 16.15 (EDB's Windows binaries, without pgAdmin, StackBuilder, tests
+     and build files; EDB publishes no checksum, so the hash is the first HTTPS download's), and
+     WinSW 2.12.0's .NET Framework 4.6.1 build, which uses the .NET Framework 4.8 every Windows 10
+     and 11 PC has and updates, not the self-contained build's unsupported .NET Core 3.1.
+     "PostgreSQL" joined the licence policy's allowed licences (a permissive, BSD-like licence).
+628. The server ships as `pnpm deploy --prod` with a hoisted layout (real folders, no links), then
+     trimmed to the packages reachable from the server (dependencies, optional dependencies and
+     required peers): the workspace's `auto-install-peers` brings the Prisma CLI and TypeScript as
+     optional peers, which nothing loads (497 MB → 219 MB; elkjs, the licence policy's exception
+     through Prisma Studio, is not shipped). Type declarations are left out. `apps/server` gained
+     `files: ["dist", "prisma/migrations"]`. The stage step checks the payload against the
+     server's own `setup-cli paths` and loads every service program and the native modules with
+     the staged packages. `server\THIRD-PARTY-NOTICES.txt` lists every package with its licence
+     text and names libvips' source (LGPL, shipped unmodified and replaceable).
+629. The POS window is bundled with esbuild into one `main.js`; app.asar holds it and its
+     `package.json` only. electron-builder is told node_modules are handled elsewhere
+     (`beforeBuild` answers false), or it would pack `apps/desktop`'s own. Fuses: no
+     `ELECTRON_RUN_AS_NODE`, no `NODE_OPTIONS`, no inspector flags, only the app.asar whose hash
+     is embedded, cookies encrypted, no extra `file://` privileges (SEC-011).
+630. The installer is staged and built on Windows (the CI job), because the server's native
+     modules (sharp, Argon2) are installed for the system the stage step runs on. The package step
+     refuses a payload staged elsewhere unless `--any-platform`, which only checks that the NSIS
+     script builds (done on this Mac: both NSIS builds pass with warnings as errors, the fuses are
+     set, the installer is 138 MB).
+631. The POS window finds the server's port and the CA's folder in the installation file (readable
+     by every Windows user), because it starts at sign-in for whoever signs in, without the
+     installer's environment. The environment still overrides it.
+632. Installer options: `/DATADIR=`, `/STAFFSUBNET=` (several with commas; the install script now
+     splits a comma list, since `powershell.exe -File` passes one string), `/MINFREEGB=`; the
+     uninstaller's `/DELETEDATA`. The installer's exit codes: 0 done, 1 the set-up failed or the
+     services could not be stopped, 2 the installed version could not be replaced; the
+     uninstaller's 3 when the Owner has not allowed deleting the data. The vendor's addresses are
+     fixed per build from `RP_CONTROL_PLANE_URL`, `RP_RELAY_URL`, `RP_QR_SITE_URL` and
+     `RP_ERROR_DSN` (repository variables and a secret in CI).
+633. The installer's texts are English `!define`s in `installer.nsh` (NFR-L02: the product is
+     English only in v1; NSIS pages cannot use `@rp/i18n`). There is no product icon yet (OI-01
+     branding), so Electron's is used.
+634. Signing waits for the code-signing certificate: the CI job signs when the secrets
+     `WINDOWS_CERTIFICATE_P12` and `WINDOWS_CERTIFICATE_PASSWORD` exist (MANUAL_TASKS.md). CI
+     builds carry `apps/desktop/package.json`'s version (0.1.0); releases set
+     `RP_PRODUCT_VERSION` (P7-04).
+
+Decided 2026-10-04 (P0-16b):
+
+607. P0-16b was split again: b is what runs on the PC and the set-up commands (in the server,
+     tested without Windows), c the PowerShell set-up scripts, d packaging and the
+     `windows-latest` workflow (was c). See `docs/build/phases/phase-0.md`.
+608. DPAPI goes through Windows PowerShell 5.1's `ProtectedData` (full path, `-EncodedCommand`,
+     values over the pipes), not a native module: nothing to build or ship, and every secret is
+     unprotected in one call per start. Machine scope with our own entropy, because the server's
+     service account, the restore tool the service runs and the installer (an administrator) all
+     read the same secrets; the secrets folder's permissions (P0-16c) keep everyone else out. The
+     files are useless on another PC. `RP_SECRET_STORE=dpapi` is required in production on Windows
+     and refused elsewhere.
+609. The database logins' passwords are secrets in the same store (`db-*-password`, base64url of 32
+     random bytes) but never in a backup, so a restore on a new PC keeps that PC's logins.
+610. A service host sits between WinSW and the server. It turns the installation file and the
+     secrets into the server's environment (no password in any XML). It runs a requested restore
+     with the administrator's login, which the server never gets, applies pending migrations at
+     every start, and then keeps the server running:
+     - a crash is restarted after 0.5 s, backing off to 5 s at most;
+     - a server that answered and then went 20 s without answering is ended and restarted, and so
+       is one that has not answered 60 s after starting;
+     - a server answering 503 for 2 minutes is restarted;
+     - on exit code 75 it prepares again;
+     - it stops the server over IPC, since Windows has no signals.
+
+     Its state file (PIDs, phase, heartbeat) replaces the PID file. The new host ends a server the
+     old one left running.
+
+611. The watchdog is a second line:
+     - it starts the database or server service when it is stopped;
+     - it restarts the server service when the host's heartbeat has been unchanged for 45 s **and**
+       the server does not answer, so a full disk that stops the heartbeat cannot take a working
+       server down;
+     - it restarts a server service stuck starting or stopping for 2 minutes;
+     - it never ends PostgreSQL;
+     - it does nothing while the maintenance flag is set (at most 4 hours, so a crashed installer
+       cannot leave the server down).
+
+     It runs as LocalSystem to control the other services. The server runs as the virtual account
+     `NT SERVICE\RPServer`, PostgreSQL as Network Service. The services are `RPDatabase`,
+     `RPServer` (depends on `RPDatabase`) and `RPWatchdog`, all automatic at boot.
+
+612. Migrations on the PC are applied by our own runner, not the Prisma CLI, so no schema engine is
+     shipped. It reads Prisma's migration folders, takes Prisma's advisory lock, runs each migration
+     in its own transaction and records it in `_prisma_migrations` with Prisma's checksum, so either
+     tool sees the other's work. A failed migration is undone whole; the server then stays stopped
+     and the host tries again every 30 s, saying why in its state file. Migrations missing from the
+     program (a newer database) are logged, not refused.
+613. `rp_migrator`'s sessions start as `rp_owner` (`ALTER ROLE ... SET role`), so `rp_owner` owns
+     every object and holds the default privileges that give `rp_app` each new table. That is the
+     same before and after a restore, which restores as `rp_owner`.
+614. PostgreSQL is set up with:
+     - `initdb --locale=C --encoding=UTF8 --data-checksums`, SCRAM, superuser `rp_admin`; C sorting
+       is stable across ICU versions, and Hindi has no case to fold;
+     - `listen_addresses = 'localhost'`, UTC, and the WAL archiving of P7-05c, in a marked block of
+       `postgresql.conf` that repair replaces;
+     - a `pg_hba.conf` written whole: SCRAM from this PC only, and replication only for `rp_backup`;
+     - port 5432 by default (`write-installation --pg-port` changes it).
+615. Fixed: on the PC the server's login could not read `_prisma_migrations`, so the nightly
+     `pg_dump` (and the backup's schema version) would have failed. The tests never saw it because
+     they connect as a superuser. Migration `20261004200000_migration_history_read` grants SELECT to
+     `rp_app`.
+616. Fixed: `RP_TLS=on`, as every doc writes it, was rejected (only `true`/`1` were accepted).
+     On/off flags now accept `on`/`off` too.
+617. The installation file is `%ProgramData%\RestaurantPlatform\installation.json`; it holds no
+     secret. The install folder's layout, which P0-16d packages, is `node\`, `server\` (with
+     `dist\` and `prisma\migrations\`), `console\`, `postgres\bin\` and `services\` (WinSW). The
+     data folder holds `postgres\`, `secrets\`, `logs\` (WinSW's and the server's) and `run\`.
+618. Deleting the data on uninstall (NFR-I02): the Owner allows it on the System page ("Removing the
+     software"), with a reason and a fresh second factor (`DATA_ADMIN`), audited as
+     `DATA_DELETION_ALLOWED`. The permission lasts 30 minutes, in `<data>\run\data-deletion.json`.
+     The uninstaller asks `setup-cli data-deletion`; without the permission it changes nothing and
+     exits with 3. Chosen over typing the Owner's password into the uninstaller: no sign-in path
+     without a paired device, and the existing lockouts and audit apply. It guards against
+     mistakes and people without the Owner's secrets, not against a Windows administrator.
+619. The data drive (ONB-002): the folder is `<drive>:\RestaurantPlatform`. GB are counted as
+     Windows Explorer counts them (1024³ bytes). NTFS or ReFS is needed (folder permissions).
+     USB, SD, MMC, FireWire and file-backed disks count as removable, iSCSI as network. When
+     installing again, the drive that already has the data is the default. The installer passes
+     the catalogue's `onboarding.minFreeDiskGb` default (20), since the settings do not exist yet;
+     a server test keeps the two equal. A data folder in or around Windows' own folders is refused,
+     and the uninstaller never deletes one.
+620. Folder permissions (`docs/runbooks/windows-installer.md`): the server's account
+     (`NT SERVICE\RPServer`, by its computed SID) may modify the data folder but only read
+     PostgreSQL's. Network Service owns `postgres\` and writes `backups\wal-staging\`. Only
+     administrators, SYSTEM and the server reach `secrets\`. Users may read `tls\` (the POS
+     window's pinned `ca.crt`; the keys there are sealed) and the installation file's folder. Each
+     run removes entries the plan does not name. `initdb` drops the administrator's rights, so the
+     installer's own account may write the data folder until the full permissions are set.
+621. Firewall (SEC-008): two inbound rules, for the server's `node.exe` only, on every network
+     profile (Windows may call the restaurant's network public), from `LocalSubnet` unless
+     `-StaffSubnet` names the staff network (none wider than /8). The outbound allow-list of
+     vendor and relay domains is the router's job (site readiness, P8-06): the Windows firewall
+     cannot filter by domain name.
+622. WinSW 2 has no `refresh`, so repair sets an installed service up with `sc.exe` (start at
+     boot, the dependency, the account, recovery). It installs a service again only when the
+     service runs another program. The failure flag is on, so a stop with an error also restarts
+     the service. `RPDatabase` restarts after 5, 10 and 30 seconds.
+623. A PC set up again with the old data drive cannot read the DPAPI secrets. The install stops,
+     changes nothing and points to a restore with the recovery key. It does not reset the logins
+     through a temporary `trust` line: the pepper, TLS keys and backup key would stay unreadable
+     anyway.
+624. The set-up scripts target Windows PowerShell 5.1, which every PC has, and are ASCII. They are
+     checked with PSScriptAnalyzer's 5.1 profiles and run in CI under 5.1 and 7. Their messages
+     are log text in English, not UI strings: the installer's pages (P0-16d) carry the UI text.
+     Install and repair log to `%ProgramData%\RestaurantPlatform\setup-logs\`; uninstall logs to
+     `%TEMP%`. A failed repair leaves the server and watchdog stopped, and the log says why.
+
+Decided 2026-10-04 (P0-16a):
+
+602. P0-16 is built in three parts: the Electron shell (a), the Windows services, watchdog and
+     DPAPI secret store (b), and packaging with the `windows-latest` CI job and the person's
+     checklist (c). See `docs/build/phases/phase-0.md`.
+603. The shell trusts the server on this PC by the installation's CA. On a loopback address it
+     accepts a certificate signed by `<RP_DATA_DIR>/tls/ca.crt` (or `RP_SHELL_CA_FILE`) and refuses
+     any other, so another program on the PC cannot pass as the server. Any other address, or no
+     CA file, gets Chromium's normal checks: a PC that opens the server across the LAN installs the
+     CA as `docs/runbooks/lan-tls.md` says.
+604. The IPC allow-list of SEC-011 is empty: no preload, no IPC, no Node.js in the page. The
+     console may ask for notifications, the camera (scanning a pager's QR code) and writing to the
+     clipboard, from its own server only. The server's own CSP (P0-14b) covers the console; the
+     start-up page has `default-src 'none'`.
+605. The shell starts with Windows as the signed-in user's login item. The services start before
+     anyone signs in (P0-16b); the window appears at sign-in. `RP_SHELL_OPEN_AT_LOGIN=0` turns
+     this off for a back-office PC. Closing the window brings it back after a second, except when
+     the shell quits or Windows signs out or shuts down.
+606. Electron is pinned to an exact version (44.5.1) and kept current by Dependabot. Its
+     `@types/node` is overridden to the workspace's version, so adding it changes no other
+     package's types.
+
+Decided 2026-10-04 (P7-04b):
+
+599. A release published from the web app starts at 10 % on Stable and 100 % on Pilot. The share
+     can be changed before publishing. A hotfix goes to its PC whatever the share, so its form
+     hides the share.
+600. Only the Super Admin (RELEASES_MANAGE) sees the rollout and hold controls. Everyone with
+     FLEET_VIEW sees each release's rollout, its halt reason and how installing it went. The cohort
+     is picked from the release's own channel's PCs.
+601. A PC's page has an Updates card: what it follows or the version it is held at. The hold
+     starts from the PC's own version. Holding and releasing both need a reason.
+
+Decided 2026-10-04 (P7-04a):
+
+593. P7-04 is built in four parts:
+     - a: rollouts at the Control Plane;
+     - b: the vendor web app's release pages;
+     - c: the update agent on the PC (its installer step waits for P0-16);
+     - d: phones, tablets and pagers, and the version matrix.
+       P0-16 is prepared before c.
+594. A PC's place in a rollout is a stable bucket (0 to 99, FNV-1a of the release and the PC), so
+     widening keeps everyone already reached. The cohort gets a release whatever the percentage.
+     PAUSED and HALTED both stop new offers; HALTED carries a reason. The CLI and pipeline
+     publish at 100 % by default.
+595. A PC is never offered an older version (forward-only migrations, UPD-005).
+     - A held PC gets its pinned version, whatever the rollout, while it runs an older one, and
+       nothing newer.
+     - A hotfix is a release for one PC, offered ahead of the channel.
+     - A halted release is not offered even to a held PC or a hotfix target.
+596. Install outcomes come with heartbeats (`updateReport`: INSTALLING just before the installer,
+     then INSTALLED, ROLLED_BACK or FAILED), and a PC that runs a release counts as installed.
+     The failures are:
+     - a rollback or a failure;
+     - INSTALLING followed by no heartbeat for `CP_ROLLOUT_SILENT_MINUTES` (45);
+     - `CP_ROLLOUT_ERROR_SPIKE` (100) server errors in the day after an install.
+       The rollout halts by itself at 2 or more failures that are 20 % or more of the installs
+       (settings). The halt is audited by `system:rollout`.
+597. Each failed install opens an `UPDATE_FAILED` fleet alert, delivered like the others. It
+     closes when the PC runs that version or a newer one, or by Support with a reason when it
+     never will. It is not one of the heartbeat-state alerts that every heartbeat re-evaluates.
+598. Version ordering moved from the Control Plane to `@rp/domain` (`semver.ts`), next to the
+     rollout rules, and the Control Plane re-exports it.
+
+Decided 2026-10-04 (P7-09b):
+
+588. `bills.digitalBillChannel` (OFF, WHATSAPP, SMS) is off by default. It costs the vendor per
+     message and needs the vendor's set-up (manual task 28), so a restaurant turns it on.
+589. A settled bill is queued by itself (a `BillSettled` consumer, once per invoice) when the
+     invoice has an Indian mobile number with the consent box ticked (BILL-011). Anything else
+     (no consent, a landline, a voided invoice) is never sent. The cashier can send it again from
+     the bill, as often as asked; each send is audited without the number.
+590. The queue is a table on the PC. Sends go one at a time, every 30 seconds or at once after
+     queueing. A bill is tried again after 1, 5, 15 and 60 minutes, then every 3 hours, while the
+     Control Plane or WhatsApp cannot be reached, is busy, or the day's limit is reached. It is
+     given up a day after it was queued. "Not set up" and a number WhatsApp cannot deliver to fail
+     at once.
+591. The whole number is kept on the PC only while the bill waits. It is cleared once sent or
+     given up, and erasing a diner's number (DATA-011) also stops a waiting bill. Digital bills go
+     with their invoice's year in archive-then-purge (DATA-008).
+592. The POS shows, under each invoice of a bill, what happened ("Sent on WhatsApp to
+     +91 ******3210 at 14:05", "Waiting to send…", "Not sent: …") and "Send again". The settle
+     toast says the bill goes to the diner. Nothing shows while digital bills are off.
+
+Decided 2026-10-04 (P7-09a):
+
+583. Digital bills go through the Control Plane, with the vendor's provider account: its keys
+     never reach a PC (SEC-002), one WhatsApp number serves every restaurant, and the copy behind
+     the link needs a public address that a restaurant PC does not have. The bill's content leaves
+     the restaurant only for this (BILL-012).
+584. WhatsApp first (OI-06): Meta's Cloud API with one approved Utility template, `digital_bill`,
+     taking the restaurant, the invoice number, the amount, the link and the day it expires. SMS
+     sits behind the same adapter interface and needs TRAI DLT registration and a chosen provider
+     first (manual task 28).
+585. The link's token is an HMAC of the bill's id under `CP_DIGITAL_BILL_KEY`, and only its
+     SHA-256 is stored. The PC can be given the same link again when it retries, and a database
+     copy opens nothing. The page is plain HTML with the bill as printed, no scripts, not indexed,
+     and rate-limited to 60 an address a minute.
+586. The cloud keeps the number's last four digits only. The copy is deleted by an hourly sweep
+     once `keepDays` (the restaurant's `bills.hostedCopyDays`) have passed; the row stays for
+     support and the daily limit (3,000 a restaurant, `CP_DIGITAL_BILL_DAILY_LIMIT`).
+587. A send is idempotent on the PC's id. SENT answers again without a second message; FAILED is
+     tried again when asked. A number WhatsApp cannot deliver to (131026 and the like) and the
+     vendor's own set-up errors are not retryable; busy, rate-limited or unreachable are.
+
+Decided 2026-10-04 (P7-06d):
+
+581. The data-volume test (DATA-012) projects five years from two measurements rather than
+     generating five years: a service day through the real API gives each table's rows per order,
+     and days at design capacity give each row's cost on disk with its indexes. Each table takes
+     the larger count and the measured cost where the bulk run has 1,000 rows or more. The result
+     is the same from 30 and 180 days (50.35 GB), so 30 days is the default.
+582. Tables the daily retention or the event bus empty count 90 days; tables neither run writes
+     (QR inbox rows, QR calls, feedback, diners' numbers, approvals, cash movements) get stated,
+     generous figures; 30 % is added for the space updates leave behind, plus the schema, the menu
+     and 1 GB of WAL. The test fails above 100 GB (decimal), so a schema change that blows up a
+     table shows when it runs.
+
+Decided 2026-10-04 (P7-06c):
+
+576. The archive viewer reads the archive file itself, streamed and decrypted once per question,
+     never a restore into the live database (DATA-009). The year's daily report is kept in memory
+     once read; an invoice search scans the invoices table only, skipping lines that cannot match
+     before parsing them. At design capacity a year is a few hundred MB, read in seconds.
+577. Those who read the restaurant's reports (the Owner and managers) see the old years and open
+     their archives; a cashier's reports are their own shifts' (§4.2), so the archive routes
+     refuse an OWN grant. Archiving and the full export stay the Owner's (DATA_ADMIN).
+578. An archive made with another PC's backup key is refused with a clear message (open it on
+     that PC, or get the key back through escrow) rather than a decryption error.
+579. The full data export (DATA-010) is every table as JSON lines and CSV, read in one
+     REPEATABLE READ READ ONLY transaction through cursors, plus the invoice register and the
+     PDF books by financial year (the same writers as the archive's human-readable export). It
+     leaves out credentials, sessions, one-time codes, the server's bookkeeping tables and every
+     `*_hash`/`*secret` column. It goes to a folder typed in (a whole path, refused otherwise) or
+     the second backup location's `rp-exports`. It runs in the background, one at a time; the
+     last result is kept until the server restarts (the folder stays).
+580. The export is not held back by a restricted licence: the licence agent gates ordering only
+     (LIC-005), and the export's routes do not ask it. Covered by a test that makes the licence
+     refuse everything.
+
+Decided 2026-10-03 (P7-06b):
+
+568. Only the oldest whole financial year still on the PC may be archived and purged, so what
+     stays is one stretch of time and the audit chain keeps its tail (the audit log goes from its
+     start up to the year's last entry).
+569. A year is its orders, invoices, bills and shifts by business date; what hangs off them goes
+     with them whatever its own date (items, KOTs, events, payments, cash movements), so no
+     required link from a later record can block the purge and the archive is complete. Table
+     sessions, staff and the menu stay. Suggestion outcomes (derived report data) go by date.
+570. The statutory period is 72 months from the due date of the year's annual return, taken as 31
+     December after the year ends (§12); within it the Owner must acknowledge that the restaurant
+     keeps the archive. The PC does not refuse: the BRD asks for a clear warning.
+571. The archive is the backup file format (kind ARCHIVE), encrypted with the backup key, holding
+     every row as `row_to_json` lines, a description with the counts and the last audit entry, and
+     a manifest. It is read back in full, counts included, before anything is deleted.
+572. The human-readable export is the invoice register (CSV, amounts in rupees, CGST/SGST/IGST/
+     CESS columns) and a PDF book per day with every invoice as printed on 80 mm paper. The PDF is
+     written by a small text-only writer (Courier, two columns), because pdfmake takes too long for
+     a year of invoices; the bill text is the receipt renderer's own.
+573. The purge runs through a separate login in `rp_purge` (`RP_PURGE_DATABASE_URL`), in one
+     transaction: each table must lose exactly the rows archived or nothing is deleted, and the
+     purge record is written in the same transaction. The application role still has no DELETE on
+     these tables (AUD-004).
+574. The invoice-line guard now lets the purge delete lines of settled invoices, and lets a later
+     year's invoice line lose its link to a purged order item (the foreign key's SET NULL);
+     nothing else about a settled invoice's lines may change.
+575. Archives go to the cloud after the nightly backup. The Control Plane marks them ARCHIVE (from
+     the file name): the retention keeps them for good and a restore from the cloud never uses
      them.
-256. An alert repeats in its factory way (until acknowledged, once per state change, until put
-     right, daily), every R until acknowledged, or never.
-257. The pager text has up to 20 characters; `{table}` fills in the table for a table's alerts and
-     `{message}` the manager's words for a nudge, which must keep it. The editor previews it for
-     table 7. A rule that does not reach pagers or the waiter app asks for no text.
-258. A rule that cannot work (nobody, nowhere, a pager with no text, a placeholder the alert
-     does not fill or a stray brace, a repeat the alert does not offer, a fixed row) is refused
-     by the server (422 `SETTING_INVALID`, naming the alert and the problem) and stopped in the
-     editor beside the field it is about.
-259. Saving a rule reads the rules again and changes only that alert's entry, keeping only what
-     differs from the factory rule: another manager's change to a different alert is kept, and a
-     rule put back to the factory one is no longer "Changed".
-260. N, R and the nudge messages show on both the General and the Notifications pages (the same
-     setting and editor): the rules talk about them, and someone looking under General finds them
-     too.
-261. The page's heading is "Notification rules" (its link says "Notifications"), because the
-     toasts' landmark is already called "Notifications".
 
-Decided 2026-10-11 (P1-08c):
+Decided 2026-10-03 (P7-06a):
 
-296. A table opened by mistake is freed from its details on the POS ("Free the table"), with a
-     reason for the audit log, through the close-without-bill route P1-02 built. The POS had no
-     way to do it, and the System page's "Install now" (P4-04b) needs every table closed.
-297. The action shows only while the table's amount so far is zero and nothing waits for approval,
-     to anyone whose role does not deny `ORDER_CREATE`, the route's own capability. Whoever can
-     open a table and order can free one opened by mistake; with nothing ordered there is no
-     money at stake, so no manager step is added, and the audit entry keeps who did it and why
-     (ADR-0006). The server stays the judge: a free dish leaves the amount at zero, and its
-     refusal (`TABLE_HAS_ITEMS`) shows in the dialog.
-298. Like the other reasons on the POS, the reason is 3 to 200 characters, as the route requires.
+563. P7-06 is split into four (phase-7.md): automatic retention, archive-then-purge, the archive
+     viewer with the full data export, and the data-volume test.
+564. The daily retention removes cleared or acknowledged alerts (not one a service call still
+     points at), closed service calls, printed or failed print notices and expired idempotency
+     records after `retention.operationalDays`; and log files, downloaded cloud backups and restore
+     leftovers. The outbox, inbox and photos keep their own pruning.
+565. A diner's "visit" is their consent or their latest feedback; after
+     `retention.dinerContactMonths` without one, the number is anonymised (as an erasure, with
+     `erasedAt`). Feedback after `retention.feedbackMonths` loses its comment and diner link and
+     keeps its ratings, so the reports still count it.
+566. Each run that changes something writes one `RETENTION_APPLIED` audit entry per restaurant with
+     the counts; the System page shows the last run.
+567. A new migration grants DELETE on alerts, service requests and print notices to `rp_app`. The
+     roles migration's grant loop covered only the tables then present; the schema test now lists
+     them among the deletable tables, so the retention works under the restaurant PC's real role.
 
-Decided 2026-10-10 (P4-04a):
+Decided 2026-10-03 (P7-05e):
 
-289. Kitchen screens and table tablets are reported offline once they have been away for
-     `devices.offlineAfterSeconds`, 60 s by default (10 s to an hour, managers change it; NTF-003
-     gives no time). A minute lets a reload, a browser update or a moment out of Wi-Fi pass
-     without an alert, and still tells the managers quickly about a screen the kitchen needs. A
-     device is online again as soon as it connects.
-290. Only kitchen screens and table tablets are watched this way: pagers already report through
-     their heartbeats, waiter phones sleep and wake all day and are not in NTF-003's list, and the
-     POS and manager browsers are where the alert is read.
-291. When a device's last connection closed is kept in memory, not taken from `last_seen_at`
-     (written at most once a minute). After a restart, a device stored online gets the whole
-     grace from the server's start, when it can first reconnect; one that does not come back is
-     then reported, so a screen switched off while the server was down still raises its alert.
-292. The stored state is held against the live connections every 5 s, so a connection whose
-     announcement was missed (stored offline but connected) is put right and announced like any
-     other change.
-293. Sizes are written in units of 1,024 with Windows' names (KB, MB, GB, TB) and one decimal below
-     100 of a unit ("12.4 GB"), as Explorer shows the drive on the server PC, so the alert matches
-     what the Owner sees when freeing space.
-294. A printer alert gives the printer's own error when it reported one, otherwise says that it is
-     not printing, then how many tickets wait for it; the disk alert says how full the drive is
-     and how much is free. An alert without those details still shows its type, as before.
-295. The 90 % disk alert (`storage.criticalPercent`) stays with storage by category in P7-06, and
-     the update alerts with the update agent (P7-04): P4-04a adds the publisher NTF-003 lacked for
-     screens and tablets, as planned.
+556. Escrow is RSA-OAEP (SHA-256) with an RSA_4096 encrypt-and-decrypt KMS key in India: the PC
+     wraps its backup key with the public half the heartbeat answer offers; only a KMS Decrypt,
+     for a restore code, unwraps it. The KMS adapter uses our SigV4 module; a configured RSA key
+     stands in for development and is refused in staging and production.
+557. A PC sends its backup key id in each heartbeat (none while the Owner opted out of the cloud
+     backup), so the vendor offers escrow until it holds that key. Every key a PC ever used stays
+     escrowed, since older cloud backups need it until the retention removes them.
+558. A restore code (OI-10): new vendor capability BACKUP_RESTORE (Super Admin, Support), with the
+     reason and how the Owner was verified, audited. 16 characters without look-alikes, one use,
+     24 hours. Issued only when there is a cloud backup whose key is escrowed.
+559. The code is traded by the restore tool on the new PC (`POST /v1/cloud-restores`, public,
+     5 attempts a minute per address). The tool makes a key pair; the Control Plane unwraps with
+     the KMS and wraps again for the tool, so the key never crosses in the clear and the Control
+     Plane keeps nothing unwrapped. The code is claimed atomically, so it works once.
+560. The restaurant's Owner is told when a code is issued: heartbeat answers carry the week's codes
+     until the PC reports them seen, and the PC raises the new alert type `VENDOR_RESTORE_CODE`
+     (Owner, POS and dashboard, not repeated).
+561. The cloud restore restores the newest cloud backup whose key was released, checked against
+     its SHA-256, through P7-05b's restore; the licence moves by the vendor's rebind as before.
 
-Decided 2026-10-10 (P4-03e):
+562. Correction to 553: BRD §9.3 keeps cloud backups 30 daily + 12 monthly, not the local
+     14 + 8. `backupsToRemove` gained monthly retention; the Control Plane's defaults are
+     `CP_BACKUP_KEEP_DAILY=30` and `CP_BACKUP_KEEP_MONTHLY=12`. §9.3's deletion within 30 days of
+     a contract ending (after notice and the CA's confirmation) is a manual step in the runbook.
 
-279. The restaurant's own details are two more pages of Settings. Restaurant holds what managers
-     change (name, contact, logo, opening hours, when the business day ends), as the server's
-     profile route allows them (`OPERATIONS_CONFIGURE`). Tax and invoice holds the invoice
-     particulars, the tax groups and the invoice series: the Owner changes them after the second
-     factor (AUTH-006), and managers and custom roles that open Settings see them read only, with
-     a note saying only the Owner changes them (MGR-007).
-280. The legal name, address, state, GSTIN and FSSAI number sit on the Tax and invoice page, not
-     the Restaurant page: they are what every tax invoice prints (BILL-002), and the server guards
-     them with the tax capability and the second factor.
-281. The logo is uploaded as a menu photo (the server's only image upload), so choosing or
-     replacing it needs `MENU_MANAGE`; without it the dialog says so, and removing the logo still
-     works. A separate logo upload route was not worth adding for one image.
-282. Every change on both pages takes an optional reason for the audit log, as settings do
-     (decision 247), of at least 3 characters when one is given; archiving a tax group or a
-     series asks for a reason, as archiving does elsewhere.
-283. A new tax group starts with CGST and SGST rows with empty rates and SAC 996331 (restaurant
-     service), the usual case for an intra-state restaurant; the rows can be removed for a
-     nil-rated group or changed to IGST or CESS. Rates are typed as percentages with up to two
-     decimals and sent as basis points.
-284. A new invoice series puts the financial year in the number and starts again every April,
-     with "/" and 6 digits (INV/2026-27/000001), the seed's format; the dialog shows the first
-     number as it is typed, from the domain's formatter.
-285. Opening hours allow up to 4 windows a day (the server takes 28 a week), and windows are not
-     checked for overlap: the hours are shown to guests and staff, nothing is refused because of
-     them, and the server accepts them as they are. "Use Monday's hours every day" fills the week
-     from Monday, the usual first step.
-286. The default series has no Make default or Archive buttons: it is already the default, and
-     the server refuses to archive it. Another series is made default first.
-287. The Tax and invoice page reads again on `RestaurantChanged`, a menu change (the items using
-     each group) and `BillPrinted` (the invoices issued from each series, which fix a series's
-     format), so what it shows matches what the server will allow.
-288. The refusal to archive a tax group in use is the text the Owner reads, singular for one item:
-     "1 menu item uses this tax group. Give it another tax group first."
+**Question for the Business Owner (OI-10):** how Support verifies the Owner before issuing a restore
+code. Default: a video call with government ID matching the Owner on record, and a call back on
+the registered number. A two-person rule is the stricter option.
 
-Decided 2026-10-10 (P4-03d):
+Decided 2026-10-03 (P7-05d):
 
-269. The floor and the stations and printers are two more pages of Settings (Floor, and Stations
-     and printers), with the rest of the restaurant's configuration, rather than pages of their
-     own in the dashboard's navigation.
-270. The Floor page is linked and opened only for people who may manage staff and sections
-     (`STAFF_MANAGE`), the permission the server's floor routes already require (BRD §4.2 puts
-     sections with staff); others who open Settings never see a page whose every change the
-     server would refuse. Stations and printers is for everyone who opens Settings
-     (`OPERATIONS_CONFIGURE`), as its routes are.
-271. A new section goes after every other and a new table after its section's tables, archived
-     ones included, so a restored one never shares a place with a new one; a new table is laid
-     for four, the database's default.
-272. An archived table keeps its label taken (labels name tables on old tickets and bills, as the
-     server already required): the dialog says so and to restore that table instead.
-273. Archived stations and printers are neither listed nor restored: the server has no restore
-     for them and their names are free again, so adding one anew does the same. Sections and
-     tables have Restore, which the server offers.
-274. A broken printer's tickets are sent elsewhere from the printers list (Send tickets
-     elsewhere, Print here again), each with a reason for the audit log, to another active
-     printer that prints its own tickets; the only such printer is chosen already.
-275. A test page that does not print is the printer's answer, shown as a toast in its words, not
-     an error of the page; the page then reads the printers again, since the server marks the
-     printer not printing.
-276. A new station shows and prints its tickets on the only printer there is, asks for one when
-     there are several, and shows them on a kitchen screen only when there is none.
-277. The hints for a floor without tables now point to Manage → Settings → Floor.
-278. The refusals managers now read as they are say one thing for one: "The section still has a
-     table. Move or archive it first." and "This station is still used by 1 menu item. Move it to
-     another station first."
+547. P7-05d is split: the cloud backup itself (P7-05d), and the key escrow with restore from the
+     cloud (P7-05e), which needs the vendor KMS key and the OI-10 policy.
+548. The PC uploads straight to object storage with signed URLs the Control Plane issues, in
+     parts of 64 MiB (larger for files that would need more than 10,000), each with its
+     `Content-MD5`. The bytes never pass through the Control Plane. A 100 GB database makes a
+     backup of about 19 GB, which a 10 Mbps line sends in about 4 hours, so the URLs last 24 hours.
+549. Storage is S3 or S3-compatible, signed with Signature Version 4 by our own small module
+     (checked against AWS's published examples), so no SDK is added. Staging and production
+     refuse any region but `ap-south-1` and `ap-south-2` (DATA-003: stored in India). A local
+     folder, served by the Control Plane with HMAC-signed URLs, stands in for development and
+     tests, and is refused in staging and production.
+550. What is sent: the nightly full backup file as it is (already AES-256-GCM encrypted on the PC
+     with its backup key), not the continuous backup. The cloud's RPO is the BRD's 24 hours.
+     Manual backups are not sent. Only the newest waiting backup goes; older waiting ones are
+     marked SKIPPED.
+551. A failed upload waits an hour and tries again. The alert (`DISK_OR_BACKUP`, dedupe
+     `cloud-backup`) opens only when it failed and nothing reached the cloud for 26 hours, so a
+     few hours without the internet stay quiet (NFR-A04).
+552. The Owner's opt-out is the existing setting `backups.cloudEnabled` (DATA_ADMIN, so the Owner
+     with a fresh second factor); its change is the audited `SETTING_CHANGED` with the reason, and
+     the heartbeat tells the vendor (`backup.cloud.enabled`). Backups made while it is off stay
+     waiting, so turning it back on sends the newest at once.
+553. (Corrected in P7-05e, decision 562: §9.3 keeps 30 daily and 12 monthly.) The Control Plane
+     keeps 14 daily and 8 weekly cloud backups per PC (`CP_BACKUP_KEEP_*`, the
+     same retention as the local backups), applied after each upload. Rows stay as DELETED, and
+     uploads unfinished for two days are aborted. Vendor staff (any role) see when and how large;
+     they cannot read them.
+554. The Control Plane's QR-relay provisioner pool now listens for errors on idle connections.
+     Before, the relay's database closing one (a restart, or a test dropping it) crashed the whole
+     Control Plane; the full check caught it as an unhandled error in `support.int.test.ts`.
+555. The recovery key's parser refuses a last character whose spare bits are not zero. 34 bytes
+     leave 3 unused bits in the 55th character, which the check bytes do not cover, so a mistype
+     there (A for B) used to pass in about a quarter of keys; a flaky P7-05b test showed it.
 
-Decided 2026-10-10 (P4-03c):
+Decided 2026-10-03 (P7-05c):
 
-262. The page is called Suggestions (Settings → Suggestions), the word the tablets, the waiter
-     app and the POS use, rather than "Recommendations".
-263. A dish is suggested as usual, pinned, boosted or blocked. Pinned dishes come first wherever
-     they can be served, before the rules (the next course and the best sold first among them);
-     boosted ones come before the best sellers and first among a rule's, a pairing's and a
-     category's dishes of the same course; blocked ones are never suggested, whatever a rule
-     says. The filters (stock, already ordered, veg only, channel) still apply to all of them.
-264. Pinned and boosted suggestions are layers of their own (PINNED and BOOSTED), tracked and
-     reported like the others (REC-008). A pinned or boosted dish may carry the restaurant's own
-     words (up to 60 characters), shown as its reason; without them it says "Our pick" (REC-006).
-265. A preference is changed by people who configure operations (`OPERATIONS_CONFIGURE`), like
-     the rules, applies to the next suggestions at once without publishing the menu, and is
-     audited on the dish with before, after and an optional reason.
-266. Each dish has one preference row, changed in place; "as usual" is NORMAL, not a delete. An
-     archived dish keeps its row but is neither listed nor suggested.
-267. A rule change that only reorders its places is no change: it is not written or audited.
-268. The preview reads the real suggestions from the server for a chosen place and, optionally,
-     one dish in the order (six at most, as a tablet shows them). It records no impressions, so
-     it never counts in the recommendation reports.
+537. PostgreSQL's `archive_command` only stages each WAL piece (`wal-stage`: copy, fsync, rename,
+     under the cluster's system id), and the server encrypts it into the archive and copies it to
+     the second location. So an unplugged USB drive or an unreadable key store never makes
+     archiving fail, which would fill the data drive and stop the database.
+538. The server closes the log with `pg_switch_wal()` every 5 minutes (`backups.walMode`
+     CONTINUOUS, the default) or every hour (HOURLY); the installer sets `archive_timeout = 3600`
+     as a backstop while the server is stopped. The RPO while the data drive survives is about the
+     interval plus 30 seconds.
+539. A base backup every night at `backups.nightlyAt`: `pg_basebackup --format=tar
+--wal-method=fetch` (so it is complete on its own), gzip level 1, then the backup file format
+     (kind BASE), read back in full before it is named.
+     - New setting `backups.pointInTimeDays` (2 by default, 1 to 14, Owner): the base backups of
+       those days and the newest one before them are kept, with the log from the oldest on.
+     - Older days are covered by the nightly backups (14 daily, 8 weekly). A base backup is a
+       physical copy of the whole cluster, so 14 of them would double the room backups take.
+540. The archive is kept per PostgreSQL system identifier (`wal/<id>/`, `base/<id>/`), because a
+     new cluster numbers its log from the start again.
+541. The continuous backup needs its own role, `rp_backup` (REPLICATION, EXECUTE on
+     `pg_switch_wal()`), given as `RP_BACKUP_DATABASE_URL`. Without it the service is off and the
+     System page says so. The everyday role never gets REPLICATION.
+542. A restore to a moment replays the log on a temporary PostgreSQL started on the base backup,
+     then dumps it and restores the dump with P7-05b's steps.
+     - The temporary PostgreSQL listens on 127.0.0.1 only, on a free port, and trusts local
+       connections while it runs (its pg_hba.conf is replaced). It is reached as the
+       administrator role named in `RP_ADMIN_DATABASE_URL`.
+     - The photos, TLS files and secrets come from the newest nightly backup made at or before the
+       moment.
+     - Why: it reuses P7-05b's tested swap and undo, works the same on the same PC and a new one,
+       and never stops or touches the live cluster's files.
+     - The cost is an extra dump and restore: 33 MB/s here, within the two-hour RTO up to about
+       60 GB on the restaurant PC. P0-16 may add an in-place switch for larger databases.
+543. A moment beyond the end of the archive brings back everything archived instead of failing,
+     and says so. The server refuses a moment in the future (`POINT_IN_TIME_FUTURE`) and one before
+     the oldest base backup (`NO_BASE_BACKUP`). The Owner's console offers "the latest moment" and
+     "a moment I choose", in India time.
+544. An unplugged second location shows the continuous backup as "behind", with no alert; it
+     catches up by itself. A failure to archive, to close the log or to take a base backup is
+     "failing" and raises `DISK_OR_BACKUP` (dedupe key `continuous-backup`) until it works (DATA-005).
+545. The restore's "database in use" check counts client connections only (PostgreSQL stops
+     autovacuum itself for the rename), and names the programs connected. The new test found
+     that autovacuum on a just-restored database could make P7-05b's restore fail.
+546. The licence agent now waits for a check under way when the server shuts down. Its late
+     write reconnected Prisma after shutdown and held a connection, so a restore right after a
+     restart found the database in use.
 
-Decided 2026-10-05 (P4-03a):
+Decided 2026-10-03 (P7-05b):
 
-242. P4-03 is built in five parts, each a page of the dashboard's Settings area: the General
-     settings from the catalogue (P4-03a), notification rules (P4-03b), recommendation rules with
-     boost, pin and block (P4-03c), floor, stations and printers (P4-03d), and tax and invoice
-     (P4-03e).
-243. The catalogue keeps one setting per value. The pager heartbeat is `pagers.heartbeatSeconds`,
-     now set by the vendor (10 to 300 s, default 30): the pager firmware and the broker must agree
-     on it, and a wrong value would mark every pager offline. Pager vibrations stayed in
-     `pagers.vibration` (P4-03b then moved them into the rules, decision 251). The disk warning is
-     `storage.warnPercent`
-     (default 80 %), which the hourly disk check now reads. `pager.heartbeatSeconds`,
-     `pager.vibrationPatterns` and `notifications.diskAlertPercent` are gone; a value stored
-     under one of them is ignored.
-244. The General settings page is for anyone who may configure operations
-     (`OPERATIONS_CONFIGURE`, custom role applied): the Owner and managers by default. Everyone
-     on it sees every setting, and each says who changes it, rather than a shorter list.
-245. The names, descriptions and option labels of settings live in the i18n catalogue
-     (`settingItems.<key>`), not in the contracts' English descriptions, so they can be
-     translated (NFR-L02). A new setting without words fails the console's tests.
-246. The editor follows the setting's validation: numbers within its range; basis points typed as
-     a percent (12.5 for 12.5 %, up to two decimals) and paise as rupees; on and off as a switch;
-     fixed choices as a list; lists of text one per line; optional text left empty for none;
-     daily windows as two 24-hour times (HH:MM), where a window that ends before it starts runs
-     past midnight. A draft is checked with the catalogue's validation before it is sent; rules
-     across settings (amber before red) are the server's, shown as its message.
-247. A reason is optional when changing a setting (unlike voids and discounts) and is kept in the
-     audit entry with the values before and after (AUD-001).
-248. Vendor settings (UPD-010) are shown with their value and "Set by your provider" and are never
-     changed here. Managers see the Owner's settings (tax, invoice, data, licence) as "Only the
-     Owner changes this"; the Owner confirms the second factor when it is not fresh (AUTH-006).
-249. The bill printer offers "Choose a printer each time" and the active printers; a printer
-     archived since it was chosen still shows, marked "(archived)", until another is chosen.
-250. The notification rules and pager vibrations get their own page (P4-03b) instead of a raw
-     editor in the General list.
+531. A restore goes into a new database (`<name>_restoring`), owned by `rp_owner`, and is
+     switched in by renaming. So the same steps serve the same PC and a new PC, and a failure
+     never touches the live database.
+     - The database there before is kept as `<name>_before_<time>`, to go back to. It is dropped
+       when it held no restaurant (a fresh install).
+     - Secrets, photos and TLS files are swapped the same way: the earlier ones are kept, and are
+       put back if a later step fails.
+532. `pg_restore` runs with `--jobs` (up to 4) rather than one transaction: about twice as fast
+     (19 s against 11 s for 1.3 GB), and the separate database already makes it all-or-nothing.
+533. The dump's default privileges name the role that ran the migrations on the old PC. They are
+     restored separately and rewritten to `FOR ROLE rp_owner`. Everything else is restored as
+     `rp_owner`, with its grants, so AUD-004's missing DELETE comes back.
+534. The Owner's one-click restore on the same PC needs DATA_ADMIN, which means the Owner with a
+     fresh second factor (AUTH-006), and a reason.
+     - The server checks the file is there and opens with this PC's key.
+     - It saves the request and exits with code 75. The Windows service runs
+       `restore-cli pending` before starting the server again (P0-16).
+     - The request is removed before the restore starts, so a failed restore runs once and its
+       outcome shows on the System page.
+     - The server holds the administrator's database password only when `RP_ADMIN_DATABASE_URL`
+       is set. That is meant for development, not for the restaurant PC.
+535. The backup recovery key (`RPK1-…`, base32 with a 2-byte check) can be shown to the Owner,
+     with a fresh second factor; this is audited.
+     - It lets the backups be read on a new PC even without the vendor's escrow (P7-05d), in
+       line with "data never withheld".
+     - It is not in the BRD. It is the Owner's own copy of their key, alongside the escrow.
+       **Question for the Business Owner**: keep it, or rely on the escrow only? Default: keep.
+536. A restored PC keeps the backup's installation key (its identity with the vendor), but keeps
+     its own backup key. So a new PC must not be activated with a new code before restoring; the
+     vendor moves the licence instead (LIC-004).
 
-Decided 2026-10-05 (P4-02e):
+Decided 2026-10-03 (P7-05a):
 
-232. A custom role is built on Manager, Cashier, Waiter or Kitchen, never the Owner, and lists
-     what it adds and what it takes away. What it adds is allowed outright: a waiter's custom
-     role that adds "Move and merge tables" moves any table, and one that adds "Void an item"
-     voids without a manager's PIN. What only the Owner may do (the matrix rows a manager is
-     denied: tax and invoice settings, data administration, the licence) is never added. Adding
-     what the base role already allows, or taking away what it never allows, is refused, so a
-     role lists only what it changes.
-233. Only the Owner creates, changes, archives and restores custom roles, with a fresh second
-     factor (AUTH-006): a role decides who manages staff and who counts as a manager. Everyone who
-     manages staff sees them and gives them to people.
-234. Someone counts as a manager when their base role is Manager or their custom role lets them
-     manage staff. Only the Owner, with a fresh second factor, adds such a person, gives or takes
-     away such a role, or deactivates and reactivates them; nobody changes their own role.
-235. A person gets a custom role like its base role (`customRoleId` with `role`). A manager's
-     approval with their PIN (AUTH-011) still needs an Owner or Manager base role whose grant,
-     custom role applied, allows the action: a custom role does not make a cashier an approver,
-     and a manager whose role takes an action away cannot approve it.
-236. A change to a role applies to its people from their next request; their live connections
-     close (`SESSION_ENDED`), so their screens sign in again with the new permissions. People
-     whose role no longer takes orders leave today's sections, as when someone is given such a
-     role (P4-02a).
-237. Role names are unique, ignoring case, among active custom roles and the built-in role names,
-     up to 40 characters.
-238. Custom roles are archived, never deleted (master data), and only when no active person has
-     one. Deactivated people keep theirs; reactivating someone whose role was archived since keeps
-     it (it still works, and the Roles page counts them). Restoring checks that the name is still
-     free.
-239. Discount limits are per base role: a custom role that adds "Give discounts within the
-     limit" uses the cashier's limit unless its base role has one; one that adds "Give discounts
-     above the limit" gives any discount, like a manager.
-240. Screens follow the custom role: modes and dashboard pages are decided with `grantOf`. The
-     overview and the order feed read the live order feed (`OPERATIONS_CONFIGURE`), so a cashier
-     whose custom role manages staff gets the Staff page, starts at the POS and opens Manage on
-     Staff. Sign-in tiles and staff rows show the custom role's name ("Captain (Waiter)").
-241. The role editor is its own page for the Owner (`/manage/staff/roles/new` and `/:roleId`), with
-     one choice per permission offering only what changes something, in four groups; changing the
-     base role keeps the changes that still mean something. It says when a role makes people
-     managers and how many people a change signs out of their screens.
+522. P7-05 is split into four (phase-7.md): encrypted local backups, restore, continuous WAL
+     archiving, and the cloud backup with key escrow.
+523. A backup is one encrypted file. It uses AES-256-GCM in 1 MiB chunks, with a key for each file
+     derived from the backup key and a random salt (HKDF-SHA256). Every chunk authenticates the
+     header, its position and whether it is the last. This means:
+     - a file of any size streams through;
+     - a changed, reordered or cut file, or the wrong key, is found;
+     - the header names its key (a key id) without revealing it.
+524. The full backup is a logical dump (`pg_dump`, custom format, without owners, with grants),
+     plus the photos, the LAN TLS files and the secrets the data needs. That is every local secret
+     except the backup key itself.
+     - It can be restored onto a new PC and onto another PostgreSQL 16 minor version.
+     - The installation key is included, so a restored PC keeps its identity with the vendor. The
+       licence moves to the new PC by the vendor's rebind (LIC-004), which already binds whichever
+       PC asks next.
+525. The nightly backup runs at a new setting, `backups.nightlyAt` (04:30 India time by default,
+     after the cut-off, Owner only).
+     - A PC that was off then backs up when it starts.
+     - A failed nightly backup is tried again after an hour.
+     - "Back up now" is for anyone with OPERATIONS_CONFIGURE and is audited.
+526. Every backup is read back in full before it gets its name: all chunks, the manifest and
+     `pg_restore --list`. The copy at the second location is checked the same way.
+     - A failed copy makes the backup PARTIAL, which alerts like a failure.
+     - With no second location set, the backup succeeds, but the System page asks for one.
+527. Retention applies to each location separately, by file name: the newest backup of each of
+     the last `keepDaily` days and of each of the last `keepWeekly` weeks (Monday to Sunday). The
+     newest backup is always kept.
+528. A failed or partial backup:
+     - raises `DISK_OR_BACKUP` (one alert, `backup`) for the Owner and managers until a backup
+       works;
+     - goes to the vendor in the heartbeat.
+       No successful backup for 26 hours shows as overdue.
+529. Two new configuration values:
+     - `RP_PG_BIN`: where the PostgreSQL client programs are; the installer sets it.
+     - `RP_BACKUPS=off`: development and end-to-end tests only; refused in production.
+530. The record of backups (`backup_runs`) belongs to the installation, not a restaurant, since a
+     backup holds the whole database. Its audit entries are written for each restaurant.
 
-Decided 2026-10-05 (P4-02d):
+Decided 2026-10-03 (P7-07c):
 
-222. The menu editor is its own dashboard page (`/manage/menu`) for the roles that manage the menu
-     (Owner and managers, `MENU_MANAGE`), with Items, Categories and Modifier groups under one
-     publishing bar. An item opens on its own page (`/manage/menu/items/:itemId`), not a dialog:
-     it has too many fields for a dialog on a phone, and a page can be linked to.
-223. Every draft edit is announced as `MenuDraftChanged` (which part changed), only to the roles
-     that manage the menu, so two managers editing at once see each other's changes. Ordering
-     surfaces keep waiting for `MenuPublished` (decision 26). The import publishes at once, so it
-     announces no draft changes of its own; a refused edit announces nothing.
-224. "Changes not published" compares the draft with the published version without availability
-     and stock counts, which are live (decision 28). Publishing asks for a confirmation, because
-     every screen changes at once; an unchanged draft keeps its version and the editor says so.
-225. Food type is never preselected for a new item: veg, non-veg or egg is a statement the
-     restaurant makes to its guests, so an item cannot be saved until someone chooses it.
-226. A photo is uploaded as soon as it is chosen and belongs to the item once the item is saved. A
-     photo chosen and then abandoned is used by nothing, so the photo sweep removes it after
-     `retention.operationalDays` (P1-04).
-227. An empty place (display order) puts a new item or category after the others in its
-     category or level; the number can be changed later.
-228. The editor cannot turn a combo back into a plain item (the API has no such change, and
-     orders already refer to its parts): to stop selling a combo, archive it. An item that is a
-     fixed part of a combo or one of a choice's items cannot become a combo; the server now
-     checks choices too (decision 29 only checked fixed parts).
-229. The reason for a price change is optional, as in the API; when given it goes into the
-     `ITEM_PRICE_CHANGED` audit entry (MENU-009). The field shows only when a price changes.
-230. When an item saves but its combo does not (for example because another manager made the
-     item part of a combo meanwhile), the editor keeps the saved item, stays on its page and says
-     what failed, instead of trying to undo the item.
-231. MENU-007 (time-based availability for single items) stays in P6-05; combos already have dates
-     and hours.
+518. The go-live test is judged from what the server records after "Start the test", not from a
+     separate test mode, so it exercises the real paths:
+     - a POS order and a settled bill are always needed;
+     - a waiter-phone, table-tablet, kitchen-screen or pager path is needed when at least one
+       active device of that kind is paired;
+     - QR is needed unless the QR step was skipped and at least one table has a code;
+     - the evidence is the first order from each source, a ticket bumped from a kitchen screen,
+       a pager call answered and a captured payment, all after the start.
+519. Test orders are ordinary orders. The manager voids the test bill afterwards with a reason, so
+     reports leave it out; nothing is deleted (AUD-004). "Start again" moves the start time and the
+     evidence is looked for afresh. The go-live step can be confirmed only once the test passes.
+520. The settings export holds only the restaurant's own settings that differ from their default,
+     with the restaurant's name and the time. Vendor settings, secrets, devices and staff are left
+     out. Import checks each setting as if it were changed by hand (same rights; Owner-only
+     settings need the Owner with a fresh second factor), lists what it left alone and why, and
+     refuses the whole file if the result would break a rule between settings (amber after red).
+     The whole import is audited as one `SETTINGS_IMPORTED` entry.
+521. The site-readiness checklist (ONB-011) is a printable page under Set up. It lists the BRD §11
+     items and is ticked by hand on paper; nothing about it is stored.
 
-Decided 2026-09-28 (P4-02c):
+Decided 2026-10-03 (P7-07b):
 
-213. Devices is its own dashboard page (`/manage/devices`) for the roles that may pair devices
-     (Owner and managers), beside Staff. It lists paired devices by type in the order a restaurant
-     sets them up; unpaired devices are not listed (the audit log keeps their history).
-214. Pagers are listed there too (MGR-006 "every paired device"), with Locate, Rename and Unpair.
-     They are still registered, given out and given new credentials in Staff → Pagers, since a
-     pager does not pair with a code.
-215. "Connected" means a live connection now: a Socket.io connection in the device's room for apps
-     and screens, heartbeats for pagers. A screen's or tablet's connection changes are not
-     announced yet, so the page reads again every minute and after device events. "Last seen" is
-     the last authenticated request (at most once a minute) or the moment the last live
-     connection closed.
-216. "Locate" works only while the device is connected and is never replayed: a device that
-     connects later does not start beeping. At most 6 a minute per device. A console shows "This
-     is <name>" and chimes every 3 s for 15 s or until OK; browsers only play sound after the page
-     was touched once, so an untouched console shows its name silently. A pager vibrates (P2-05)
-     and a tablet beeps (P3-01).
-217. The pairing dialog shows a QR code only for the phone and tablet apps, which scan it;
-     browsers (POS, manager browsers, kitchen screens) open a server address and type the code.
-     It knows the device paired when a new device of that type and name appears in the list. An
-     issued code cannot be withdrawn; it expires, and "Get a new code" issues another with the
-     same details.
-218. Names need not be unique. Renaming is audited and announced, and a renamed console shows its
-     new name at once.
-219. Unpairing a pager disconnects it from the broker at once; its heartbeats and
-     acknowledgements are then ignored, its device alerts are cleared and no offline alert is
-     raised for it.
-220. Offline alerts for kitchen screens and tablets (NTF-003) need a presence publisher with a
-     grace period, so that a page reload raises nothing. That is added in P4-04 (spec updated),
-     not here; tablets report battery and charging in P3-01 (spec updated).
-221. The page names bindings from the floor, stations and staff lists, archived ones included. If
-     one of those cannot be read, the devices are still listed, with "a table no longer on the
-     floor" or "someone no longer on staff" in place of the name.
+515. A fresh install had no way to create its restaurant and Owner; only the development seed
+     did. This is now the first run.
+     - It happens on the restaurant PC itself (loopback only, like the bootstrap pairing code),
+       and only while no restaurant exists. It asks for the restaurant's name and the Owner's
+       name and PIN.
+     - It creates the built-in roles and a default invoice series ("Tax invoice", prefix INV),
+       audited as `RESTAURANT_CREATED` with the Owner as actor.
+     - The console then pairs the PC with the bootstrap code, and the Owner signs in and carries
+       on with the set-up page. A password and authenticator are step 4 (AUTH-006).
+516. The first run's PIN has the restaurant's PIN length (`auth.pinLength`, 4 by default), so it
+     works on the PIN pad at once.
+517. P7-07 is now in three (phase-7.md). The go-live test, settings export and the readiness
+     checklist are P7-07c.
+
+Decided 2026-10-03 (P7-07a):
+
+510. P7-07 is split into two (phase-7.md): activation and the set-up checklist (P7-07a), and the
+     guided go-live test, settings export and the readiness checklist (P7-07b).
+511. The set-up page reads each step's status from what is set up, so it resumes after any stop.
+     It keeps no separate wizard state, only two kinds of mark in `system_meta`
+     (`onboarding.marks`):
+     - a person's confirmation of the invoice look and of the go-live test;
+     - skips of the two steps a restaurant may not need (devices; QR table tents).
+       The go-live test can only be confirmed once every other step is done or skipped. Marks are
+       audited (`ONBOARDING_STEP_MARKED`).
+512. Each step links to the page that already does it; the wizard adds no second way to edit
+     anything. Stations count as done only once every station that prints has a printer that
+     has printed (`lastSeenAt`).
+513. The Owner activates the PC from the set-up page with the vendor's code (ONB-003,
+     LICENSE_MANAGE, second factor). This uses the installer's enrolment, now audited with the
+     Owner as actor, and sends a heartbeat at once so the licence follows within a minute. A
+     wrong or used code answers 422 with the vendor's message.
+514. The Manage Overview shows "Setup: N of 11 steps done" with a link until the setup is
+     complete, for roles that may open Setup.
+
+Decided 2026-10-03 (P7-08d):
+
+506. Error reporting (NFR-O02) uses the Sentry envelope format, so any Sentry-compatible service
+     works (manual task 24 suggests one in India). The new `@rp/error-reporting` package is
+     shared by the server and the CP. Each report is scrubbed: messages and context through
+     `@rp/domain` scrub, and user folders taken out of file paths. At most 60 reports an hour per
+     machine and the same error once a minute; a report never blocks or throws.
+507. The DSN is configuration (`RP_ERROR_DSN` written by the installer, `CP_ERROR_DSN` from the
+     secret manager). Without one, nothing leaves the machine.
+508. Apps never hold the DSN (SEC-002). The console, the waiter app and the table tablet post to
+     the PC (`POST /api/v1/client-errors`, a paired device only), which reports with its key,
+     tagged with the component and device type.
+     - Limits: at most 20 an hour per device on the server, and 10 a minute in each app.
+     - These are not counted in the heartbeat's server error count.
+509. A crash (uncaught exception) of the server or the CP is reported, then the process exits
+     within 2 seconds as before; the watchdog restarts it.
+
+Decided 2026-10-03 (P7-08c):
+
+501. Remote configuration (UPD-010) pushes the VENDOR settings that have no source of their own:
+     QR ordering limits and timings, `pager.heartbeatSeconds`, and feature flags (`features.*`).
+     Licence values come from the signed licence, the heartbeat interval from the heartbeat
+     answer, and the installer's disk minimum from the installer.
+502. The first feature flag is `features.aiMenuImport` (default on). When it is off, starting
+     an AI menu import answers 409 `FEATURE_OFF` with a message pointing to the Excel template.
+503. The fleet has one set of values; a PC may have its own on top. Only the Super Admin changes
+     them (a new capability, `REMOTE_CONFIG`), always with a reason, audited as
+     `remote_settings.changed`.
+504. The PC reports the digest of what it holds: the first 16 hex digits of the SHA-256 of the
+     canonical JSON. The CP pushes the values in heartbeat answers until the digests match.
+     - A key not pushed returns to its default.
+     - A value the setting does not allow is ignored, so the default applies.
+     - Applying is audited on the PC as `VENDOR_SETTINGS_APPLIED` (no staff actor), with a
+       `SettingsChanged` event, so screens refresh.
+505. The System page is the support screen (NFR-I03): versions, services, storage, devices,
+     backups (from P7-05) and the licence, and now sending diagnostics. Nothing else is
+     needed.
+
+Decided 2026-10-03 (P7-08b):
+
+498. Support (SUPPORT_NOTES) asks an activated PC's restaurant for diagnostics with a reason.
+     - The PC gets open requests in every heartbeat answer (at most 10, oldest first).
+     - A request lapses after 7 days, shown as EXPIRED.
+     - The CP audits asking (`diagnostics.requested`) and declining
+       (`diagnostics.request_declined`). Sending the bundle for a request marks it FULFILLED
+       with the bundle, once.
+499. On the PC, a new request raises a `SUPPORT_REQUEST` alert. It is a new event, not in
+     Appendix C, sent to the Owner and the managers on duty on the dashboard until it is
+     resolved.
+     - The System page lists open requests with "Allow and send" and "Decline".
+     - Answering clears the alert, and so does a request that closed at the vendor (answered
+       elsewhere, or lapsed).
+     - Both answers are audited locally (`DIAGNOSTICS_SENT` with the request id, and
+       `DIAGNOSTICS_REQUEST_DECLINED`). The vendor sees who answered.
+500. The heartbeat service lets other services act on each answer (`onAnswer`), so the System
+     module handles requests without the cloud module knowing about alerts.
+
+Decided 2026-10-03 (P7-08a):
+
+494. P7-08 is split into three (phase-7.md): the bundle (P7-08a), support's requests (P7-08b),
+     and remote configuration, the support screen and error reporting (P7-08c).
+495. The diagnostics bundle (UPD-008) is JSON:
+     - versions and the platform;
+     - an allow-list of configuration (origins only, never the database address or keys);
+     - settings changed from the default;
+     - the System page's status and the device list;
+     - the end of the newest three log files in `<data>/logs` (at most 1 MB and 2,000 lines
+       each).
+       Everything except the allow-listed configuration goes through `scrubValue`/`scrubText` in
+       `@rp/domain`, which removes PEM keys, URL credentials, Bearer/Basic tokens, JWTs, values
+       under secret-named fields, long random strings (40+ characters, unless it is a "/" path),
+       email addresses and Indian phone numbers. Each log file is scrubbed as a whole, so a
+       multi-line key is caught.
+496. A manager (OPERATIONS_CONFIGURE) can save the exact bundle from the System page ("See what
+     is sent") before or instead of sending it. When the PC is not connected to the vendor,
+     sending is disabled and the page says to email the saved file.
+497. The Control Plane takes bundles up to 4 MB (`POST /v1/diagnostics`, signed by the PC) and
+     keeps them as sent. Every role sees the list. Only roles with SUPPORT_NOTES can open a
+     bundle, every opening is audited (`diagnostics.opened`), and the web app offers no
+     download, as the access policy asks.
+
+Decided 2026-10-03 (P7-03b):
+
+491. Fleet is in the web app's sections for every role, after Restaurants.
+     - The page shows open alerts first, then every PC: online state and last heard from,
+       version, disk, backups, devices connected out of paired, errors, licence and audit log.
+     - It refreshes every minute and can be filtered to PCs with alerts or offline ones.
+492. A PC's page adds its health, every alert (open and closed, with who closed it and why) and
+     the audit log fingerprints it reported, with when each was checked again or set aside.
+493. Only an audit log alert has a Close button, for roles with SUPPORT_NOTES. The dialog points
+     to the runbook (check with the Owner first).
+
+Decided 2026-10-03 (P7-03a):
+
+484. P7-03 is split into two (phase-7.md): health and alerts (P7-03a), and the dashboard
+     (P7-03b).
+485. Offline means silent for more than 30 minutes (`CP_OFFLINE_ALERT_MINUTES`) of the
+     restaurant's opening hours. The opening hours come from the PC's own profile, sent in each
+     heartbeat. Silence before opening does not count: the minutes run from whichever is later,
+     the last heartbeat or the start of the current opening. A PC without opening hours (not set
+     up, or older than P7-03) counts every hour, so a silent PC is never missed.
+486. Disk full means more than 90 % used (`CP_DISK_ALERT_PERCENT`). Backup failed means the
+     latest backup failed; PCs send `backup: null` until P7-05.
+487. One open alert per PC and kind (a partial unique index). Offline, disk and backup alerts
+     close by themselves. An audit chain alert only closes by a person with SUPPORT_NOTES, with a
+     reason; the heads seen so far are then set aside, so the chain counts from the PC's current
+     head (a restore from backup, say). Opening and closing are audited as `system:fleet`.
+488. Audit chain checks (AUD-003):
+     - A head may never go back, change its hash at a sequence already seen, or disappear.
+     - Each heartbeat's answer also asks for the hash of a random earlier head. The PC answers
+       with its next heartbeat, so an old entry rewritten (with every hash after it recomputed)
+       is caught even when the newest head looks right.
+     - An entry missing because it was archived and purged (P7-06) is accepted: the PC reports
+       its oldest entry.
+489. Alerts go to an optional webhook (`CP_ALERT_WEBHOOK_URL`, Slack/Teams `{ text }`, https
+     outside development), as they open and as they close. A post that fails is retried every
+     minute; deliveries run one at a time, so an instance never sends an alert twice. Without a
+     webhook, alerts only show in the app. Email or SMS paging is left for later (no provider
+     yet).
+490. The heartbeat's error count is the server errors reported (the 500s the exception filter
+     reports) since the last heartbeat that reached the Control Plane. "Online" in the fleet
+     view means heard from within two heartbeat intervals and a minute.
+
+Decided 2026-10-03 (P7-02f):
+
+478. Every role sees Restaurants, Invoices, Plans and Releases; Finance and the Super Admin also
+     see the Audit log; only the Super Admin sees Staff. Opening a page the role may not use
+     says so and calls nothing.
+479. Plans:
+     - prices are typed in rupees and sent as paise;
+     - an empty price means the cycle is not offered;
+     - an archived plan stays visible but cannot be chosen;
+     - choosing a plan offers only the cycles it has prices for.
+480. Invoices:
+     - the restaurant and status filters are kept in the address, so a link from a restaurant's
+       Subscription tab opens its invoices;
+     - a payment defaults to what is still owed and can never be more;
+     - voiding needs a reason.
+481. Releases are published to Pilot by default, and only by the Super Admin.
+482. Staff:
+     - a setup link is the app's own address plus `/setup#<token>`, shown once, to be given in
+       person or by phone;
+     - the reviewer's own account is not on the access-review list, so it is always kept;
+     - nobody changes or resets their own account from this page.
+483. The vendor web app's end-to-end test runs in CI's e2e job, against the built Control Plane.
+     It creates the first Super Admin with the CLI and uses real authenticator codes. Any
+     browser console error, such as a CSP violation, fails it.
+
+Decided 2026-10-03 (P7-02e):
+
+471. P7-02e is split into two (phase-7.md). P7-02e covers sign-in, setup and restaurants;
+     P7-02f covers billing, releases, audit and staff, plus an end-to-end test.
+472. The vendor web app is its own package, `apps/control-plane-web` (React, Vite and
+     `@rp/ui-web`, like the console). The Control Plane serves it at `/` when `CP_WEB_DIR` is set.
+     Same origin as the API means no CORS. The pages carry a strict CSP and `noindex`.
+473. The session token is kept in the tab's session storage, not a cookie: it is gone when the tab
+     closes and needs no CSRF defence. The server's 8-hour and 30-minute idle limits are the real
+     session end. Any 401 brings the person back to signing in, with a note that the session ended.
+474. Setup links are `/setup#<token>`. The token stays in the URL fragment, so it never reaches a
+     server or proxy log, and it is removed from the address bar once the account is ready. The
+     CLI prints the link.
+475. Buttons show only when the role allows them (`vendorMay`). The server enforces every call
+     anyway. The UI tests use a fake Control Plane that answers 403 exactly as the server does.
+476. The licence form offers only the states LIC-005 allows from the current one, and sends only
+     what changed, with the reason. An activation code, reactivation code or setup link is shown
+     once, with Copy. Disconnecting a PC and replacing the QR credential ask first.
+477. A restaurant's GST state code is taken from its GSTIN when left empty.
+
+Decided 2026-10-03 (P7-02d):
+
+466. Support notes (VCP-007) are written by Support, Onboarding and the Super Admin, read by every
+     vendor role, and never changed: a database trigger refuses updates and deletes, and a
+     correction is a new note. Each note is audited (`support.note_added`).
+467. Provisioning a restaurant in the QR relay (VCP-002, VCP-008) is Onboarding's (the
+     `TENANTS_MANAGE` capability). The Control Plane talks to the relay database as its own login
+     (`CP_RELAY_DATABASE_URL`, TLS outside development) through `relay_provisioner`'s functions
+     only. It creates the tenant and a credential the relay keeps only as a hash.
+468. The credential reaches the restaurant's PC in a heartbeat answer. It is sealed at rest on
+     both sides (`CP_SECRET_KEY` in the Control Plane, the SecretStore key on the PC). The PC reports the first 16 hex digits of its SHA-256; the
+     Control Plane sends the credential again until the digest matches, then marks it delivered.
+     The PC's relay sync reads the credential on every cycle, so no restart is needed. The manual
+     `pnpm relay:credential` route stays for a PC without the Control Plane.
+469. Provisioning again rotates the credential: a new one is issued and the old one is revoked in
+     the relay at once. Delivery starts again, so QR ordering pauses until the PC's next heartbeat
+     (at most 5 minutes). Use this when a credential may have leaked.
+470. The vendor access policy is `docs/runbooks/vendor-access-policy.md`. It covers no standing
+     access, business data only through diagnostics (with the manager's consent) or backups
+     (only on the Owner's restore request), least privilege by role, MFA, quarterly access reviews
+     and auditing. It is reviewed with each quarterly access review.
+
+Decided 2026-10-03 (P7-02c):
+
+462. Plans have a price per billing cycle (monthly, quarterly, yearly; a cycle without a price is
+     not offered), device limits and modules. A restaurant's subscription keeps the price it was
+     put on; changing the plan applies the new price from the next invoice and the plan's limits
+     and modules to its licences at once (next heartbeat).
+463. The billing run (hourly, and on demand) issues each invoice on the first day of its period,
+     catching up any missed, numbered `SUB/<financial year>/00001`; due after
+     `CP_BILLING_PAYMENT_TERMS_DAYS` (7). An invoice is never deleted: voided with a reason.
+464. Overdue follow-up (LIC-005): the oldest unpaid invoice past due moves an active licence to
+     payment due; more than `CP_BILLING_GRACE_AFTER_DAYS` (15) past due, to grace; grace over, to
+     restricted (the PC also restricts by itself from the next business day). Payments are
+     recorded by hand (v1); a payment that leaves nothing overdue makes the licences active
+     again at once (LIC-006: within a minute online); paying down to a newer invoice only just
+     past due goes back to payment due. Billing only lifts what it set itself, never a vendor's
+     own restriction or grace (`set_by_billing`).
+465. The vendor's own GST invoices and collection through a payment gateway (VCP-004, S) are left
+     for later: v1 invoices are for tracking what is owed.
+
+Question for the Business Owner (P7-02c, LIC-009): the subscription agreement's days to pay
+(default 7) and days past due before grace (default 15), with the licence's 7 days of grace,
+before new orders pause. All three are settings; tell us the agreed numbers.
+
+Decided 2026-10-03 (P7-02b):
+
+459. A tenant keeps its name, legal name, GSTIN (checked with its check character), GST state,
+     contact name, email and phone. The tenant list shows each restaurant's most severe licence.
+460. Moving an installation to a new PC (VCP-002 "re-bind", LIC-004) issues an activation code for
+     the active installation: the old PC keeps working until the new one activates; then the old
+     key is refused, the licence binds the new PC at its first heartbeat, audited
+     installation.moved. Support and the Super Admin may move (LICENCE_REBIND).
+461. Every fleet endpoint names the vendor capability it needs, the same matrix as P7-02a; the
+     audit trail is paged by entry id, filtered by target or action.
+
+Decided 2026-10-03 (P7-02a):
+
+453. P7-02 is split into five (phase-7.md).
+454. Vendor staff sign in with email, password and an authenticator code in one request: MFA is
+     never optional or skippable (VCP-001, SEC-018). Accounts start from a one-time setup token
+     (72 hours, 256 bits, kept as SHA-256) given out of band; the account is active only after
+     the authenticator is confirmed. Passwords: at least 12 characters, Argon2id peppered with
+     the Control Plane's secret key; authenticator secrets sealed with it (AES-256-GCM).
+     `CP_SECRET_KEY` is required in staging and production.
+455. Five failed sign-ins lock an account for 15 minutes; 20 attempts per address per 15 minutes;
+     codes are never accepted twice. Sessions are bearer tokens kept as SHA-256, 8 hours, ended
+     after 30 minutes without use, ended at once when the account is disabled or reset.
+456. Roles and what they may do: Super Admin everything; Onboarding tenants, installations,
+     re-binding, notes; Support re-binding, reactivation codes, notes; Finance licences, codes,
+     billing, the audit trail; Read-only reading. The matrix is in `@rp/contracts/control-plane`
+     (`vendorMay`), enforced by the API, only reflected by the web app. Nobody changes their own
+     account; the last active Super Admin cannot be demoted or disabled.
+457. The quarterly access review (SEC-018) is recorded by a Super Admin listing the accounts to
+     keep; every other active account is disabled at once, audited with the note.
+458. TOTP moved from the server to `@rp/totp`, shared by the restaurant PC and the Control Plane.
+
+Decided 2026-10-03 (P7-01d):
+
+451. Staff screens show the licence only where it applies (production): the payment reminder on
+     the POS and the dashboard, put off until the next day with one tap (remembered in the
+     browser only); the grace days left, the day and time a restriction starts, and the
+     restricted or ended notice on every staff screen (POS, dashboard, kitchen screens, waiter
+     phones), never on a table tablet or the QR page. They read it again on `LicenceChanged`.
+452. Manage → Licence (Owner and managers, LIC-008) shows the state, why, until when, the plan,
+     modules and devices against their limits; the Owner also has "Check now" and the
+     reactivation code (with the second factor), and the page says when the licence does not
+     apply on this PC (development).
+
+Decided 2026-10-03 (P7-01c):
+
+445. The licence applies (restricts) only in production, where it cannot be switched off and only
+     the built-in vendor keys count; development and tests show it without restricting unless
+     `RP_LICENCE_ENFORCE=true`, and may add keys with `RP_LICENCE_KEYS`.
+446. A restricted licence refuses with 423 LICENCE_RESTRICTED: opening a table, submitting any
+     order (staff, tablet, QR; a retried submission still gets its first answer), approving a
+     diner's order and firing held items. Nothing else: bills, payments, printing, reports,
+     exports, backups and closing tables work in every state.
+447. The agent judges the licence at start-up and every minute (so a restriction applies at the
+     business day's cut-off), by the later of the clock and the last time seen. Its record (last
+     time seen, when a restriction was decided, a reactivation, codes used, tamper reports) is
+     sealed with a local secret; an edited or missing record (while a licence is kept) is
+     reported and makes a restriction apply at once. Each tamper kind is reported once a day.
+448. Every licence carries the Control Plane's last reactivation counter, so an old code is
+     refused even after the PC's record is lost. Reactivation is the Owner's (LICENSE_MANAGE,
+     with the second factor), five tries an hour, active until the end of the code's business
+     day; audited.
+449. Device limits apply when a pairing code is made (said at once) and when the device pairs
+     (decided under a lock), for table tablets, pagers, waiter phones and kitchen screens.
+450. The fingerprint is read with one PowerShell/WMI call on Windows (machine GUID, board serial,
+     BIOS UUID, first disk serial, CPU id), and from what a Mac or Linux gives without
+     privileges in development; read again every six hours.
+
+Decided 2026-10-03 (P7-01b):
+
+440. Activation (ONB-003) is the enrolment of P0-17: the first heartbeat after it carries the
+     first licence, with default terms (plan Standard, every module, 30 tablets, 15 pagers, 15
+     waiter phones, 6 kitchen screens, 30 days, 7 days of grace) until the vendor sets the plan.
+441. Licences travel in heartbeat answers: a new file when none is current (daily renewal, a
+     change of terms, a lost file gets the current one again), and heartbeats every 60 s while
+     the licence is not ACTIVE, so a payment recorded reactivates a site within a minute (LIC-006).
+442. The fingerprint is bound by the first licence. Three of five identifiers matching keeps the
+     PC, and the bound fingerprint follows the change (a disk replaced, then later a network
+     card, stays the same PC); fewer gets no licence until support re-binds it (audited).
+443. Vendor state changes follow `licenseMachine` (never out of TERMINATED), always with a reason,
+     audited with before and after. Entering GRACE starts its days; leaving it clears them.
+444. Until a KMS adapter exists for the chosen cloud, the signing key is injected from the secret
+     manager (`CP_LICENCE_SIGNING_KEY`); without it no licence is issued. Each installation's
+     reactivation secret is HMAC(master, installation id), sent once to the PC that lacks it;
+     codes reach at most 60 days ahead, counters 1 to 255, shown once, audited without the code.
+
+Decided 2026-10-03 (P7-01a):
+
+434. P7-01 is split into four (phase-7.md). Security-sensitive: two human reviewers before
+     release, with the KMS signing key (manual task 23).
+435. A licence file is the payload's exact JSON text, the vendor's Ed25519 signature of it and the
+     key id (first 16 hex digits of the SHA-256 of the key), so nothing depends on how JSON is
+     re-serialised. Installations accept only keys in `VENDOR_LICENCE_KEYS` (several, to rotate).
+436. The fingerprint is five identifiers in a fixed order (machine id, board serial, BIOS UUID,
+     disk serial, CPU id), each kept only as SHA-256 of installation id, kind and value, so the
+     vendor never holds serial numbers; board placeholders ("To be filled by O.E.M.") count as
+     unread; unread never matches; three of five must match.
+437. Anything wrong (missing, unknown key, tampered, another installation or PC, run out, grace
+     over, vendor restriction) records RESTRICTED (or TERMINATED); it applies from the start of
+     the next business day after it was first decided, and until then the restaurant works as in
+     grace, with the banner and the days left.
+438. Offline reactivation codes are 16 Crockford base-32 characters (day of the new end, a
+     counter, 56 bits of HMAC-SHA256 with the installation's secret, which the Control Plane
+     derives from a master key). They lift EXPIRED, GRACE_ENDED and a vendor restriction until
+     their day, never a termination or a file not trusted. The server limits attempts.
+439. The clock guard judges by the later of the clock and the last time seen; a clock set back by
+     more than 5 minutes, or 10 minutes from the Control Plane's, is a tamper event.
+
+Decided 2026-10-03 (P6-05g):
+
+432. Printer auto-discovery (ONB-004 step 6, S) looks for receipt printers by their raw-print
+     port, not by mDNS: almost every ESC/POS network printer answers on 9100, and a TCP look needs
+     no library and works on any LAN. The server looks at its own private IPv4 networks only
+     (RFC 1918; a wider network is cut to its own /24; a public address is never scanned), 64
+     addresses at a time, 400 ms each, so a /24 takes about two seconds. Ports are the setting
+     `printers.discoveryPorts` (default 9100). Only when a manager presses Find printers; nothing
+     is added or printed; a printer already added says so; Add opens the usual dialog filled in.
+433. The settings page edits a list of whole numbers (one per line) as it edits text lists.
+
+Decided 2026-10-03 (P6-05f):
+
+429. P6-05f found the floor had an API (P1-02a) but no console page: the POS pointed managers to
+     "Manage → Floor", which did not exist. P6-05f builds it (sections and tables: add, change,
+     archive with a reason, restore; managers and the Owner), and the plan on it. Printer
+     auto-discovery moves to P6-05g.
+430. The floor plan (ONB-004 step 5, S) is a grid of 40 × 24 cells per section; a table is a
+     rectangle or round table 2 to 10 cells a side (`tables.layout`, `@rp/domain` floor-plan).
+     Tables of one section may not overlap (`LAYOUT_OVERLAP`); a table moved to another section
+     is taken off the plan. Tables not placed yet are drawn in the first free spot, sized for
+     their seats, and saved with the plan. Saved with `PUT /floor/layout`, audited
+     FLOOR_LAYOUT_CHANGED.
+431. Dragging works with a pointer and with the keyboard (arrows move, Shift+arrows resize, R
+     round or square), announced to screen readers. The POS offers a Plan view of the floor once
+     a table has been placed; the tiles stay the default. The phones keep their list.
+
+Decided 2026-10-03 (P6-05e):
+
+427. The amount in words (BILL-001, S) is `@rp/domain` `amountInWords`, Indian grouping (thousand,
+     lakh, crore; crores beyond 99 group again), English, "Rupees … and … Paise Only". Setting
+     `bills.amountInWords` (default on). Each invoice keeps whether it had words when issued
+     (`particulars.amountInWords`), so a reprint matches the original; invoices from before have
+     none. Shown under the total on the printed bill and on the POS bill preview.
+428. Printing the bill from the waiter app (WTR-008, S) contradicts the BRD §4.2 matrix (waiters:
+     "- (can request bill)"), so it is the setting `bills.waiterMayPrint`, off by default, changed
+     by those who manage staff. On, a waiter may print their own tables' bills: the server issues
+     the invoice as the POS would and prints it on the bill printer (audited as theirs); when it
+     cannot print, the bill stays issued and the app says why. Never a reprint (a printed bill is
+     refused: copies are the cashier's). The table overview says whether the person may print
+     (`mayPrintBill`), so the app shows Print bill only then.
+
+Question for the Business Owner (P6-05e): may waiters print bills from the app (WTR-008 S), which
+the §4.2 matrix does not allow? Built off by default (`bills.waiterMayPrint`); turning it on is
+one switch in Settings → Billing.
+
+Decided 2026-10-03 (P6-05d):
+
+422. Merging tables (TBL-006) is "these guests join that table": the chosen table's orders,
+     kitchen tickets, open requests and guests go to the other open table's session, and its own
+     session closes ("Merged into T1", `merged_into_session_id`); its tablet resets and the table
+     is free (or needs cleaning). Not while either table's bill is printed, nor when the merged
+     table has an invoice or discounts (take them back first). One bill follows naturally.
+423. Moving dishes (TBL-006) is whole lines, a combo with its parts, never a part or part of a
+     quantity (the bill split does that within a table). Dishes waiting for approval, ended, on
+     a printed bill or with a discount do not move; nor while either bill is printed. An order
+     whose every dish moves goes over whole; otherwise the moved dishes go to a new order at the
+     other table, made by the same person from the same source ("Moved from T5"), so sales stay
+     with whoever took them.
+424. Kitchen tickets are never printed again: a merged order's ticket shows its new table with
+     "Moved from"; a moved dish shows "Now for T6" on its line; printing stations still cooking
+     get a MERGED or MOVED note. Screens hear the new event `OrdersMoved`.
+425. Merge and move need TABLE_MOVE_MERGE (waiters: both tables theirs), audited as
+     TABLES_MERGED and ITEMS_TRANSFERRED. Built on the POS (Merge into…, Move dishes…); the
+     waiter app keeps Move table only (WTR-008 does not ask for more).
+426. "Needs cleaning" (TBL-004, S) is the setting `tables.needsCleaning` (restaurant, default
+     off). On, a table the guests left (settled, closed without a bill, moved or merged away)
+     shows "Needs cleaning" and cannot be opened or moved to until someone who takes orders
+     marks it clean (`POST /tables/:id/clean`, audited TABLE_CLEANED); the POS and the waiter app
+     offer Mark clean on its tile. Approving a QR order at such a table opens it anyway: the
+     diners are evidently seated there.
+
+Decided 2026-10-02 (P6-05c):
+
+419. Takeaway from the waiter app (WTR-013) is a screen of its own from "My tables": the menu,
+     an optional customer name and phone, Send to kitchen (orderType TAKEAWAY, the same order
+     route as the POS, so the server gives the day's token, TBL-008) and the open takeaway orders
+     with their tokens and each dish's progress. Billing a takeaway stays at the POS.
+420. Time-based availability (MENU-007) is per dish: optional daily hours "Served from / until"
+     in the restaurant's local time, an end before the start running past midnight (items
+     `window_start`/`window_end`, both or neither). Outside them the dish is "Only 07:00–11:00"
+     on every surface, flagged in a waiting cart, refused by the server and the QR relay
+     (NOT_AVAILABLE_NOW, "X is served 07:00–11:00 only."), and never suggested. A combo whose
+     set part is outside its hours is refused too.
+421. Hours are part of the menu (published like a price change), not a live switch like stock.
+     An item edit that leaves `timeWindow` out keeps the hours, so older callers (menu import)
+     never clear them. The import template does not carry hours yet; they are set in the editor.
+
+Decided 2026-10-02 (P6-05b):
+
+415. Hold and fire is a new item state, HELD, between ordering and the kitchen: a staff line may
+     be held (`hold: true`); FIRE moves it to SENT with a NEW ticket per station; CANCEL works
+     from HELD as from SENT (with a reason, stock returned). Diners' orders cannot hold.
+416. A held line is ordered: its counted stock is taken at once, so it cannot be sold to another
+     table, and comes back if it is cancelled. It is not on the bill until fired, and an invoice
+     cannot be issued while anything is held (`ITEMS_HELD`).
+417. Setting `orders.holdAndFire` (restaurant, default on): off, holds are refused. The phones and
+     the POS do not read settings, so they offer Hold always and show the server's refusal.
+418. Anyone who may order may fire an order's held items (`POST /orders/:id/fire`, all or the
+     ones named); audited as ORDER_FIRED.
+
+Decided 2026-10-02 (P6-05a):
+
+409. P6-05 is split into five parts (phase-6.md). KDS-010 (the all-day summary) was built in P1-09.
+410. KDS-002's M part was not met: a kitchen screen had one station. A screen now has one or more
+     (`devices.extra_station_ids` after `station_id`; none is every station, the Expo/Pass
+     screen), chosen at pairing or later (`PUT /devices/:id/stations`, audited; the screen
+     reconnects with `DEVICE_CHANGED` to join its new rooms). It may narrow to one of its
+     stations; a person signed in may still choose any.
+411. The Expo/Pass view is a switch on a screen of several stations (or all): Tickets, or Orders,
+     one card per order with every station's lines, "Ready to serve" when all are ready, and
+     "Picked up" for what is ready. Tickets show their station there too.
+412. Automatic escalation (KDS-006 S, setting `kds.autoEscalateNotCollected`, default off): a
+     sweep every 30 s raises the same READY_NOT_COLLECTED alert as the button, without a person
+     or device, once per ticket: an alert acknowledged is not raised again for the same ticket.
+413. "On break" (NTF-009) is a card in the waiter app's tables screen; the server already routed
+     alerts. `GET /staff/me/break` was added so the app shows the state it starts with.
+414. The denomination count (BILL-013 S) is optional at shift close ("Count by notes and coins"):
+     ₹2000, 500, 200, 100, 50, 20, 10, 5, 2 and 1 (a note and a coin of one value are one count),
+     totalled as typed; the server totals it again. Not offered at day-end, which closes shifts
+     already counted.
+
+Decided 2026-10-02 (P6-04c):
+
+407. Bulk photos are matched in the browser (`matchPhotos` in `@rp/domain`): a short code first
+     (the whole file name, or its first word), then the dish's exact name, then the longest dish
+     name inside the file name; ties and a dish already taken by an earlier photo are left for
+     the person. Archived dishes are not offered.
+408. Each photo is uploaded like a single one (checked and re-encoded, P1-04), then set on its
+     dish by a new `PUT /menu/items/:id/photo` (a draft change, audited as MENU_ITEM_CHANGED with
+     the photo before and after), so nothing else about the dish is sent again. The page says to
+     publish afterwards.
+
+Decided 2026-10-02 (P6-04b):
+
+402. The restaurant's server turns each photo upright and makes it at most 2,000 px on its long
+     edge (JPEG 82) before sending it to the Control Plane; PDFs go as they are. The console takes
+     photos up to 15 MB and PDFs up to 20 MB, 40 MB together (a 55 MB body limit on that route
+     only).
+403. The review is per dish and per section: a printed menu cannot say which station cooks a dish
+     or its tax group, so each section gets both (the restaurant's first station and tax group to
+     begin with). A dish needs a name, a price or a price for each size, and veg / non-veg / egg.
+     "Mark all in this section checked" is allowed: the section's dishes are all on the screen.
+404. The server refuses the import while any dish is unchecked (`MENU_REVIEW_INCOMPLETE`), then
+     builds the template's sheets from the review (`reviewedMenuSheets` in `@rp/domain`) and runs
+     the template import (`commitSheets`): the same checks, one transaction, audit
+     (`MENU_IMPORTED` with `format: AI` and the import id) and publishing.
+405. Add-ons found on the menu become option groups, not attached to any dish (a printed menu
+     rarely says which dishes take which extras); the review says to attach them in the editor.
+406. The console keeps the import id in the browser, so a reload comes back to the reading or the
+     review; drafts stay at the vendor for 30 days.
+
+Decided 2026-10-02 (P6-04a):
+
+397. P6-04 is built in three parts: a, the Control Plane's reading service; b, review and import
+     on the restaurant PC; c, bulk photo upload (ONB-007).
+398. The AI provider is Anthropic's Claude (Messages API), model `claude-sonnet-5-5` by default
+     (`CP_AI_MODEL`): it reads photos and PDFs, and a forced tool call returns the menu as
+     structured data. The key is only in the Control Plane's environment (`CP_AI_API_KEY`, from
+     the secret manager; SEC-002); without it AI import is off and the Excel template stays.
+399. Reading is a job, not one long request: `POST /v1/menu-extractions` answers 202 at once and
+     the restaurant's server asks for the result (a menu takes about a minute). Files wait in the
+     Control Plane's database and are deleted once read; drafts are dropped after 30 days; the job
+     record keeps the model and tokens for costs. Up to 10 files, photos ≤ 5 MB (the provider's
+     limit), 20 MB together.
+400. The draft holds only what a printed menu can say: sections, dishes, descriptions, prices
+     (paise, from the printed text with integer arithmetic), sizes, veg / non-veg / egg marks,
+     spice, tags, add-ons, and what the reader was unsure of. Tax group, station and the rest are
+     set by the manager at review (P6-04b).
+401. Each restaurant may have 20 menus read in 24 hours (`CP_AI_DAILY_LIMIT`; the vendor pays per
+     menu). A busy provider (429, 5xx, 529, timeout) is tried 3 times, 30 s apart.
+
+Decided 2026-10-02 (P6-02):
+
+391. A basket is a table's visit (every order of its session, across rounds), or a takeaway or
+     counter order on its own. Dishes count once per basket when they reached the kitchen (as for
+     best sellers); a combo counts as itself, not its parts.
+392. Mining is co-occurrence with support, confidence and lift over pairs of dishes (rules are
+     pairs, so FP-Growth adds nothing), each direction its own rule, in integers (basis points
+     and percent). Score = confidence × lift / 100, so a strong and surprising pairing ranks
+     above a merely common one. At most 10 rules per dish and 5,000 in all (the QR snapshot's
+     limit).
+393. `reco.minOrders` counts orders in the window that reached the kitchen; below it nothing is
+     learned and the run says how many there are so far.
+394. "Nightly" is once per business day: an hourly check (from 5 minutes after start-up) runs a
+     restaurant whose last run ended before today's business date, so a PC switched off at night
+     learns soon after it starts. Managers can run it at once (`POST
+/recommendations/learned/run`, OPERATIONS_CONFIGURE).
+395. Each run replaces the rules (`learned_associations`: derived data, so rp_app may delete it)
+     and is recorded in `learning_runs`. The engine reads them from memory (NFR-P09), and the
+     QR snapshot carries them, republished when they change.
+396. The Suggestions page shows the last run (window, orders, active or not) and the 50
+     strongest pairings in words ("ordered together 62 % of the time, 1.8× more often than by
+     chance").
+
+Decided 2026-10-02 (P6-01):
+
+388. Combo choice slots, variants and modifiers were already shared on every surface (the
+     `@rp/ordering` selection, slots, summaries, price estimate and `requestLines`, and the
+     ComboChoices / ItemOptions components for web and native); the server and the relay check
+     them with the same `resolveOrderLine`. P6-01 adds what was missing: combo dates and hours
+     on the menu cards.
+389. The menu as served (`GET /menu`, and so the QR document) carries the restaurant's time zone
+     (`MenuSnapshot.timeZone`, optional; stored versions leave it out), so every device judges
+     combo hours by the restaurant's clock, not its own. Without it, Asia/Kolkata.
+390. `unavailableReason(item, {menu, now})` adds NOT_NOW for a combo outside its dates or hours;
+     cards say "Only 12:00–15:00" (or "Not available now" without hours) and cannot be chosen, on
+     the POS, the waiter app, the tablet and the QR page; the waiter app's cart and "order
+     again" flag it too. The clocks tick every 30 s (the QR page with its menu refresh).
+
+Decided 2026-10-02 (P5-06):
+
+385. The Phase 5 exit test runs the local server against the in-process relay (its migrations,
+     rules and functions over HTTP) in the `check` job, as the P5-03 tests do; "against local
+     Supabase" is covered by the `relay-supabase` CI job, which runs the relay's own suites
+     (isolation, roles, orders, retention, functions) on a Supabase stack, and by manual task 20
+     on the real projects. S11's Control Plane half is tested with P7.
+386. A 30-minute outage is simulated at the relay's clock (presence 30 minutes old, the expiry
+     job run by hand), not by waiting. The test relay can now cut only the restaurant's traffic
+     (`cut('restaurant')`), so diners' phones still reach the relay as they would.
+387. An order the relay offers again after the restaurant dealt with it (its "received" lost, or
+     a relay restored) is acknowledged again from the start; nothing is made twice (found by the
+     exit test).
+
+Decided 2026-10-02 (P5-03d):
+
+380. The doorbell is a hand-written Phoenix client (protocol 1.0.0, JSON) over Node's built-in
+     WebSocket, not `@supabase/realtime-js`: the server needs one channel and five message
+     kinds, and no new runtime dependency. A change only rings; orders and requests are still
+     read through the `server` function.
+381. `session` returns the public API key and the changes to listen for, so the local server
+     needs no Realtime setting of its own; Realtime's address is derived from `RP_RELAY_URL`'s
+     host. The key is `RELAY_REALTIME_API_KEY` if set, else Supabase's `SUPABASE_ANON_KEY`.
+382. Timings (constants, not BRD values): polling 5 s without the doorbell and 60 s with it; a
+     ring picks up after 100 ms (one pickup per burst); heartbeat 25 s, a line is dead when one
+     goes unanswered; the token is renewed 5 minutes before its hour is up; rejoining backs off
+     from 5 s to 60 s; a relay without Realtime is asked again after an hour. The doorbell starts
+     12 s after start-up.
+383. The System page's QR relay line says whether new QR orders "arrive instantly" (Realtime) or
+     are "checked every few seconds" (`qrRelay.realtime`).
+384. Supabase Realtime applies RLS by taking on the token's role, so the migration grants
+     `relay_server` to `supabase_realtime_admin` where that role exists. The tests' Supabase
+     stand-in creates it, and a roles test checks it is the only relay role Realtime can take.
+
+Decided 2026-10-02 (P5-03c):
+
+376. Menu photos go to the relay's public `menu-photos` Storage bucket through the `server`
+     function (`PUT photos/:photoId/:width`), never with a key on the local PC. The function picks
+     the path, `<tenant>/<photo>/<width>.webp`, and takes WebP files up to 2 MB only (checked by
+     the content type and the file's own header). Edge functions use the service-role key that
+     Supabase gives them for Storage calls only (ADR-0015 updated).
+377. The sync agent sends the three sizes the PC already made (160, 480 and 960 px) once per photo,
+     since a photo never changes (a new one has a new id); what was sent is kept in system_meta
+     `relay.photos`. Only QR dishes' photos are sent. The menu document lists only photos the relay
+     has, with each real width once (a photo narrower than 960 px is not enlarged), so the page
+     never shows a broken image. A photo the relay refuses (400, 413 or 415) is left out until the
+     server restarts; the menu still goes. A relay without Storage answers 503 `PHOTOS_OFF`, and
+     the agent asks again an hour later.
+378. Retention (BRD §9.3, "while the item exists + 90 days"): the agent tells the relay which
+     photos the menu uses (`POST photos/sweep`) when that changes and at least daily. The others
+     are marked removed; their files are deleted 90 days later through the Storage API, and the
+     record a day after that by `relay.purge()`. A photo used again within 90 days is restored;
+     later, the sweep reports it missing and the agent sends it again.
+379. The QR page shows a 72 px square thumbnail in each dish row and a wider photo in the dish
+     sheet, as `<img srcset>` straight from the bucket (lazy, `alt=""` since the dish name is
+     beside it). The CSP already allows the relay's origin, which serves Storage too. Combos and
+     suggestions show no photos in v1.
+
+Decided 2026-10-02 (P5-05c):
+
+373. Call waiter / request bill (QR-011) has its own queue at the relay,
+     `relay.qr_service_requests`, kept like the order queue:
+     - RLS for the same three roles;
+     - stamped by the relay and expiring after the pickup timeout;
+     - status moves only forward: notified, on the way, done; or rejected, or expired;
+     - 7-day retention; on the Realtime publication.
+       One request of each kind may be open per table (a partial unique index), so pressing again,
+       from any phone, finds the open one. A browser may make at most 6 requests in ten minutes (a
+       relay constant: not a BRD value).
+374. The local server picks requests up through an inbox (`relay_service_requests`), tells the
+     relay "received", then raises them like the tablet's, with source QR (`raiseFromQr`).
+     - The table must be open, as at the tablet; otherwise the diner is told it is not open
+       yet and to wave to a waiter.
+     - A request of that kind already open at the table (from the tablet or another phone) is the
+       same request.
+     - "Waiter is on the way" and "done" go back through a durable event consumer, as order
+       statuses do.
+375. Setting `qr.serviceRequests` (restaurant, default on) turns the QR page's buttons on. They
+     are the two QR-011 names, Call waiter and Request bill; Water stays on the tablet. Each
+     shows its latest status, followed every 3 s until it is settled.
+
+Decided 2026-10-02 (P5-05b):
+
+369. The QR page's suggestions run the same engine as every surface (`recommend()` in
+     `@rp/ordering` `qrSuggestions`), in the browser, on a snapshot the local server publishes
+     with the menu. The snapshot holds:
+     - the QR-channel rules;
+     - best sellers by time of day and for the whole day, as rankings of `menu.bestSellerCount`
+       dishes rather than counts, so the menu is not republished after every order;
+     - dayparts, the business-day cut-off, the course order, the pins and blocks, and learned
+       pairings (empty until P6-02).
+       Rule edits raise no event; the next presence cycle (30 s) republishes them. Recommendation
+       and price settings bring it forward.
+370. The page shows one suggestion row, "You may like" (or "Add to your order" once the cart has
+     something). Each suggestion shows the reason in the restaurant's words when it has them.
+     Adding one sends its source with the line, so the restaurant counts it as ordered
+     (REC-008). Shown and tapped events are not sent from QR pages (no tracking, QR-013). The
+     best-seller filter appears once a snapshot exists.
+371. "Added to your order" is no longer a toast on the QR page: on a phone it covered the cart
+     bar. The bar shows the count and total, and a hidden live region tells screen readers.
+372. The speed budget (QR-012, NFR-P12) is a Playwright test, not Lighthouse CI:
+     - the same metric (LCP) and mobile profile (Slow 4G at 150 ms and 1.6 Mbps, a 4× slower
+       CPU), measured on a 300-dish menu;
+     - budget 2.5 s; measured 548 ms with a 406 kB page before compression;
+     - this avoids a heavy CI dependency, and the test prints its figures in the CI log.
+
+Decided 2026-10-02 (P5-05a):
+
+361. P5-05 is built in two parts:
+     - a, the site;
+     - b, recommendations (the local server will publish them in the QR menu document),
+       call waiter / request bill (S), photos (after P5-03c) and the Lighthouse budget.
+362. The QR site is Next.js 16 (App Router).
+     - The table page fetches the menu on the server, so the first view is the menu (QR-012).
+     - After that, the browser calls the relay's functions directly (CORS).
+     - `RELAY_URL` is read at request time, so one build serves dev, staging and prod.
+363. Privacy (QR-013):
+     - a Content-Security-Policy set per request in `src/proxy.ts` (next.config headers are fixed
+       at build time), allowing only the site and the relay;
+     - `Referrer-Policy: no-referrer`, because the address holds the table's code;
+     - no third-party resources, and pages not indexed;
+     - the browser keeps only a random id for the rate limit, the cart, and the ids of orders
+       sent from it, under keys that hold only the start of the code;
+     - Next.js telemetry is off in the scripts.
+364. Same behaviour as every surface (MENU-012):
+     - the selection rules, search, filters, cart and estimate come from `@rp/domain` and
+       `@rp/ordering`; components from `@rp/ui-web`; words from `qrSite.*`;
+     - only QR-channel dishes are shown;
+     - a search's results form one list, best first; otherwise the dishes are shown by section;
+     - filters are veg, Jain and spicy; best sellers come with P5-05b's snapshot.
+365. Sending an order:
+     - the idempotency key belongs to the cart as it is, and is sent again on a network retry,
+       so a retry never orders twice;
+     - lines the menu refuses are marked with the reason, and the menu reloads;
+     - a rate limit says how long to wait; the restaurant being offline turns the page
+       read-only;
+     - read-only disables adding and sending.
+366. Following orders:
+     - each order is checked every 3 s until it is settled;
+     - one still waiting past its pickup time reads "Please call a waiter" by the page's own
+       clock too;
+     - each dish's kitchen state is shown (S).
+367. The page refreshes the menu every 60 s with `?known=<version>`; the relay answers
+     `document: null` when nothing changed. The QR menu document gained `priceMode` for the
+     estimate.
+368. Licences:
+     - exceljs (P4-06) carries a zip reader that brings in `traverse` and `chainsaw`, declared
+       "MIT/X11" (MIT), and `buffers`, which declares none;
+     - they are now reviewed exceptions, with `buffers` to confirm, or the reader dropped,
+       before the pilot;
+     - the licence check runs in the security workflow, not in `pnpm check`, which is why it had
+       been failing unnoticed since P4-06.
+
+Decided 2026-10-02 (P5-04):
+
+357. A table's QR code opens `<RP_QR_SITE_URL>/t/<token>`. The token is 128 random bits in
+     base64url (22 characters).
+     - This PC keeps the token so the tent can be printed again. It is in the restaurant's own
+       database, behind the same backups.
+     - The relay gets only its SHA-256 (hex over the UTF-8), with the table sync.
+     - The site address is installation config, like the relay's, and set by the vendor. Without
+       it, codes can be made but not printed (`QR_SITE_NOT_SET`).
+358. Codes are made for every table without one in one step. A new code for one table needs a
+     reason; it replaces the old token, so the relay stops the old code at its next sync (seconds
+     online). Both are audited without the token and announced as a floor change. Both need
+     STAFF_MANAGE, like the tables.
+359. Tents are a PDF from pdfmake (its own QR drawing, error correction M):
+     - A6: one card per page, for stands;
+     - A5: landscape, two A6 panels side by side, which fold on a dashed line into a standing tent
+       with the code on both faces.
+       Each panel has the restaurant's name in its accent colour, "Scan to see the menu and order",
+       the code, "Table <label>", a line saying the waiter confirms the order, and the address.
+       Printed in English, like the QR site for now.
+360. The console has a QR codes page (managers and the Owner):
+     - each table's code, with Show and New code;
+     - make the missing codes;
+     - download the tents as A6 or A5.
+       The pdfmake setup moved to `common/pdf.ts`, and the download helper to `app/download.ts`.
+
+Decided 2026-10-02 (P5-03b):
+
+350. Picking up a QR order is an inbox (`relay_orders`), written before anything else. Then:
+     1. If it is past its pickup time by the relay's clock (presence gives the offset), it is left
+        to expire and nothing is made.
+     2. Otherwise the relay is told RECEIVED first: if that answer is 410, nothing is made.
+     3. Then it becomes a normal QR order, priced here, waiting for approval.
+        A crash between the steps resumes from the inbox, and an order already made (found by its
+        `externalRef`) is never made again.
+351. A QR order for a table that is not open:
+     - keeps its table without a session;
+     - alerts the waiter who looks after that table today: the responsible waiter now falls back
+       to the table's default waiter (TBL-002) when there is no session;
+     - shows in that waiter's own approvals.
+       Approving opens the table, laid for 1 with that waiter, or joins a session someone opened
+       meanwhile (QR-010).
+352. When the restaurant cannot take the order, nothing is made and the diner is told REJECTED
+     with the reason:
+     - lines this menu can no longer serve (its own line check's words);
+     - a removed table;
+     - an order the engine refuses.
+353. What the diner is told, from the order here:
+     - RECEIVED while waiting;
+     - SENT_TO_KITCHEN with each line's state (S) once approved, including lines cancelled
+       later;
+     - REJECTED with the waiter's reason when every line was rejected.
+       It is sent in the order the relay accepts (RECEIVED on the way). A durable event consumer
+       marks each change, so nothing is lost offline; a short nudge sends it within half a second.
+354. Each order line now keeps the diner's `clientLineId`, which ties the kitchen's states to the
+     QR page.
+355. Pickup is polled every 5 s for now. The Realtime doorbell that lets polling slow down (QR-009,
+     Supabase cost) is its own part, P5-03d. It needs the project's public API key, and is
+     checked against a real Supabase.
+356. The relay sync loops share `PacedLoop`:
+     - each run sets the next;
+     - a change only ever brings it forward;
+     - back-off after failures;
+     - a caller during a run gets one more run, shared with anyone else who called meanwhile.
+
+Decided 2026-10-02 (P5-03a):
+
+343. P5-03 is built in three parts: a publishing, b orders, c photos. The tests run the real
+     relay in-process (`@rp/relay/testing`: its schema in the test cluster, its functions over
+     HTTP) in place of a local Supabase, which needs Docker. An internet cut is the relay dropping
+     every connection.
+344. The relay address is `RP_RELAY_URL` (https in production). The credential is not
+     configuration:
+     - `pnpm --filter @rp/server relay:credential < file` stores it, sealed in the database with
+       a new SecretStore key, and audits that without the value;
+     - the Control Plane will deliver it in P7.
+345. The sync is reconciliation, not a queue of events.
+     - One loop sends presence every `qr.presenceIntervalSeconds`.
+     - Each time, it builds the tables and the QR menu and compares their hashes with what reached
+       the relay. That record (`relay.sync`) is kept across restarts.
+     - A change made while offline is therefore sent once the relay answers, and nothing is ever
+       dropped or sent twice.
+     - Menu, stock, QR-settings and floor events bring the loop forward within 2 s (MENU-006).
+     - Back-off after a failure: 5 s doubling to 60 s.
+346. Versions: the QR menu version is the relay's publication counter. If the relay already has a
+     newer one (a restored backup), the next version is the relay's latest plus one.
+347. The QR menu holds only what the QR channel offers:
+     - its dishes and the parts of their combos;
+     - their categories, option groups and tax groups;
+     - no stations.
+       Counted stock is published only as sold out (0) or not, so it does not republish on every
+       order. `serviceRequests` stays false until the QR site offers it (P5-05), and photos come
+       with P5-03c.
+348. Tables carry no QR code hash until P5-04 makes the codes. A removed (archived) table goes out
+     of service at the relay, and labels are cut to 40 characters.
+349. The System page shows "QR menu online": not set up, waiting for the credential, in step with
+     the menu version and last contact, or the error with what it means (read-only QR menu;
+     changes sent when it is back).
+
+Decided 2026-10-02 (P5-02b), design in ADR-0015:
+
+335. The local server's side is one function, `server`, with routes for session, presence, menu,
+     tables, orders and an order's status. Every call carries the restaurant's credential, checked
+     against its hash; the function then acts as `relay_writer` for that restaurant only.
+336. Realtime sessions:
+     - an HS256 JWT signed with the project's JWT secret (`RELAY_JWT_SECRET`, optional), with the
+       role `relay_server` and the tenant, lasting an hour;
+     - without the secret, the answer is 503 `REALTIME_NOT_CONFIGURED` and the sync agent polls
+       `server/orders`.
+       A move to asymmetric signing keys only would need an ES256 signer.
+337. Presence (every `qr.presenceIntervalSeconds`) carries the `qr.*` settings, so the relay
+     enforces the restaurant's values without another call. It answers with the relay's clock so
+     the server can spot a skew.
+338. Menu versions only grow, one publication per restaurant at a time.
+     - The same version with the same document is a replay (an outbox retry).
+     - An older version, or the same version with a different document, is refused with
+       `STALE_MENU_VERSION` and the latest version.
+339. Tables are sent as the full list, with each QR token's SHA-256 in hex.
+     - Tables left out go out of service; nothing is deleted.
+     - A table or code listed twice is a 400. A hash another restaurant already has is a 409.
+340. Pickup (polling) lists the submitted orders still inside their pickup time, oldest first, at
+     most 100, without prices or browser ids.
+341. Status reports:
+     - receiving an order past its pickup time marks it EXPIRED and answers 410 `ORDER_EXPIRED`,
+       so the restaurant rejects it (QR-007);
+     - a move the rules forbid is 409 `INVALID_STATUS_CHANGE`.
+342. Transactions follow postgres.js's rule: a failed statement fails the transaction even when
+     caught; recovering needs `Tx.savepoint`. The Node test adapter enforces the same rule, so a
+     test fails where Supabase would.
+
+Decided 2026-10-02 (P5-02a), design in ADR-0015:
+
+328. P5-02 is built in two parts: a, the diners' functions; b, the local servers' functions.
+329. The diners' functions are `qr-menu`, `submit-order` and `order-status`.
+     - The table's QR token travels in the `x-rp-table-token` header, so it stays out of URLs and
+       logs. The browser's anonymous random id travels in `x-rp-browser`.
+     - Every answer is `no-store`. CORS allows only the QR site's origins
+       (`RELAY_ALLOWED_ORIGINS`). The platform's JWT check is off for these functions.
+     - Unexpected failures are logged with their name, code and message, never a database
+       error's detail, which can hold the row's values.
+330. A submission answers 200, like the local API:
+     - ACCEPTED, for a new order or a replay of the same key at the same table (`replayed`,
+       ORD-013);
+     - or REJECTED, with every line the latest menu cannot serve and the version it was checked
+       against; nothing is stored then.
+       The check is the restaurant's own (`@rp/ordering` `resolveOrderLine`, channel QR), against the
+       latest publication.
+       Other answers:
+     - a key already used at another table: 409 `IDEMPOTENCY_KEY_REUSED`;
+     - the restaurant absent (QR-008): 503 `RESTAURANT_OFFLINE`;
+     - no menu yet: 503 `MENU_NOT_PUBLISHED`.
+       The relay stores the lines as sent, without prices; the local server prices them when it
+       picks the order up (ORD-014).
+331. Rate limits (QR-006) count the orders stored in the window: per table, and per browser across
+     the restaurant's tables. Advisory locks per table, then per browser, stop a burst from slipping
+     past.
+     - Over the limit: 429 `RATE_LIMITED`, with `Retry-After` set to when the window frees up.
+     - Replays and refused submissions do not count.
+332. The QR menu document (`QrMenuDocument`) holds:
+     - the restaurant's name and accent colour;
+     - its time zone and the instruction limit;
+     - whether Call waiter / Request bill is offered;
+     - the menu snapshot for the QR channel, with live availability;
+     - the photos, each in up to six sizes.
+       Recommendations will be added as an optional field with P5-03.
+333. The expiry job runs every minute (pg_cron). An order past its pickup time reads EXPIRED to its
+     diner at once.
+334. Packaging: the edge functions are Node-tested TypeScript, bundled by esbuild for Deno, as set
+     out in ADR-0015. Bundles are about 500 kB minified, mostly zod. Supabase allows 20 MB.
+
+Decided 2026-10-02 (P5-01), design in ADR-0015:
+
+319. The relay keeps everything in schema `relay`, which the Data API does not expose; `public`
+     stays empty. Every table has RLS, and every policy names one of three NOLOGIN roles:
+     - `relay_server`: a local server's Realtime subscription; it reads its own QR orders only;
+     - `relay_writer`: an edge function acting for a verified local server;
+     - `relay_diner`: an edge function acting for a browser whose table token resolved. It reads
+       its restaurant's menu, photos, presence and settings, and orders for its own table only.
+       Its tenant and table come from `request.jwt.claims`; a missing or malformed claim matches
+       nothing.
+320. Edge functions use their own login, `relay_edge`, not the `postgres` connection string. It
+     inherits nothing and can only switch, per transaction, to `relay_writer`, `relay_diner` or
+     `relay_provisioner`. Its password is set by hand (manual task 20). No relay role is granted to
+     `authenticator`, so the Data API can reach none of them.
+321. A local server's credential is 256 random bits, made by the Control Plane. The relay stores
+     only its SHA-256.
+     - `server-session` (P5-02) exchanges it for a short-lived JWT carrying `relay_server` and the
+       tenant, which is used for Realtime only.
+     - All writes go through edge functions (BRD §13: "Edge Functions for all writes").
+     - Revoking a credential, or suspending the restaurant, works at once.
+322. Table tokens are at least 128 random bits, made by the local server (P5-04). The relay gets
+     only the SHA-256; regenerating replaces it, so the old code stops resolving. The diner role
+     never reads a hash.
+323. Order rules are enforced in the table, whoever writes:
+     - a new order is SUBMITTED and expires after the restaurant's pickup timeout, both stamped
+       by the relay's clock;
+     - what the diner submitted never changes (`RL400`);
+     - the status moves SUBMITTED to RECEIVED or EXPIRED, then RECEIVED to SENT_TO_KITCHEN or
+       REJECTED (`RL409` otherwise);
+     - an order past its deadline cannot be received (`RL410`), so the local server rejects it as
+       expired;
+     - the idempotency key is unique per restaurant.
+324. Retention (BRD §9.3): `relay.purge()` runs hourly by pg_cron.
+     - Orders go 7 days after they were received or expired.
+     - Every menu snapshot but the latest goes after a day.
+     - Photo files and their metadata go with a Storage sweeper (P5-03), because deleting
+       Storage rows in SQL would leave the files behind.
+325. A menu snapshot carries availability. The sync agent republishes on a change, debounced
+     (P5-03), instead of keeping a separate availability table: one document for the QR site,
+     and only the latest version counts.
+326. `relay.tenant_settings` mirrors the `qr.*` settings: same defaults and limits, and a test
+     compares it with the registry. The sync agent keeps it in step (P5-03).
+327. The tests run on plain PostgreSQL 16, with a prelude that gives Supabase's API roles broad
+     default privileges (the worst case). They act as each role the way PostgREST, Realtime and
+     the edge functions do. The `relay-supabase` CI job runs the same suite on a local Supabase
+     stack; it has not run yet, because nothing can be pushed until GitHub access exists.
+
+Decided 2026-10-02 (P3-05b):
+
+315. The tablet asks for feedback once the table's bill is printed (BILL_PRINTED), while it is
+     online, once per visit: the server takes one per table session and the tablet remembers it
+     with the guests' data.
+316. The feedback form:
+     - food and service out of 5 (large stars), a comment up to 500 characters, and an optional
+       Indian mobile number;
+     - the number needs its consent box ticked. The words of the box are stored with the purpose
+       (`DIGITAL_BILL_AND_FEEDBACK`), the time, where (TABLE_TABLET) and the device (BILL-011,
+       SEC-019).
+     - The consent is audited without the number.
+317. The Feedback report (RPT-013, a Should) gives the averages (in hundredths of a star), the
+     ratings by day with a chart, and every comment with its table, newest first. A diner who left
+     a number is marked, but the number is never shown. It is exported as `FEEDBACK`.
+318. Erasure (DATA-011) is for the Owner with a fresh second factor (DATA_ADMIN), by number:
+     - the number is cleared and `erasedAt` set, and feedback is unlinked from it;
+     - the record that consent was given stays, invoices keep what tax law needs, and the audit
+       entry carries no number.
+       Still to come:
+     - the screen for erasure and the anonymising of old feedback after
+       `retention.feedbackMonths` come with P7's data tools;
+     - sending the digital bill on WhatsApp or SMS comes with P5/P7, which have the provider.
+
+Decided 2026-10-02 (P3-05a):
+
+312. P3-05 is built in two parts: a the suggestion rows and their tracking, b feedback after the
+     bill.
+313. The tablet suggests in three places, each row with the dish, its price and the reason:
+     - "You may like" above the menu (for what is in the cart, veg-only following the filter);
+     - "Goes well with this" in a dish's sheet (the cart and that dish);
+     - "Add to your order" in the cart.
+       The waiter app shows "Suggest to the table" on a table's order view (WTR-011), for the
+       table's orders and the cart. Rows show only when online and only when there are suggestions.
+314. Tracking (REC-008):
+     - Each suggested dish counts once as shown while its row is up; a press counts as a tap;
+       adding it to the cart counts as added. The line then carries its source, so the server
+       counts it as ordered.
+     - Events go in batches every 3 s (50 at most), and any still waiting are sent when the
+       screen closes.
+     - When the server cannot be reached they are kept (500 at most, oldest dropped first) and
+       sent later.
+
+Decided 2026-10-02 (P3-03c):
+
+306. Search on the tablet uses a small matcher in `@rp/ordering` rather than fuse.js: no new
+     dependency, predictable on Hermes, and tested with the BRD's own examples.
+     - It drops words that say nothing ("something", "dishes", "please"), matches each remaining
+       word exactly, by the start of a word, inside a word, or with one typo (two for long words),
+       over names, synonyms and tags.
+     - "Spicy"/"hot" also match spice level 2+, "veg" matches veg dishes.
+     - Every word must match; the best match comes first, menu order on a tie.
+307. The tablet's filters are Veg, Jain (dishes tagged Jain), Spicy (spice level 2+ or tagged
+     Spicy) and Bestsellers. The sorts are menu order, price low to high and price high to low.
+     The tax note follows `billing.priceMode`, which `TabletTableView` now carries.
+308. The cart is kept on the tablet (`rp.tablet.cart.v1`), so a restart loses nothing, and is
+     wiped with the guests' data.
+     - The review shows each dish, the subtotal, the estimated GST (on top, or included) and the
+       estimated total, worked out with `computeBill`. The bill has the exact amounts.
+     - One idempotency key goes with every retry of the same lines (ORD-013).
+     - Refused lines are marked to change or remove (ORD-017).
+309. "What we ordered" lists each order newest first, with "Waiting for waiter confirmation" while
+     it waits and each dish's status live: Received, Preparing, Ready, On its way, Served, or "Not
+     accepted" with the reason. It also gives the totals ordered and waiting.
+     - "Waiter: confirm here" approves at the table: the waiter, the cashier, a manager or the
+       Owner picks their name and enters their PIN.
+     - Order lines now carry their `endReason`, so the diner sees why a dish was refused.
+310. Without the server (connection not online), the dishes, "Send to the waiter" and the four
+     buttons are paused under "Please call a waiter", and come back with the connection
+     (TAB-013).
+311. The waiter app's item sheet moved to `@rp/mobile-shell` (`ItemSheet`, with an optional label
+     for its button), shared by the waiter app and the tablet.
+
+Decided 2026-10-02 (P3-03b):
+
+305. Diners' orders waiting for approval show as a card: at the top of the waiter's tables screen,
+     on each table's screen (that table's), and above the POS floor. The card is there only while
+     something waits.
+     - Each order shows its table and number, how long it has waited, its total, and each line
+       with its choices and instructions.
+     - Approve sends it in one tap (NFR-U03).
+     - Change sets quantities with steppers (0 removes a line). It approves only once "The diner
+       agreed to these changes" is ticked, and never with nothing left.
+     - Reject asks for the reason the diner sees (3 characters at least).
+     - The cashier and managers see every table's orders, waiters their own (as the server
+       decides).
+
+Decided 2026-10-02 (P3-03a):
+
+298. P3-03 is built in three parts: a the server, b the staff screens (waiter app and POS), c the
+     tablet's ordering.
+299. A tablet orders only for the open session at its own table: `TABLE_NOT_OPEN` otherwise, and
+     no table session id is accepted from it. The order is priced and checked like any other
+     (ORD-013, ORD-014, the tablet channel), and every line waits for approval.
+300. Approving (ORDER_APPROVE_CUSTOMER: waiters for their own tables, by the session's waiter;
+     the cashier, managers and the Owner for all):
+     - Changes first: a quantity changed, or 0 to remove a line, only with `dinerAgreed`. A removed
+       line is REJECTED with "Removed with the diner's agreement"; removing every line is refused
+       (reject instead).
+     - Stock is checked again; a dish that ran out refuses the approval and names it.
+     - The rest go to the kitchen exactly as a staff order does: SENT with the approver, tickets
+       per station and stock taken off. A table waiting for its bill becomes OCCUPIED again.
+     - Audited as `ORDER_APPROVED` with the changes, followed by `OrderApproved`.
+301. Rejecting needs a reason (3 to 200 characters) that the diner sees. Every waiting line is
+     REJECTED, and an order with nothing left is CANCELLED. Audited as `ORDER_REJECTED`.
+302. Approve at table: the waiter (or the cashier or a manager) picks their name and enters their
+     PIN on the tablet. It is checked like a sign-in (throttle, lock-out, `TABLE_APPROVAL_DENIED`
+     on failure), and a waiter may approve only their own table. It approves the tablet's own
+     table's orders only.
+303. The approvals inbox lists orders with any waiting line, oldest first, with the table and its
+     waiter: a waiter's own tables, or all for the others.
+304. Bestsellers are the most ordered dishes over the whole day for `reco.bestSellerDays`, still
+     on the menu. There are `menu.bestSellerCount` of them: new setting, default 10, 0 for no
+     badge.
+
+Decided 2026-10-02 (P3-02):
+
+297. The open table's screen has four large buttons in a 2×2 grid: Water, Waiter, Bill and Cancel.
+     - A request button stays lit, with "Requested, waiter notified · n min ago" (updated every
+       30 s) and then "… is on the way" with the waiter's name once acknowledged.
+     - It cannot be pressed again while open; the server refuses a duplicate anyway.
+     - Cancel is greyed out with nothing open, clears the only open request at once, and lists the
+       open ones to choose from when there are several ("Keep them" closes the list).
+     - A refused request shows the server's reason, e.g. too many requests this minute.
+
+Decided 2026-10-02 (P3-01c):
+
+296. "Locate" (MGR-006) is for paired, connected table tablets (409 otherwise; pagers follow with
+     their firmware, P2-05).
+     - The tablet flashes its name in the accent colour for 15 s and sounds a 3 s tone on the
+       alarm stream.
+     - The request goes only to that device's room; managers see it too.
+     - It changes nothing, so it is not audited.
+     - A tablet ignores a request more than a minute old, e.g. one replayed after a reconnect.
+
+Decided 2026-10-02 (P3-01b):
+
+290. The tablet locks itself in kiosk mode whenever it shows guests' screens (on start and when
+     staff mode ends) and keeps its screen on.
+     - As device owner it allows its own package to lock, takes away the lock screen and the status
+       bar, and stays on while plugged in.
+     - Without device owner, Android asks before pinning the screen, and the staff panel says so.
+     - Device owner comes from MDM in production and `dpm set-device-owner` in testing, through a
+       device-admin receiver in `@rp/mobile-native`.
+291. Staff mode: five taps within 3 s in the top-left corner (hidden from diners and screen
+     readers), a manager or the Owner from the sign-in tiles, and their PIN. The panel shows the
+     tablet, table, server, version, battery and kiosk state, and locks again after 10 minutes or
+     on "Lock the tablet again".
+292. The guests' data is wiped when the session the tablet last saw closes or another is found:
+     cart, orders and feedback under `TABLET_GUEST_KEYS`, plus the screens' state through
+     `guestEpoch`.
+     - The tablet keeps its table as last read, so a restart while the server is out of reach shows
+       the same screen (NFR-A01).
+     - The table is read again on its events, on reconnecting and when the manager moves the
+       tablet.
+293. Health is sampled every minute and sent when charging or the network kind changes, when the
+     battery moves by 5 points, and at least every 5 minutes (TAB-015).
+294. The idle screen rotates the pinned dishes every 8 s (photo, name, description and price) under
+     "Please wait to be seated"; the open table's screen welcomes the guests with their table and
+     number. The service buttons (P3-02) and ordering (P3-03) arrive there.
+295. "Locate" becomes its own small WP, P3-01c.
+
+Decided 2026-10-02 (P3-01a):
+
+284. P3-01 is built in two parts: a the server side (with the console's accent colour and device
+     health), b the tablet app.
+285. A tablet reads its own table at `GET /api/v1/devices/current/table`. The answer gives the
+     label, the state and the open session (the tablet unlocks while there is one), and the idle
+     screen's promotions. Only table tablets bound to a table may read it (403 `NOT_A_TABLE_TABLET`,
+     409 `TABLET_NOT_BOUND`).
+     - The promotions are the restaurant's pinned dishes (P4-03c) that are live, available and
+       offered on the tablet, while `tablet.idleShowsPromotions` is on. They come in menu order,
+       because settings keep no order.
+286. Every app except a pager reports its battery, charging, kind of connection, Wi-Fi signal and
+     version (`POST /api/v1/devices/current/health`); the Devices page shows them.
+     - Managers hear about it (`DeviceStatusChanged`) only when low battery starts or ends, or
+       charging or the connection kind changes.
+     - A device on charge does not count as low, so plugging a tablet in clears its alert.
+     - Tablets and kitchen screens alert the managers (Appendix C). Phones do not: the waiter app
+       warns its own holder.
+287. Tablets and kitchen screens are online while connected. One away for
+     `devices.offlineAlertSeconds` goes offline: new setting, default 120 s, 0 never. The managers
+     are then alerted once, and the alert clears on reconnecting. The check runs every 15 s.
+288. Staff leave a tablet's kiosk mode with a manager's or the Owner's PIN, chosen from the sign-in
+     tiles, since nobody signs in on a tablet (`POST /api/v1/devices/current/kiosk-exit`).
+     - The PIN check has the same throttle and lock-out as the others.
+     - Exits are audited as `TABLET_KIOSK_EXITED`, refusals as `TABLET_KIOSK_EXIT_DENIED`.
+     - Moving a tablet to another table stays on the dashboard (Devices, Move), where a manager is
+       signed in with their PIN (AUTH-009).
+289. The restaurant's brand on the tablets is the logo (already in the profile) and a new accent
+     colour. It is kept as #RRGGBB in upper case; left out of an update it is unchanged, null means
+     the standard colour. The tablets choose black or white text on it for contrast (P3-01b).
+
+Decided 2026-10-01 (P4-07b):
+
+281. The suspicious-activity report (RPT-014, AUD-006, `GET /api/v1/reports/suspicious`, REPORTS_VIEW_EXPORT)
+     flags eight patterns, each with the person it is about:
+     - voided after the bill printed: a bill voided after it was printed, or an item cancelled or
+       voided after a printed bill carried it. "Printed" is read from the audit trail, because an
+       edited bill's next print is an original again;
+     - a printed bill edited under its number, with the change in its total;
+     - a discount strictly above `audit.discountFlagBp` of what it applied to (a flat discount as a
+       rate of the item's line, or of the bill after item discounts, rounded up), on bills that
+       count, as RPT-007 lists them;
+     - a kitchen ticket or bill printed again `audit.reprintFlagCount` times or more in the period
+       (new setting, default 2), about whoever reprinted it most (the latest on a tie), the others
+       listed with it;
+     - a shift closed more than `audit.cashVarianceFlagPaise` over or short, about the shift's
+       holder (a manager who closed it for them is listed too);
+     - an item voided after the kitchen started it;
+     - an item sent to the kitchen that is on no settled bill once its table has left, or, without a
+       table, once its business date is over; about whoever ordered it (or accepted a diner's
+       order). Combo parts are billed through the combo, so only whole lines count;
+     - the cash drawer opened without a sale.
+       One event can match two patterns (a cooking dish voided off a printed bill): they answer
+       different questions. Totals list every pattern, and the flags per person rank whose name keeps
+       coming up. A new index on `invoice_lines(order_item_id)` keeps one day instant.
+282. The daily report: every 15 minutes, for each restaurant with `audit.dailyReportEnabled`, the
+     business date before the current one is reported once. The report runs for that date, and an
+     audit entry `SUSPICIOUS_ACTIVITY_REPORTED` (no actor, on the reported date) records the counts
+     and is how the job knows the date is done. When anything is flagged, the Owner gets a
+     `SUSPICIOUS_ACTIVITY` alert with the counts. This is a new notification event, not in
+     Appendix C: to the Owner, on the dashboard and the Control Plane, no repeat, no escalation,
+     and editable like any rule. Days missed while the server was off are not reported afterwards;
+     the report screen still shows them.
+283. The cash drawer (BILL-016) is kicked with `ESC p 0` (pin 2, 50 ms) on the bill printer.
+     - Cash payments open it once the payment is committed, when `bills.cashDrawerKick` (new,
+       default on) and a bill printer are set. A retried request never kicks it again. A failure
+       only logs and marks the printer offline; the payment stands.
+     - "Open the drawer (no sale)" on the POS shift screen (`POST /api/v1/cash-drawer/open`,
+       BILL_PRINT_AND_PAYMENT: cashiers, managers, Owner; not waiters) asks for a reason and records
+       `CASH_DRAWER_OPENED` with the person's open shift.
+     - A printer that cannot be reached answers `opened: false` with the reason (as printing a bill
+       does), and nothing is recorded, because the drawer did not open.
+     - Drawers wired to pin 5 are left for the printer test (manual task 13), which says to report
+       one.
+
+Decided 2026-10-01 (P4-07a):
+
+277. P4-07 is built in two parts: a the audit viewer and chain check, b the suspicious-activity
+     report, its daily job and the S12 fixture.
+278. The audit trail (`/manage/audit`, AUDIT_VIEW: Owner and Manager) lists a period's entries
+     newest first, 100 at a time, filtered by action and person (both kept in the address), with
+     who, approver, device, reason and the recorded values before and after behind "Changes".
+     Actions and record types are shown as recorded, made readable ("Invoice voided"): many are
+     composed at run time, so they are data, not interface text.
+279. The audit log exports like a report (`AUDIT`, with the action and person filters in the
+     stamp); only people who may view the trail may export it, whatever their report rights.
+280. "Check now" runs the existing chain verification over the whole trail and says where it
+     broke and why, or that it is intact with the head the vendor also receives.
+
+Decided 2026-10-01 (P4-06):
+
+273. Every report exports as CSV, Excel (.xlsx, ExcelJS) or PDF (A4, pdfmake), all from one
+     document model in `@rp/domain` (`report-document.ts`: the stamp and tables whose columns are
+     text, money in paise, number, percent in basis points or date), so the three formats show
+     the same figures. CSV is unchanged for the six reports it already exported.
+274. Excel: one sheet per table, the stamp on top and the header frozen; amounts are numbers in
+     rupees with two decimals and percentages are numbers, so the CA can sum them; text stays text
+     (never run as a formula). PDF: ₹ with Indian grouping, DD-MM-YYYY dates, landscape when a
+     table has more than six columns, page numbers; Roboto as shipped with pdfmake (it has ₹), and
+     no network or disk access beyond those fonts.
+275. Excel takes at most 200,000 rows and PDF 5,000 (`EXPORT_TOO_LARGE` says to use CSV or a shorter
+     period); CSV has no limit. Files come back in the JSON answer, CSV as text and the others as
+     base64. A year's invoice register as CSV (about 90 MB) is the largest file; a streamed
+     download is left for P8 hardening if the pilot needs it (this replaces the note in 267).
+276. The server declares the pdfmake types it uses (`src/types/pdfmake.d.ts`): `@types/pdfmake`
+     brings the browser's DOM types into the server build, which broke the TLS code's typing.
+     `@fast-csv` (via ExcelJS) is pinned to the workspace's `@types/node` for the same reason.
+
+Decided 2026-10-01 (P4-05d):
+
+269. The Reports area (`/manage/reports`, for REPORTS_VIEW_EXPORT with ALLOW: the Owner, managers
+     and custom roles given it) groups the reports as Sales (sales, dishes, sources, payments),
+     Tax (GST summary, invoice register), People (staff, shifts), Controls (discounts,
+     cancellations and voids, reprints and edits) and Operations (kitchen, tables, suggestions).
+     A cashier's own shift report stays on the POS side for later.
+270. One period scopes every report, in a row above them: Today, Yesterday, Last 7 days, This
+     month, Last month, or two dates (at most 366 days). It lives in the address, so a report can
+     be bookmarked; "today" is the restaurant's business date. While a new period loads, the
+     previous figures stay dimmed instead of flashing.
+271. Charts (Recharts) show one measure each, in the primary colour, with hairline grids, a
+     tooltip per bar and the same figures in a table below; no report needs more than one series.
+     Rupees on chart axes are shortened (₹12k, ₹1.5L); tables show them in full.
+272. A bill-level discount or a reprint of a table's bill opens the table's first order, whose
+     drill-down lists the table's bills (a table bill has no single order).
+
+Decided 2026-10-01 (P4-05c):
+
+264. RPT-018 is checked by an opt-in test (`RP_PERF=1 pnpm --filter @rp/server test:perf`) on a
+     generated year at §7.2 capacity: 730,000 orders, 2.9 million order and invoice lines, 1.5
+     million audit entries and alerts, 2 million suggestion events. Every report must answer for
+     the whole year within 5 s through HTTP. It is not part of `pnpm check`: the year takes about
+     four minutes to generate. `RP_PERF_HOLD=<file>` keeps the year open for tuning queries.
+265. The P1-13 reports now sum in PostgreSQL like the P4-05 ones; the shift report reads the cash
+     of all its shifts in three queries, with payments indexed by shift.
+266. Each invoice line keeps its dish (`item_id`) and its share of its tax group's tax
+     (`tax_share`), set when issued with `@rp/domain` `lineTaxShares` (also on split parts) and
+     filled for existing lines by the migration the same way. The item-wise report adds them up:
+     2.5 s for a year instead of 16 s spreading every invoice's tax again. The figures are the
+     same to the paisa (checked over the generated year).
+267. The invoice register API returns a page (500 by default, at most 1,000) with the total and
+     the next offset; a year is over 200 MB as one answer. The CSV export still takes the whole
+     range in one file; P4-06 makes long exports a download.
+268. Suggestion counts come from the events alone and only ordered events join their lines:
+     joining every event on its mostly empty line column made one hash bucket of nulls (156 s).
+     The kitchen report reads the year once by dish and station, with combos left out by id.
+
+Decided 2026-10-01 (P4-05b):
+
+260. Prep time runs from the kitchen starting a dish (or from sending, for a dish bumped straight
+     to ready) to ready; pickup time from ready to picked up (or served). Combos count as their
+     parts. A negative span (a clock change) is left out of the averages.
+261. "Notify manager" presses are the uncollected-dish alerts the kitchen raised itself (with a
+     device), not the ones the timer raised.
+262. Table metrics count closed sessions, leaving out those closed as opened by mistake; a moved
+     party stays one session. Spend is the grand total of the session's bills that count; spend
+     per cover is rounded to the paisa; turnover is sessions per table (not archived) per day, in
+     basis points.
+263. The attach rate of suggestions is ordered per impression, in basis points; revenue is the
+     line total of suggested lines not rejected, cancelled or voided. The totals also give the
+     share of orders with at least one suggested line.
+
+Decided 2026-10-01 (P4-05a):
+
+255. P4-05 is built in four parts: a report data I, b report data II, c the 12-month
+     performance test, d the console's Reports area.
+256. The new reports aggregate in PostgreSQL (`$queryRaw`), not in memory, for RPT-018 at §7.2
+     capacity (2,000 orders a day). Indexes added: audit entries by action and business date,
+     alerts and service requests by business date.
+257. Money in the new reports is billed money: invoice lines of invoices not voided, at their
+     current version (gross, discounts, taxable value), by the invoice's business date. Who, the
+     approver and the reason come from the audit trail (discounts from their own records).
+258. A person's sales (RPT-003) are the items they took, or for a guest's order the items they
+     approved. Acknowledgements count alerts and service requests together; escalations are
+     alerts that reached the managers while the person was an original recipient; cancellations
+     and voids are the ones they performed.
+259. A void is wastage when the item had reached preparing or later (every void does, since a
+     dish not started is cancelled instead). A voided bill's value is its grand total.
+
+Decided 2026-10-01 (P4-04):
+
+251. The alert centre of P2-06c already covers MGR-008 (groups for the person, escalations, the
+     kitchen, tables, staff and system, each with Acknowledge), so P4-04 adds the System page
+     (`/manage/system`, OPERATIONS_CONFIGURE) and an e2e step with a seeded system alert.
+252. `GET /api/v1/system` reads everything fresh: versions (installed product, server, Node.js,
+     PostgreSQL), database and uptime, the vendor link from the heartbeat, the data drive with
+     `storage.warnPercent` and `storage.criticalPercent`, devices paired and connected per type, the
+     update on offer, open tables and the maintenance window. Backups and the licence are null
+     until P7-05 and P7-01 fill them; "Send diagnostics" is shown disabled until P7-08.
+253. Storage by kind (DATA-006): the database without the audit trail ("orders, bills and menu"),
+     the audit trail (`audit_log`), and the folders `photos`, `logs` and `backups` under the data
+     directory. No logs folder counts as nothing; no backups folder as "not set up". Sizes use the
+     units Windows shows (1 KB = 1,024 bytes).
+254. "Install now" (UPD-004, UPDATE_INSTALL_NOW: Owner and Manager) records the approval for the
+     version on offer in `system_meta` (`updates.install_approval`), audited as
+     `UPDATE_INSTALL_APPROVED` with the optional reason; an approval for an older version no
+     longer shows once a newer one is offered. The updater (P7-04) acts on it and still waits for
+     open tables unless the update is security-critical.
+
+Decided 2026-10-01 (P4-03e):
+
+247. The restaurant's own setup is one dashboard page, "Restaurant" (`/manage/restaurant`,
+     OPERATIONS_CONFIGURE): managers change the profile (name, contact, opening hours, logo,
+     business-day cut-off); the invoice particulars, tax groups and invoice series show to them
+     read-only and are changed by the Owner (TAX_AND_INVOICE_SETTINGS), each change asking for the
+     second factor when the server wants it.
+248. Opening hours are entered per weekday, up to four windows a day; a day without one is closed,
+     and closing before opening means after midnight. Tax rates are typed as a percent with up to
+     two decimals and stored in basis points; a new group starts as CGST and SGST with SAC 996331.
+249. A series with invoices keeps its format: the form shows why and only the name can change. The
+     default series has no Make default or Archive; the server refuses both anyway. A GSTIN is
+     tidied (upper case, no spaces) when the field is left, and checked against the state.
+250. The photo upload of the menu editor is a shared `PhotoPicker`, also used for the logo.
+
+Decided 2026-10-01 (P4-03d):
+
+244. Stations and printers are one dashboard page, "Kitchen and printers" (`/manage/printing`,
+     OPERATIONS_CONFIGURE), not part of Settings: they are records with their own API (P1-07),
+     not catalogue values. Archived ones are not listed; they stay in the database.
+245. A printer is shown as printing (it took the last job), offline (since when, and why) or not
+     tested yet (nothing sent to it). The test page answers in a toast; the list reads the
+     printer again afterwards, and follows `PrinterStatusChanged` and `RestaurantChanged`.
+246. Sending a printer's tickets elsewhere, printing there again and archiving all ask for a
+     reason (audited on the server). Only active printers that are not themselves redirected are
+     offered as the target. A screen-only station may keep a printer for reprints.
+
+Decided 2026-10-01 (P4-03c):
+
+240. Pin, boost and block (REC-009) are one choice per dish in the `reco.itemPreferences` setting
+     (dish id to PIN, BOOST or BLOCK; at most 500 dishes), so they are audited and announced like
+     any setting, and a dish no longer on the menu is simply ignored.
+241. Pinned dishes come first but take at most half the places (rounded up), so the restaurant's
+     rules still show; among themselves they follow the next course, then sales. Boosted dishes
+     rank first among the learned pairings and among the best sellers, and join the best sellers
+     when they are not one. Blocked dishes are never suggested, whatever the layer. The usual
+     filters (stock, channel, veg-only, already ordered) apply to all of them.
+242. A pinned dish, and a boosted dish that is not a best seller, carries the new reason
+     `FEATURED`, shown as "Recommended by the restaurant". A pinned dish counts in the RULE layer
+     for tracking (REC-008) with no rule id, like a rule without one would; boosted ones keep their
+     layer.
+243. The rules and the featured dishes share one page under Settings
+     (`/manage/settings/recommendations`, OPERATIONS_CONFIGURE), with dishes and categories from
+     the published menu. Pause and resume send the whole rule with `active` changed; archiving asks
+     for a reason. Rule changes are not announced to other screens yet; the page reloads after its
+     own changes.
+
+Decided 2026-10-01 (P4-03b):
+
+237. The notification rules are a page under Settings (`/manage/settings/notifications`), linked
+     from the rules row. Only a rule's difference from Appendix C is stored in
+     `notifications.rules`; "Use the factory rule" removes it, so the event follows later factory
+     changes again.
+238. A station, a pager's wearer and the chosen waiters are offered as recipients, and the kitchen
+     screen, tablet, printed slip and vendor as channels, only for the events whose factory rule
+     has them; any event may go to the usual people and to pager, waiter app, POS and dashboard.
+239. A rule needs at least one recipient and one channel; sending to pagers needs a pager line of
+     at most 20 characters.
+
+Decided 2026-10-01 (P4-03a):
+
+232. P4-03 is built in five parts: a settings page, b notification rules, c recommendation rules
+     with boost, pin and block, d stations and printers, e the Owner's restaurant profile, tax
+     groups and invoice series.
+233. The Settings page is generated from the catalogue: each setting's editor comes from its
+     schema (switch, number, choice, list, text, printer, time window, fields, per-event choice).
+     Labels and hints live in i18n under `settingLabels` and `settingHints`, keyed like the
+     catalogue (hints copied from its descriptions); a test fails when a setting lacks either, or
+     when its default does not survive the editor.
+234. Basis points are typed as a percent with up to two decimals, paise as rupees, lists one per
+     line. "Use the default" fills in the default; the change still needs Save. An optional
+     reason goes to the audit with the change.
+235. The page is for OPERATIONS_CONFIGURE (Owner and Manager). A setting the person may not change
+     says so; vendor settings are read-only (UPD-010); Owner-only settings ask for the second
+     factor through the same dialog as the Staff page.
+236. `pager.*` and `pagers.*` keys show as one Pagers area. Two settings overlap: vibration per
+     kind of alert (`pager.vibrationPatterns`) and per event (`pagers.vibration`). The firmware
+     (P2-05) applies a per-event choice when one is set, else the kind's.
+
+Decided 2026-10-01 (P4-02e):
+
+227. A custom role is a cashier, waiter or kitchen role plus extra capabilities; it never takes
+     anything away. It may add anything a manager may do except managing staff (whose rules
+     follow the built-in roles) and the Owner-only actions (`@rp/domain`
+     `CUSTOM_ROLE_GRANTABLE`). The stored list is filtered by `extraCapabilitiesOf` on every
+     read, so even a hand-edited row cannot grant more.
+228. Only the Owner, with a fresh second factor, creates, changes or archives a custom role;
+     managers see the Roles page and give people custom roles like any other role (STAFF_MANAGE).
+229. A role people have keeps its base role, and is archived only when nobody active has it.
+     Built-in roles never change.
+230. The person's extra capabilities are read with the session on every request, so a change
+     applies on their next request. Sign-in and the current session carry them
+     (`LoginResponse.staff.capabilities`), and the console shows what they open (the dashboard
+     for a role that adds the menu, staff or devices; its overview, orders and alerts stay with
+     OPERATIONS_CONFIGURE).
+231. Real-time rooms still follow the built-in role: a custom role that adds, say, billing sees
+     billing changes when its screen reads again, not live. The waiter app and tablet still show
+     what the base role allows; the server honours the extra grants everywhere.
+
+Decided 2026-10-01 (P4-02d):
+
+220. The menu editor is a dashboard page (`/manage/menu`) for MENU_MANAGE (Owner and Manager)
+     with three tabs: Dishes, Categories, Option groups. Edits are a draft that every device gets
+     only when the manager presses Publish (MENU-013); availability and stock apply at once
+     (MENU-006), as the server already did.
+221. The draft returns every combo's parts and each counted dish's stock (`MenuDraftResponse.combos`,
+     `ItemView.stockCount`). Stock is not part of a dish's audit snapshot: it moves with every
+     order and has its own entries.
+222. A dish that is a combo stays a combo (the API has no way back); archive it to stop selling
+     it. Its own price is the combo price.
+223. Prices are typed in rupees with up to two decimals and sent as paise. Changing a saved dish's
+     price offers an optional reason, kept with `ITEM_PRICE_CHANGED` (MENU-009). Archiving asks
+     for a reason of at least 3 characters.
+224. A new dish starts on every sales channel, with the restaurant's tax group and station when it
+     has only one, and the next display order in steps of 10 so others fit between.
+225. A photo (JPEG, PNG or WebP, at most 5 MB) uploads as soon as it is chosen; removing it only
+     unlinks it from the dish (unused renditions are purged later, DATA-007).
+226. The console's browser tests raise `auth.attemptsPerMinutePerDevice` to 100 for their single
+     browser, which stands in for a terminal many people sign in on within a minute; the
+     restaurant default stays 10 (SEC-009).
+
+Decided 2026-10-01 (P4-02c):
+
+213. Devices are a dashboard page of their own (`/manage/devices`) for people who pair devices
+     (DEVICE_PAIR: Owner and Manager), not part of the Staff area: devices belong to tables,
+     stations and the counter as much as to people. Pagers are listed there too, but registered
+     and given out on the Pagers page.
+214. The device list (`DeviceView`) adds whether a device is connected now (an app with a live
+     socket, a pager by its heartbeats), its last battery, firmware, serial and when it was
+     unpaired. `DeviceSummary`, which the apps read about themselves, is unchanged.
+215. Pairing, unpairing, renaming and moving a tablet are announced as `RestaurantChanged`
+     `DEVICES`. Connections are not announced (they come and go all the time); the page reads
+     them again every 30 seconds.
+216. Renaming is audited (`DEVICE_RENAMED`, old and new name); the same name again records
+     nothing; an unpaired device cannot be renamed. Unpairing asks for a reason of at least 3
+     characters for the audit trail.
+217. The device in use cannot unpair itself from its own page (the server already refused it).
+218. "Locate" (MGR-006, a Should) waits for the device side: the table tablet's app (P3-01) and the
+     pager firmware (P2-05) will each act on a locate message.
+219. Every database session runs in UTC (`-c TimeZone=UTC`, server, Control Plane and seed). Found
+     building on a PC set to India time: PostgreSQL's `initdb` copies the PC's zone, and the pg
+     driver adapter sends and reads timestamps without an offset, so every stored instant was
+     5 h 30 off and times PostgreSQL wrote itself (`now()`) read wrong. CI never saw it because its
+     database runs in UTC. The installer (P0-16) sets up PostgreSQL on an India-time PC, so this
+     mattered for every restaurant.
 
 Decided 2026-09-28 (P4-02b):
 
@@ -1347,8 +4231,7 @@ Decided 2026-09-26 (P2-03b):
      enough battery. The low-battery level is per device type since decision 119 (it was one
      shared `notifications.lowBatteryPercent`, default 20 %).
 104. The disk check runs hourly on the server PC and alerts every restaurant on it when the data
-     drive is at or above `storage.warnPercent` (default 80 %), until space is freed. Since
-     decision 243 (it was a second setting, `notifications.diskAlertPercent`).
+     drive is at or above `notifications.diskAlertPercent` (default 80 %), until space is freed.
 
 Decided 2026-09-26 (P2-03a):
 
@@ -1503,6 +4386,51 @@ Security-sensitive PRs for the P8-03 human review:
 - #59 P2-06b: the waiter phone's foreground service and wake lock, the non-exported receiver that
   acknowledges from a notification (and keeps presses in private preferences), alert text on the
   lock screen, and the new Android permissions (blocked on the table tablet).
+- P0-16a (merged locally): the Electron shell's web preferences, navigation and permission
+  rules, and its certificate rule pinning the installation's CA on loopback.
+- P0-16b (merged locally): the DPAPI secret store (machine scope, entropy, the PowerShell call),
+  the database logins and their grants, keeping the administrator's login from the server, and
+  the watchdog acting as LocalSystem.
+- P0-16c (merged locally): the folder permissions, the server's virtual account, the firewall
+  rules, the Owner's permission to delete the data (`POST /api/v1/system/data-deletion`) and the
+  uninstaller's checks before deleting anything.
+- P0-16d (merged locally): Electron's fuses, the elevated installer and the PowerShell it runs
+  (arguments built from the command line), the pinned downloads and their checksums, the signing
+  secrets' use in CI, and what the uninstaller does with `/DELETEDATA`.
+
+- P7-04d (merged locally): the client-version check that runs before authentication (it reveals
+  only the client API range `/version` already shows), the parsing of `x-rp-client` (strict
+  pattern, bounded lengths) and what is stored from it, and the Control Plane CLI reading a
+  matrix file.
+- P7-04c (merged locally): the update hand-off from the server's account to SYSTEM (the request,
+  the watchdog starting the scheduled task, the task's principal and XML), the updater reading
+  only in the data folder and checking the installer's hash and Authenticode signer in an
+  administrators-only folder, run-once by request id, the update-signing settings and the CI
+  build's unsigned-update allowance, the database copy and swap with the administrator's login.
+- P2-04b1 (merged locally): the secure boot v2 signature check of pager firmware
+  (`firmware-image.ts`) and the trusted key list, the public firmware download with its one-time
+  token, the pager's new `ota` topic in the broker's ACL, and the reports a pager may send about
+  offers (only for versions offered to it, once).
+- P8-03b4a (merged locally): vendor sign-in (the try counted before the check, the step spent
+  once, one answer for unknown and disabled accounts with their in-memory lock), the two-person
+  reset of a Super Admin, cloud backup retention by the Control Plane's times with the date check
+  and the daily number, the request log's masking of bill links and grants, the https rule, and
+  ADR-0021 with the cross-tenant test (a reviewer should check that every PC endpoint really
+  scopes by installation, not only that the test passes).
+- P8-03b1 (merged locally): CI's code-signing gate and the `release-signing` environment, the
+  REVOKE of UPDATE on payments, cash movements and day-ends, the pager broker dropping an unpaired
+  pager, TLS required in production, the redaction of `x-override-token`, and the threat models
+  themselves (`docs/security/threat-models/`), which the human review should read first.
+- P8-03a (merged locally): the permission guard's device lists and `DEVICE_NOT_ALLOWED`,
+  sessions only on staff devices (sign-in, refresh and `SessionService`), no pairing code for a
+  pager, the Control Plane's development object-store routes and their grant schema, and the two
+  authorisation sweeps with their lists of public endpoints.
+- P8-03c2a (merged locally): the HTTPS port's limits per address before the TLS handshake and
+  before any request is read (`limitFloods`), the exemption of the PC's own addresses (a reviewer
+  should check that nothing on the PC, a proxy or a port forward, makes a LAN host arrive as
+  loopback), the socket's limits per device checked between the device token's signature and the
+  database (`authenticateToken`'s `beforeLookup`), and a stalled connection's TCP socket
+  destroyed.
 
 Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md`):
 
@@ -1511,434 +4439,3818 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
 
 ## Session log (newest first)
 
-### 2026-10-11: P1-08c Free a table opened by mistake (POS)
+### 2026-10-11: syncing the Mac build with GitHub
 
-Merged #83 (P4-04a) once CI, CodeQL and e2e were green. Planning P4-04b showed that its "Install
-now" check (every table closed) could not be met on the POS without billing a table, because the
-POS had no way to free a table opened by mistake. P1-08c adds it, as a small POS WP.
+GitHub's `main` and the local Mac build had diverged from `40890a4` (2026-10-01): a Claude Code on
+the web session merged 50 commits on GitHub (73 WPs done, mostly a second build of P4-02c to P4-04),
+while the Mac built 255 commits locally (117 WPs) with no GitHub login. A trial merge conflicted in
+116 files. Decided by the Business Owner: keep the Mac build. GitHub's `main` is merged with the
+`ours` strategy, so its history stays and its code is not taken. Ported from it: the SEC-013
+dependency fixes (overrides for `shell-quote` and `source-map-js`, `sharp` 0.35.5 everywhere
+including the QR menu's `next`) and the two reviewed audit exceptions (`node-forge`, `braces`, no
+fixed release; reasons in `infra/ci/README.md`). Not ported, listed under "Recommended next WPs":
+free a table opened by mistake (P1-08c there) and the printer-offline and disk alert words.
+Gotcha: stop any other session building on GitHub before the next sync, or the two diverge again.
+
+### 2026-10-11: P8-06b pilot KPI views
+
+Two views. (1) `GET /api/v1/reports/approvals` (`ApprovalTimeReportResponse`, `APPROVAL_TARGET_SECONDS` = 90): per customer order (tablet, QR) the wait from placing to the first approval that sent it on (`min(sent_at) - min(created_at)` over approved lines), median, p95 and the count over target per day and in total, plus rejected orders; a console report "Approval time" under Operations. (2) `GET /v1/vendor/installations/:id/availability?days=` on the Control Plane (`AvailabilityResponse`, `AVAILABILITY_TARGET_BP` = 9,990) and an "Availability in trading hours" card on the installation page: `availabilityOf` in `@rp/domain` counts an open minute (from the PC's reported opening hours; every minute if none) as down when the PC had been silent longer than the offline limit, the same rule as the OFFLINE alert; minutes before the first heartbeat are not counted; days are in the PC's time zone, up to 31. Decided: no export for the approval report (it is not an RPT export type); the median, not the mean, is judged against 90 s. Gotchas: the heartbeat table has no purge yet, so the view reads whatever history exists; the per-minute loop costs about 45k steps for 31 days. Deferred to P8-06c: the pilot itself (people, devices, 4 weeks), which also records the baselines in `docs/build/pilot/kpi-plan.md`.
+
+### 2026-10-11: P8-06a the pilot gate
+
+`pnpm trace --strict` now passes: Must 277/287 covered by tests, the other 10 listed in `docs/build/manual-evidence.json` (hardware, a signed agreement, a GitHub setting or the pilot itself). Strict mode accepts those as pending evidence, never as covered; it fails if a listed requirement gains a test (remove the entry) or is unknown. Tagged existing tests for ORD-006, ORD-009, MGR-009, AUTH-014, AUD-007, SEC-014. New tests: `apps/server/test/unit/module-boundaries.test.ts` (INT-001, INT-003: the core never imports pagers, recommendations, relay or service requests) and `packages/domain/test/repo-rules.test.ts` (NFR-M02, M03, M04, L01, SEC-016). New docs in `docs/build/pilot/`: `uat-plan.md` (S1-S14 mapped to tests and to the people-and-devices run, role scripts U-01 to U-12), `go-live-checklist.md` (with the evidence table and the Business Owner's sign-off), `kpi-plan.md` (each BRD §2 KPI's source, rhythm, baselines and the feedback loop). Decided: the pilot length stays at the BRD's 4 weeks. Deferred to P8-06b: a report for customer-order approval time (R-04) and an availability-over-time view; the pilot itself needs people. S3, S4, S5 and S14 have no test tagged with their scenario ID; the UAT plan points at the tests that cover them (watchdog, print queue, notifications), so re-tag them if a later session wants a one-to-one map.
+
+### 2026-10-11: P8-05 runbooks, manuals and training scripts
+
+Documentation only. New runbooks: `installation.md`, `restore.md`, `update-and-rollback.md` (front doors that route to the detailed runbooks), `support-playbook.md` (triage, paper fallback, common problems) and `developer-onboarding.md`. New `docs/manuals/`: one manual per role (owner, manager, cashier, waiter, kitchen) and `training-video-scripts.md` (12 videos). Incident response already existed (`docs/security/incident-response.md`). Decided: manuals follow the permission matrix in `@rp/domain`; the paper-fallback procedure and severity response times in the playbook are defaults for the Business Owner to confirm. Deferred to a person: Business Owner review (the WP's acceptance), approving the video scripts and filming the videos. Gotcha: the manuals describe screens from the code and help text, not from a run of the app, so check them against the real screens at the first usability session.
+
+### 2026-10-11: P8-04b contextual help and first-use tips
+
+Every dashboard page now has a Help button (a short explanation in a dialog) and, the first time a person opens the page, a dismissible tip above it (`apps/console/src/help/`, `help.*` strings in `@rp/i18n`). What a person has seen is kept per person in `localStorage` on that device. Decided: the tip is an inline note, not a dialog, so it never blocks work or the screen reader's view of the page. Deferred: help on the POS and KDS modes and the phone apps; training videos are P8-05. Gotcha: `apps/console` tests read `@rp/i18n` from `dist`, so run `pnpm --filter @rp/i18n build` after adding strings.
+
+### 2026-10-11: P8-04a the UX audit, the screen-states guard and the usability scripts
+
+Found most of P8-04 already enforced: touch-target and axe tests exist in every web app, and the QR menu and console run axe in a real browser. Added `apps/console/test/screen-states.test.ts` (a loading state needs an error state; a list needs an empty state), `docs/usability/ux-audit.md` and `docs/usability/usability-test-scripts.md`. Deferred: contextual help (P8-04b), pilot results and a TalkBack pass (P8-04c [H]).
+
+### 2026-10-11: P8-03e the incident response plan and the penetration-test pack
+
+Decided: the plan keeps blanks (italic) for every name, phone and address, since only the Business Owner
+can fill them; the pilot's entry criteria (P8-06) must check manual task 36 step 1. DPDP: the vendor tells
+the restaurant (fiduciary) at once; the restaurant tells the Board and persons; the 72-hour detailed report
+is stated "confirmed by counsel". The CERT-In address is stated with "check it, it changes". Vulnerability
+disclosure policy (ETSI 5.2): acknowledge in 3 working days, 90 days to fix. RELAY-S3 moves to manual task 20
+(nothing watches credential use), RELAY-S4 becomes Partly mitigated (guidance written; domain is manual
+task 21), PC-D7 keeps manual task 25 (restore rehearsal). ETSI-5.2 and ASVS-14.6 now plan manual task 36.
+
+Built: `docs/security/incident-response.md`, `incident-templates.md`, `pentest-pack.md`, manual task 36,
+links from the security and runbooks READMEs. Threat summary regenerated (195 threats, 29 with a plan).
+Verified: `pnpm security:threats`, `pnpm security:checklists`, links resolve. No code changed.
+Next: P8-04 UX polish and accessibility audit, P8-05 runbooks and manuals, P0-H1 firmware.
+
+### 2026-10-11: P8-03d2b2d the four standards checklists
+
+Decided: a row is a control group (an ASVS section, a MASVS control, an ETSI provision, a CIS
+setting group), not each of ASVS's ~280 requirements. A control is Met only for what is built; what
+needs a person, an account or a device is a Finding with the plan its threat already had. ETSI's
+pager side is Findings until P2-05 (the firmware does not exist); the PC's side is Met. New: ETSI-5.2
+(a vulnerability disclosure policy, no contact exists yet) goes to P8-03e. No threat now names
+P8-03d as its plan.
+
+Built: `docs/security/checklists/` (README, `asvs.md`, `masvs.md`, `etsi-en-303-645.md`,
+`cis-windows.md`), `infra/ci/check-checklists.mjs` and `pnpm security:checklists` (in `pnpm check`),
+8 node tests in `check-checklists.test.mjs`. Gotcha: evidence must be a path starting with a known
+top folder (`apps/`, `docs/`, ...) or a threat id; root files other than `*.md` cannot be cited.
+Next: P8-03e (incident response plan, pen-test pack), then P8-04.
+
+### 2026-10-11: P8-03d2b2c2 the database's own account and a name-constrained CA
+
+Decided: PC-I6: `pg_ctl register -U NT SERVICE\RPDatabase` (virtual account, no password). The ACL plan
+already names accounts by computed SID, so it does not need the service to exist (the earlier note
+said it did); only the folders' `NetworkService` entries became the database SID. An installation
+from before is moved by `sc config RPDatabase obj=` in `postgres-register`, with the database
+stopped first and the permissions set before. PC-S4: a new CA carries a critical name constraints
+extension (private IPv4 ranges; DNS `localhost`, `local`, `lan`, `home.arpa` and the PC's own names
+when the CA is made). A name outside it is left off the server certificate rather than stopping the
+server (a PC with a public address stays up). An existing CA is kept (replacing it re-pairs every
+device), so old installations stay unconstrained. ADR-0011 amended; both threats Mitigated (summary
+29 with a plan).
+
+Built: `nameConstraintsDer`, `nameConstraintsOf`, `namesWithinConstraints` in
+`apps/server/src/tls/certificates.ts`, used by `TlsStore`; `pgServiceAccount`,
+`pgServiceAccountArgs`; the ACL plan and install order in the PowerShell. Tests: server unit `tls`
+11 (a real TLS handshake: a LAN certificate connects, a public address is refused), `installation`,
+Pester `Permissions` 12 (all Pester 141 pass), `tls.int` 10. Not run here: the account change on a
+real Windows PC (manual task 35, step 4). Next: P8-03d2b2d.
+
+### 2026-10-11: P8-03d2b2c1 the PC as a computer: BitLocker, accounts, network
+
+Decided: no software can stop a Windows administrator, so PC-E2, DESKTOP-E4, PC-T7 and PC-D6 are
+procedures (`docs/runbooks/windows-host.md`, a new readiness line for the Windows accounts, the staff
+range asked for on the Wi-Fi line, manual task 35) and keep a plan or an acceptance. PC-I5 is
+software: the server asks Windows (`Get-BitLockerVolume`, PowerShell 5.1, at most every 10 minutes)
+whether the data drive is protected; `storage.encryption` on the System page, a red notice on
+`NOT_ENCRYPTED`, silent on `UNKNOWN` (not Windows, or not allowed). Suspended protection reads as not
+protected. PC-I5 Mitigated (summary 31 with a plan). P8-03d2b2c is split: PC-I6 (the database
+under its own virtual account: the folder permissions need the service to exist first, so it needs
+the Windows CI job) and PC-S4 (CA name constraints, amending ADR-0011) go to P8-03d2b2c2.
+
+Built: `apps/server/src/system/disk-encryption.ts`, `DiskEncryption` in contracts (docs regenerated),
+strings, readiness item `accounts`. Tests: server unit `disk-encryption` 3, console `system` 24+1.
+Not run here: the PowerShell on a real PC (needs Windows and BitLocker; manual task 35).
+Also fixed: `control-plane.int.test.ts` failed on `main` since P8-03d2b2b2 (the test server has a
+product version but no file list, so `CODE_MODIFIED`); it now stubs `checkServerFiles`. Run the
+integration tests of a WP that touches the licence agent.
+Next: P8-03d2b2c2.
+
+### 2026-10-11: P8-03d2b2b2 LICENCE-T5 the server's files checked against the release
+
+Decided: no obfuscation (the customer administers the PC; it would only slow a patcher and hurt
+support); detection instead. The installer build lists every code file of the server and its `@rp`
+packages with SHA-256 (`integrity.json`, written by `dist/integrity/write-cli.js` in `stage`); the
+server checks them at start-up and hourly through the licence agent, and a difference, or no list on
+an installed server (`productVersion` known), is the tamper event `CODE_MODIFIED`, a serious kind
+that alerts at once (`LICENCE_TAMPERING`). Reported only, not restricted. LICENCE-T5 is Accepted at
+residual Medium (a determined administrator can patch the check too).
+
+Built: `judgeIntegrity` (domain), `apps/server/src/integrity/`, the kind in contracts, domain, the
+Control Plane's and its web app's texts and `en.ts`; threat model and summary (195 threats, 33 with
+a plan). Tests: domain code-integrity and fleet-health, server unit `server-files`. Not run here:
+the agent's hourly check on a real installed layout (needs the Windows installer; first packaged run).
+Next: P8-03d2b2c.
+
+### 2026-10-11: P8-03d2b2b1 which commit a signed installer came from
+
+Decided: evidence is a new `release-evidence` job (main only, no certificate, no environment) after
+`windows-installer`: SBOM of the commit, `release-manifest.json` (version, full commit, run,
+repository, SHA-256 of installer, version matrix and SBOM) and GitHub build-provenance attestation of
+all four. P8-03d2b2b is split: LICENCE-T5 is a design question (integrity checks and obfuscation
+against a customer who is the PC's administrator, and files' hashes on the heartbeat) and goes to
+P8-03d2b2b2.
+
+Built: `infra/ci/release-manifest.mjs` and its tests, the job in `ci.yml` (actions pinned by commit:
+attest-build-provenance v4.2.2, download-artifact v8.0.2), the CDXGEN pin kept equal to
+`security.yml` by a test. UPDATE-R3 Mitigated (summary 34 with a plan). Manual task 31 has the
+`gh attestation verify` step. Not run here: the job itself (needs GitHub; no credentials on this
+Mac), so the artifact flattening step and the attestation are checked on the first push to main.
+Tests: `pnpm ci:test` 28, `pnpm security:threats`. Next: P8-03d2b2b2.
+
+### 2026-10-11: P8-03d2b2a the update signer pinned by its issuer
+
+Decided: the pin is subject plus issuer, not the thumbprint, so the vendor can renew its
+certificate from the same authority without a new installer; a signed build is refused without
+`RP_UPDATE_ISSUER` (`releaseRefusals`, `updateSettingsFrom`); an installation file from before this
+(`updates.issuer` null) checks the subject only.
+
+Built: `issuer` on `SignatureSeen` / `SignaturePolicy` and in `judgeSignature`; the PowerShell reads
+`SignerCertificate.Issuer`; `updates.issuer` in the installation file, `--update-issuer` on
+`setup-cli`, `-UpdateIssuer` on the installer script, `RP_UPDATE_ISSUER` as build variable, NSIS
+define and server environment; `Test-RPInstallerSignature -Issuer`; CI passes the repository
+variable on `main` only. UPDATE-S2 Mitigated (summary 35 with a plan). Manual task 31 and the
+software-updates runbook say to set `RP_UPDATE_ISSUER` with the certificate.
+Tests: server unit (updates, installation), desktop 56, `ci:test`, Pester SoftwareUpdate 30,
+Install, Scripts, Update (run with `~/.local/bin/pwsh`). Next: P8-03d2b2b.
+
+### 2026-10-11: P8-03d2b1 the Control Plane's step-up and audit copy
+
+Built: `STEP_UP_OPERATIONS` and `x-rp-step-up` in the contracts (ten operations: staff accounts,
+access reviews, releases and rollouts, pins, restore codes, remote settings); `@StepUp()` and the
+guard check a code never used before (the sign-in's does not count), through
+`VendorAuthService.stepUp` (wrong codes count towards the 15-minute lock and are audited as
+`vendor.step_up_failed`; 403 `STEP_UP_REQUIRED`, the session stays); the web app's `StepUpPrompt`,
+`StepUpDialog` and the client asking before those calls; every audit entry also logged as an
+`"event":"audit"` line for the host's log store; `read-audit.test.ts` makes each new vendor read
+a decision; vendor access policy (step-up, audit copy, reads, the CLI's host); manual task 34.
+Threats: CP-S2 and CP-R1 Mitigated, CP-T5 and CP-R2 Partly mitigated until manual task 34.
+Tests: Control Plane 197, Control Plane web 79. Gotchas: Control Plane tests use `bearer(token)`,
+which now adds a fresh step-up code for sessions opened by `signInVendor` (or `knownSession`) and
+moves the service's `clock` to that code's time; `bearerOnly` sends none. Under `pnpm test` the
+relay's tests sometimes report "1 error" when the machine is loaded (they pass alone and on
+`--force`). Decided: the only audited reads are diagnostics bundles and restore codes, since all
+others show the Control Plane's own records.
+
+### 2026-10-10: P8-03d2a phones and tablets hardening
+
+Built: `allowBackup: false` in both app configs; `AndroidManifest` test (only the device admin
+receiver is exported, with its system permission; permissions listed); `FLAG_SECURE` through
+`RpKiosk.secureScreen`, `AndroidScreenGuard`, and `setScreenGuard`/`useSecureScreen` in
+`@rp/ui-native` (the PIN pad holds it, ref-counted); lock-screen alert private with a public
+version and Acknowledge needing authentication; alerts channel v2; kiosk user restrictions;
+`docs/runbooks/mdm-policy.md`; manual task 33. Threats: MOBILE-I3 and T3 Mitigated, E4 Accepted,
+E2, R2, I4, S1 Partly mitigated pending the device checks. Tests: ui-native 31, mobile-native 45,
+waiter-app 71, table-tablet 32. Deferred: kiosk mode reported to managers' screens (needs a
+contract change; small WP), the checklists (d2b). Gotcha: the Kotlin changes are uncompiled;
+`setAuthenticationRequired` needs androidx.core 1.7+ (Expo 57 has it).
+
+### 2026-10-10: P8-03d1 The Electron shell's hardening
+
+Decisions 788 and 789. Five threats closed: DESKTOP-E2, E3, I3, R2, S1 (summary now 41 with a plan).
+
+Built: `debuggingSwitchIn` and `devTools: false` in `security.ts`; `startShell` quits on a debugging
+switch, removes the menu, refuses every device and cancels the USB, serial, HID and Bluetooth
+pickers, and logs each refusal; `certificateVerdict` lets the pin decide on the loopback address;
+`src/file-log.ts` and `ShellConfig.logFile` (`RP_SHELL_LOG_FILE`); `main.ts` wires them. Tests:
+desktop 55 (new: file-log 3, shell 4, security 2), `pnpm security:threats` green.
+
+Not done: P8-03d2 (checklists, MDM policy, 21 other threats). A real Electron run of the new
+handlers (Windows) is part of manual task 14's check on a clean PC.
+
+### 2026-10-10: P8-03c2b Floods at the cloud's edges
+
+Decisions 785 to 787. CP-D1 and RELAY-D4 reduced to Low and moved to manual task 32 (the edge's
+rules need the hosting accounts); no threat is planned for P8-03c2 any more.
 
 Built:
 
-- Console: `FreeTableDialog` (a reason dialog calling `closeTableWithoutBill`), offered as "Free
-  the table" in an occupied table's details while nothing billable has been ordered and nothing
-  waits for approval; a toast and the floor reads again.
-- i18n: `pos.table.free` and `pos.free.*`.
-- Tests: 3 console tests (freeing with a reason, with axe; not offered once something is ordered
-  or waits for approval; the server's refusal shown in the dialog). P4-04b's Playwright step will
-  use it to close the table it opens.
+- Control Plane: `src/http/request-limits.ts` (`requestLimitMiddleware`, a token bucket per client
+  address, second in the pipeline after the headers; 429 `RATE_LIMITED` with `Retry-After`), four
+  settings in `CpConfigSchema`, and the `CP_TRUST_PROXY` rule for staging and production.
+- Relay: `infra/supabase/src/read-throttle.ts` (`ReadThrottle`) in `qr-menu`, `order-status` and
+  the GET of `service-request`, before the database; the address is Cloudflare's header or the
+  last `x-forwarded-for` entry.
+- QR site: `src/site/menu-cache.ts` (`sharedMenu`) used by the table page; failures not kept.
+- `infra/edge` (README with the rules, `check-edge.mjs`), manual task 32, tests in
+  `infra/ci/check-edge.test.mjs`.
+- Tests: Control Plane unit `request-limits.test.ts` (5), integration `request-limits.int.test.ts`
+  (2), config (1 new; production fixtures now set `CP_TRUST_PROXY`); relay `read-throttle.test.ts`
+  (4); QR site `menu-cache.test.ts` (2); `ci:test` (3).
+- Docs: CP-D1 and RELAY-D4 in the threat models, `dast.md`, `phase-8.md`, the Control Plane README
+  and `.env.example`.
 
-Gotchas for the next session:
+Not done: the edge rules themselves and a run of `check-edge.mjs` against staging (manual task 32);
+the relay throttles are per function instance, so only the edge counts across instances.
 
-- In jsdom, `user.keyboard('{Escape}')` does not close the native `<dialog>`; click the dialog's
-  close button (`ui.dialog.close`) instead.
-- A `TableOverviewEntry` with `session: null` is a free table whatever its `state` says to the
-  floor helpers; give an occupied table a session object in test data.
+### 2026-10-10: P8-03c2a Floods from the LAN
 
-Decisions: 296 to 298.
-
-### 2026-10-10: P4-04a Device and system alerts
-
-Merged #82 (P4-03e) once CI, CodeQL and e2e were green, and split P4-04 into P4-04a (device and
-system alerts) and P4-04b (the System page).
-
-Built:
-
-- Server: `DeviceLiveness` (`src/devices/device-liveness.ts`) keeps `online` for kitchen screens
-  and table tablets from the gateway's connection changes (`RealtimeGateway.onConnectionChange`,
-  new): online and announced at once on connecting, offline once the last connection has been
-  closed for `devices.offlineAfterSeconds`, with the grace counted from the server's start after a
-  restart and a check every 5 s. The announcements are `DeviceStatusChanged`, which the P2-03b
-  triggers already turn into one alert per state, cleared when the device is back.
-- Contracts and i18n: the new setting with its label and hint; `ui.size`; the printer and disk
-  alert words.
-- Ordering: `describeAlert` gives a printer alert the printer's error and the tickets waiting for
-  it, and the disk alert how full the drive is and what is free; `sizeText` writes sizes as
-  Windows does.
-- Tests: 6 server integration tests (online at once; offline only after the grace, with its
-  alert, cleared on reconnect; a reload raises nothing; a second connection keeps a device online;
-  the restaurant's own grace; the grace after a restart and a missed connection put right; pagers,
-  phones and unpaired devices untouched), 3 ordering tests, and a Playwright step (a kitchen screen
-  switched off and on again, then three seeded alerts, each acknowledged).
-
-Deferred:
-
-- The 90 % disk alert and storage by category (P7-06), the update alerts (P7-04), and the System
-  page (P4-04b, next).
-
-Gotchas for the next session:
-
-- At a socket's `disconnect` it has already left its rooms, so `isDeviceConnected` there says
-  whether another connection of the same device is still open.
-- An outbox row's `payload` is the whole event (the event's own payload is `payload.payload`);
-  order rows by `writeOrder`, since `sequence` is set only when the event is published.
-- Integration tests that close their clients in `afterEach` leave earlier devices disconnected,
-  so the liveness tests assert per device, never on counts across the restaurant.
-- The e2e finds an alert group by its region name with any count (`^Kitchen \(\d+\)$`): earlier
-  steps can leave other alerts open. The e2e's seeded alerts are inserted with SQL
-  (`seedAlerts`), so the page is opened again to read them.
-
-Decisions: 289 to 295.
-
-### 2026-10-10: P4-03e Tax and invoice (P4-03 done)
+Split P8-03c2 into P8-03c2a (this one) and P8-03c2b (the Control Plane's and the relay's edges:
+CP-D1, RELAY-D4). Decisions 778 to 784. PC-D3 mitigated: 134 mitigated in all, 5 residual Highs,
+46 threats with a plan.
 
 Built:
 
-- Console: Settings → Restaurant (`RestaurantScreen.tsx`, `RestaurantDialogs.tsx`, logic in
-  `restaurant-view.ts`): the name, phone, email and logo, the opening hours day by day and when
-  the business day ends, each part with its own dialog, for everyone who opens Settings. Settings
-  → Tax and invoice (`TaxScreen.tsx`, `TaxDialogs.tsx`, logic in `tax-view.ts`): the invoice
-  particulars, the tax groups and the invoice series, changed by the Owner after the second
-  factor and shown read only, with a note, to everyone else. `FormDialog.tsx` holds the dialog
-  frame and the optional reason the settings dialogs share; the Floor and Printing dialogs moved
-  onto it. Strings under `restaurant.*` and `tax.*`.
-- Server: the refusal to archive a tax group in use reads well for one item, and the integration
-  test checks its words.
-- Tests: the view logic on its own (contact, hours, cut-off, legal particulars and GSTIN, tax
-  groups, series and their first number), both screens with Testing Library and axe (second
-  factor, cancelling it, refusals kept in the dialog, live changes, read-only views, a custom role
-  without `MENU_MANAGE`), and a Playwright step: a manager sets every day's hours, the Owner adds
-  a tax group and a series after the second factor and archives the group, and the manager sees
-  the tax page read only.
+- `apps/server/src/http/flood-limits.ts`: `limitFloods`, applied by `configureApp` (its request
+  limit runs third, after the correlation id and the security headers), with `ServerLimits`,
+  `DEFAULT_SERVER_LIMITS` and `httpsLimitOptions` (the handshake's timeout and the check interval,
+  which `httpsOptionsFor` gives `https.createServer`). Every TCP connection is counted per address
+  before its TLS handshake, with how fast they come; requests per address get 429
+  `RATE_LIMITED`, `Retry-After: 1` and `Connection: close`; Node's header, request and idle
+  timers; refusals logged once a minute with their count.
+- `apps/server/src/common/flood-limits.ts`: `ConnectionGate`, `TokenBucket` (now with `full`),
+  `ThrottledLog` and `isLoopback` moved out of the pager broker's `broker-limits.ts` (which
+  re-exports them), and `KeyedBuckets`, a token bucket per key that forgets full ones.
+- `NEST_APP_OPTIONS.forceCloseConnections`: the flood test found that connections held without a
+  request kept the server from stopping.
+- The socket (`RealtimeGateway`): `maxConnectionsPerDevice` (16), `handshakesPerMinutePerDevice`
+  (60) and `maxUnsentPerConnection` (1,000) in `RealtimeOptions`; a device's handshake is counted
+  by `reserve` from `authenticateToken`'s new `beforeLookup` hook, between the token's signature
+  and the database; each connection's `unsent` and `flushed` follow engine.io's `packetCreate`
+  and `flush`, and the sweep destroys a stalled connection's TCP socket (`reading`).
+- `@rp/contracts`: `REALTIME_CONNECT_ERRORS.tooManyConnections`; `@rp/api-client` retries it like
+  a starting server.
+- Tests: `test/unit/flood-limits.test.ts` (the buckets, and the limits on a plain HTTP server with
+  a clock of its own); `test/integration/flood.int.test.ts` (over HTTPS from 127.0.0.1 and ::1:
+  the handshake, slow headers and idle timeouts, the connections per address and how fast they
+  come, 429 with the connection closed, a stop while connections are held, a device's sockets and
+  handshakes, a connection that stops reading, and a flood at full speed from a worker thread
+  against the production limits while another device's screen and request are timed);
+  `createTestApp`'s `host` and `serverLimits`; the realtime test client's `checkServerIdentity`.
+- Docs: PC-D3 in the threat model and its summary; `dast.md` (what ZAP does not flood);
+  `docs/security/README.md`; the server README ("Floods from the LAN"); `phase-8.md` (as built, and
+  a flood drill from a laptop on the staff Wi-Fi added to P8-02).
 
-Deferred:
+Flood figures (this Mac, 3 s from one host, 50 lanes): about 14,000 requests sent, about 13,100
+refused at the connection, 95 answered 429, about 700 answered; without the limits about 21,000
+were answered. Another device's event reached its screen in 12 ms (27 ms without the limits) and
+its request was answered in 2 ms (40 ms).
 
-- Nothing from the spec. The first-run wizard that walks through these steps is P7-07; these
-  pages are what it will reuse.
+Tests: server 1274 (+20: 9 unit, 11 integration; 28 skipped), api-client 43 (+1), contracts
+965, console 385, Control Plane 183, relay 157; all 44 test tasks green; format, lint, typecheck,
+contract docs, compat and `pnpm security:threats` green. Traceability: Must 264/287.
 
-Gotchas for the next session:
+Also fixed: the short rush (`load-rush.int.test.ts`, every build) failed once with
+`approveOrder 409 OUT_OF_STOCK`: a manager took a dish off while a diner's order waited for its
+waiter, and the server rightly refused to send it. The simulated waiter now turns such an order
+down (`rejectOrder`), and `SimulatedDevice.call` takes the refusals a run causes itself
+(`expected`) without counting them as failures.
 
-- `labelled()` in the console tests now matches the whole label with an optional " *" (the
-  required mark): "Address" no longer matches "Address, second line (optional)".
-- ReasonDialog shows the server's refusal as the field's error (`rp-field__error`), not as an
-  alert; FormDialog shows it as an alert.
-- The e2e Owner has used recovery codes 0 to 3; the next Owner step should use `recoveryCodes[4]`.
-- An invoice series's example depends on today's financial year: compute it with the domain's
-  `formatInvoiceNumber` and `financialYearOf(calendarDateOf(now, 'Asia/Kolkata'))`, as the e2e
-  step does, rather than writing the year down.
+Not done or not verified:
 
-### 2026-10-10: P4-03d Floor, stations and printers
-
-Merged #79 (P4-03c) after fixing its one red job: the devices page test read the group headings
-right after the page heading, which shows while the list still loads, so on the loaded runner
-(coverage) they were not there yet. Reproduced by answering the device list 300 ms late; the test
-now waits for the groups.
-
-Built: console `floor-view.ts`, `FloorScreen.tsx`, `FloorDialogs.tsx`, `printing-view.ts`,
-`PrintingScreen.tsx` and `PrintingDialogs.tsx`, linked from `SettingsArea.tsx` (Floor only for
-`STAFF_MANAGE`). i18n: `floor.*`, `printing.*`, `settings.pages.floor` and
-`settings.pages.printing`, and the two hints for a floor without tables. Server: the section and
-station refusals say one thing for one table, menu item or screen. No contract, schema or route
-changes: the floor, station and printer routes existed (P1-02, P1-07a).
-
-Tests: server 752 (the floor and printing integration tests also check the refusals' words),
-console 360 (the floor's and printing's logic: sections and tables as listed, the
-section, table, printer and station forms' checks and requests, printers' health, the stations
-printing on a printer, where tickets can be sent; the Floor page with axe: lists, archived on
-request, add and rename a section, add a table after its section's tables with label checks and
-the server's refusal, change a table, archive with reasons and refusals, restore, live changes, a
-failed load, and the page hidden from a manager whose custom role does not manage staff; the
-Stations and printers page with axe: printers and stations in words, redirected and never-tried
-printers, add a network printer and three test pages (printed, not printed, printer gone), a USB
-printer's share name, sending tickets elsewhere and back with a refusal, add a station and make one
-screen-only, archive with a refusal, a printer stopping live, no printers), and 23 Playwright steps
-(was 22): Vikram adds table 11 on the terrace, a network printer at a stand-in printer that
-receives the test page, a station printing on it, sends the kitchen printer's tickets there and
-back, and archives the three; both pages and every dialog pass axe and fit a 360 px phone.
+- P8-03c2b, as split.
+- The limits on the restaurant's Windows PC and Wi-Fi: the flood test ran on this Mac (and runs in
+  CI on Linux); a flood from a laptop on the staff Wi-Fi is now a drill of P8-02 [H].
+- Apps of the previous build stop their live connection when refused with `TOO_MANY_CONNECTIONS`
+  until they restart (decision 781); no device within the limits meets it.
 
 Gotchas:
 
-- jsdom does not close a native `<dialog>` on Escape; click its Close button in tests.
-- "27 Sep" is "27 Sept" in newer ICU data for en-IN; match the month with `Sep.*`.
-- A stand-in network printer is a `net` server on 127.0.0.1 in the Playwright process: the real
-  server's transport connects, writes the ESC/POS bytes and closes, and the text reads as latin1.
-- Queries inside a section that also lists tables meet the tables' "Place" and "Archived" too;
-  scope to the section's heading block.
+- Node stops checking `headersTimeout` once `server.close()` begins (it clears the interval), so
+  connections that never sent a request kept `app.close()` waiting for ever:
+  `forceCloseConnections`.
+- `handshakeTimeout` and `connectionsCheckingInterval` are read only when the server is created:
+  they go in `httpsOptionsFor`. Plain HTTP (development, most tests) keeps Node's 30 s check.
+- Socket.io's `disconnect(true)` and engine.io's `close()` wait for the write buffer to drain,
+  which never happens for a client that stopped reading: destroy `socket.request.socket`.
+- Right after a burst of events a reading client has hundreds of messages waiting (engine.io
+  hands them over one write callback at a time), so a backlog counts as stalled only with no
+  `flush` since the last sweep.
+- Two hosts in one test: listen on `::` and connect from 127.0.0.1 and ::1. The certificate has no
+  ::1, so connect with `servername: 'localhost'`, and give Socket.io `checkServerIdentity` (engine.io
+  passes it to the WebSocket though its type leaves it out). supertest always uses 127.0.0.1.
+- A flood made in the test's own thread competes with the server for the event loop: `flood()`
+  runs it in a worker thread (`eval: true`, CommonJS).
+- `trustLoopback` is true by default, so no other test meets the limits; set it false, with
+  `host: '::'`, to test them.
 
-Deferred: drag-and-drop floor layout and printer discovery stay in P6-05 (as planned).
+### 2026-10-10: P8-03c1 The ZAP scans, security headers and the CSPs
 
-Decisions: 269 to 278.
+Split P8-03c into P8-03c1 (this one) and P8-03c2 (floods and rate limits: PC-D3, CP-D1,
+RELAY-D4). Decisions 768 to 777. Four threats mitigated: PC-I2, PC-I4, DESKTOP-I1, RELAY-T5 (133
+mitigated in all, 5 residual Highs, 47 with a plan).
 
-### 2026-10-10: P4-03c Suggestions: rules, pinned, boosted and blocked dishes
+Built:
 
-Built: `@rp/domain` `recommendations.ts`: `ITEM_PREFERENCES`, `ItemPreferenceDef`, the PINNED and
-BOOSTED layers and `recommend`'s `preferences` (pinned first, boosted before the best sellers and
-first among equals, blocked never). Contracts: `RecommendationPreference`,
-`RecommendationPreferenceRequest`, `RecommendationPreferenceView`, the list response and params,
-the PINNED and BOOSTED reasons, and the routes `listRecommendationPreferences` and
-`setRecommendationPreference`. `@rp/ordering`: "Our pick" for a pinned or boosted dish without
-words. Server: `recommendation_preferences` with migration
-`20261006000000_recommendation_preferences` (the layer enum gains PINNED and BOOSTED in their
-place), `RecommendationPreferencesService` and `RecommendationPreferencesController`, suggestions
-read with the preferences, and a rule change that only reorders its places treated as no change.
-i18n: `suggestions.*`, `settings.pages.suggestions`, `reco.reason.pick`. Console:
-`SuggestionsScreen.tsx`, `SuggestionDialogs.tsx` and `suggestions-view.ts`, linked from
-`SettingsArea.tsx`.
+- `infra/dast` (`@rp/dast`, a new workspace package): starts the QR site with its relay (two
+  restaurants, Realtime on, the site's origin the only one allowed), the relay's functions, the
+  Control Plane with the vendor web app (a Super Admin set up by the CLI, password and
+  authenticator) and the local server over HTTPS with the console (seeded, a POS inserted with an
+  Ed25519 key and its device token by challenge, the Owner by PIN), each from its build; writes
+  an Automation Framework plan per surface (request script for credentials renewed every 30 s,
+  OpenAPI import with ids given an example, spider, passive scan, active scan at medium with
+  `RULES_OFF`, JSON and Markdown reports); runs ZAP (`ZAP_PATH` or `ZAP_DOCKER_IMAGE`); judges
+  every finding against `src/triage.json` (`judge`, `triageProblems`) and writes
+  `reports/summary.md`. `pnpm security:dast`; the scans are `test/scan.test.ts`, skipped without
+  `RP_DAST=1`.
+- CI: the `dast` job in `security.yml` (on `main`, weekly, by hand) with ZAP 2.17.0's container
+  pinned by digest (`ZAP_IMAGE`) and PostgreSQL as a service; the reports kept 30 days without
+  the credentials file.
+- Headers: `API_SECURITY_HEADERS` on every answer of the server and the Control Plane,
+  `SECURITY_HEADERS` on the relay's (preflights too); `notFoundOutsideApi` in both (Express's
+  HTML 404 replaced the CSP); `redirect: false` for the web apps' files; Trusted Types in the
+  console's and the vendor web app's CSP, with `zod-jitless.ts` first in their `main.tsx`; the
+  QR site's nonce CSP in `proxy.ts` on every request, `connection()` in the root layout,
+  `instrumentation-client.ts` (Zod without eval), HSTS in `next.config.ts`; the bill page's style
+  by hash; `/version`'s `node` the major line only. `@rp/relay/testing`'s `startRelay` takes
+  `allowedOrigins`.
+- Docs: `docs/security/dast.md` (what, how, the results, what is not covered); the four threats
+  and CP-I5's note in the models, the summary; `docs/security/README.md`; manual task 21's header
+  and TLS check; the READMEs of `infra/dast`, `infra/ci`, the server, the Control Plane and the
+  QR site; CLAUDE.md's map; `phase-8.md`.
 
-Tests: domain 245 (pinned first wherever they can be served, boosted before the best sellers and
-first among a rule's, blocked never, even by a rule), contracts 558 (a preference request, its label
-only for pinned or boosted dishes, the reasons), ordering 40, server 752 (a manager pins, boosts and
-blocks dishes and the suggestions follow at once, each change audited with the reason; an archived
-or unknown dish is refused and a waiter may neither read nor change them; the list leaves out
-archived and NORMAL dishes, whose rows stay; the layers' order in the database), console 314 (the
-page's logic: rules in words, hours, dates and places, the dialog's checks, form and request, the
-dishes' order and the preview rows; the page: the rules with axe, adding a checked rule, change,
-pause, turn on and remove with a reason, no menu yet, the server's refusal in the dialog, pin with
-words, block and back, and the preview per place and dish), and 22 Playwright steps (was 21): Vikram
-adds a rule, blocks the dish it suggests, pins Gulab Jamun with "Fresh today", the preview follows
-each change, the page fits a 360 px phone, and everything is put back.
+Tests: the final DAST run (all four surfaces, about nine minutes on this Mac): no finding open,
+no High or Medium, three Lows triaged, no 5xx. Server 1254 (+2, 28 skipped), Control Plane 183
+(+3), relay 157 (+1), QR site 8 (+1), dast 12 (and the 4 scans), contracts 965, console 385,
+vendor web 75; Playwright: console 26 (+1), QR site 12 (+1), vendor web 2; all 44 test tasks
+green; format, lint, typecheck, contract docs, compat, `pnpm security:threats` and `pnpm ci:test`
+green. Traceability: Must 264/287.
 
-Gotchas:
+Also fixed: the console's e2e added a waiter with PIN 7777 and a manager with 8888, which the
+easy-PIN rule of P8-03b2a refuses; that run had been failing since.
 
-- An ICU message's text in a regular expression needs escaping: "(optional)" in a field label is
-  a group, so a name built with `new RegExp` from it never matches.
-- The best sellers are counted once per daypart and kept for ten minutes, so a browser test cannot
-  count on the preview being empty or full before it orders anything; assert what a rule or a pin
-  puts there.
-- A Postgres enum value is added in place with `ALTER TYPE ... ADD VALUE ... BEFORE`, so the
-  layers keep their order for `ORDER BY` and the schema test.
+Not done or not verified:
 
-Deferred: none.
-
-Decisions: 262 to 268.
-
-### 2026-10-05: P4-03b Notification rules
-
-Merged #77 (P4-03a), which also landed #76 (P4-02e, now shown as merged), after fixing its one red
-job: a settings screen test checked a row after a live refresh inside a 1 s `waitFor`, with a slow
-role query in the callback, and timed out on the loaded runner. Reproduced by running four copies
-on one core (three of four failed); the row is now found once and the wait allows 5 s, and all
-four pass.
-
-Built: `@rp/domain` `notifications.ts`: `vibration` on every rule, `VIBRATION_PATTERNS`,
-`NotificationRuleOverrides`, `FIXED_EVENTS`, `TABLE_ALERTS`, `recipientChoices`, `PHONE_CHANNELS`
-and `SCREEN_CHANNELS`, `fixedChannels`, `reachOf`, `channelsFor`, `repeatChoices`,
-`pagerPlaceholders`, `ruleProblems`, `overrideProblems`, `overrideFor` and `withRule`; `pager.ts`
-`vibrationFor` takes the rules. Contracts: `notifications.rules` with `vibration` and the rule
-checks; `pagers.vibration` removed (73 settings). Server: the pager broker reads the vibration
-from the rules. i18n: `settings.pages`, `notificationRules.*`; `settingItems.pagers.vibration`
-removed. Console: `SettingsArea.tsx` with General and Notifications, `SettingRow.tsx` (shared),
-`NotificationsScreen.tsx`, `RuleDialog.tsx` and `notification-rules-view.ts`. The browser test's
-takeaway step now matches its heading exactly: once the open takeaway orders had loaded,
-"Takeaway" also matched "Open takeaway orders".
-
-Tests: domain 240, contracts 551 (a rule change with its vibration, and one that
-cannot work refused with the alert and the problem), server 746 (a manager's change to the
-bill rule changes who is alerted, the pager text, escalation and repeat, with the reason in the
-audit log, and back to the factory rule the cashier is alerted again; five changes that cannot
-work are refused; a changed pager text and buzz reach the pager), console 299 (the rules page's
-logic: every alert once and in words, the changes and N and R read from the settings, whom and
-where, the pager preview and hint, repeats, editing and comparing rules, problems by field; the
-page: the rules in their groups with N, R and the nudge messages, a changed rule, the fixed rows,
-a change with a reason that keeps another alert's change, the checks, a nudge's message, back to
-the factory rule, N changed and the rules saying so, the server's refusal and a live refresh), and
-21 Playwright steps (was 20): Vikram sends water requests to the cashier too with "{table} JAL"
-and three buzzes, sets N to 90 seconds, checks a 360 px phone and puts the factory rule back.
+- P8-03c2, as split.
+- The CI job has not run (GitHub is not reachable, manual task 1); the container's host
+  networking and file permissions are untested here (Docker is not running on this Mac). The scans
+  ran with an installed ZAP 2.17.0 (`~/.local/zap`, checked against the release's SHA-256).
+- The deployments (the QR site's host, Supabase, the Control Plane's hosting) are not scanned:
+  manual task 21 checks the site's headers and TLS; the others when they exist.
 
 Gotchas:
 
-- The toasts' landmark is named "Notifications", so a page region with the same name fails axe's
-  `landmark-unique`.
-- Pass `{table}` and `{message}` into a message as values; a literal brace in an ICU message
-  starts an argument.
-- Testing Library's `user.type` reads `{` as the start of a key name: type `{{` for a brace.
-- Server tests that change `notifications.rules` reset it afterwards, or later tests' alerts
-  follow the changed rule.
-- On the Settings page, "Sign out" also matches the "Change Sign out idle …" buttons: use
-  `exact: true` in Playwright.
+- ZAP's OpenAPI import sends an empty value for a `format: uuid` parameter with a pattern
+  (`/menu/items//archive`); `forZap` gives each id an example.
+- Next.js puts the nonce on its scripts only while rendering; a page built ahead of time keeps
+  scripts the CSP refuses. Playwright's `addScriptTag` is refused too: evaluate instead.
+- `'strict-dynamic'` in Chromium also runs an inline script that running script creates; the
+  site's scripts are all its own, so `'self'` with the nonce is stricter.
+- Zod 4 probes `new Function` when it builds its first object schema; under a strict CSP or
+  Trusted Types that is a reported violation on every page. `config({ jitless: true })` must run
+  before any schema module is evaluated (first import of `main.tsx`; Next.js's
+  `instrumentation-client.ts`).
+- Nest answers unknown paths only under its global prefix; Express's finalhandler (HTML, its own
+  `default-src 'none'`) answers the rest unless a last middleware does.
+- The pager broker's timing test can fail when ZAP and the servers load the machine; it passes
+  alone.
 
-Deferred: none.
+### 2026-10-10: P8-03b4b The QR relay (P8-03b done)
 
-Decisions: 251 to 261.
+Decisions 762 to 767. Six threats of the QR relay mitigated: RELAY-D1, RELAY-D2, RELAY-D3,
+RELAY-E3, RELAY-I5 and RELAY-T8. 129 mitigated in all, 5 residual Highs; no threat is planned for
+P8-03b any more, so P8-03b is done.
 
-### 2026-10-05: P4-03a Settings from the catalogue
+Built:
 
-Opened #76 (P4-02e). GitHub's hosted runners did not pick up its lint-and-test and APK jobs, twice
-(no step ran); its end-to-end, CodeQL and security checks passed. This branch carries P4-02e's
-commits, so its CI run covers both.
+- Relay migration `20261010180000_relay_threats.sql`: the `relay_control_plane` login (NOLOGIN
+  until manual task 20), a member of `relay_provisioner` only, and `relay_edge` no longer one (the
+  first migration no longer grants it either, decision 765); `relay.rate_limit_wait` without
+  `REJECTED` orders at the table; `relay.service_request_wait` with an index on the table's
+  requests; the photos table's type check WebP only, and the bucket's types set where it exists.
+- `infra/supabase/src/http.ts`: `readCapped` (the announced length first, then a capped read of
+  the stream, cancelled past the cap), `DINER_BODY_MAX_BYTES` (512 KB), `readBody`'s cap,
+  `RoutesOptions` (`browsers`, `admit`); `server.ts`'s `credentialOf` as the `admit` check and no
+  CORS; `diner.ts`'s `tableTokenOf`, checked by `submit-order` and `service-request` before their
+  bodies; `service-request.ts` asks `relay.service_request_wait` (and still returns an open request
+  of the kind over the limit).
+- `config.toml`: the bucket WebP only. `@rp/relay/testing`'s `provision` logs in as
+  `relay_control_plane`, as the Control Plane does. `@rp/contracts`' relay routes: 413 for the
+  diners' bodies and 429 for service requests (`docs/api/relay.openapi.json`).
+- Control Plane: the `CP_RELAY_DATABASE_URL` login named `relay_control_plane` in its
+  configuration's comments and `.env.example`.
+- Docs: the six threats in the relay's model and the summary; ADR-0015 (the two logins, caps, the
+  limits); `docs/runbooks/qr-relay.md` (who reaches what, the limits, a table flooded with junk,
+  checks after a deployment); manual task 20 (step 4a, the Control Plane's login, and the
+  bucket's check); `authorisation.md`; the relay README; `phase-8.md`.
 
-Built: P4-03 split in five (phase-4.md, BUILD_PLAN.md). Contracts: the settings catalogue without
-duplicates (`pager.heartbeatSeconds`, `pager.vibrationPatterns` with `PAGER_PATTERNS` and
-`notifications.diskAlertPercent` removed; `pagers.heartbeatSeconds` set by the vendor, 10 to
-300 s). Server: `SystemAlerts.checkDisk` reads `storage.warnPercent`. i18n:
-`dashboard.section.settings`, `settings.*` (page, groups, rows, values, units, dialog, problems)
-and `settingItems.*` (name and description of every setting, option and daypart labels).
-Console: `src/manage/settings/` (`settings-view.ts`: groups, the editor from each schema, values in
-words, draft checks, who may change what; `SettingsScreen.tsx`; `SettingDialog.tsx`;
-`SettingsArea.tsx`), the Settings page in `modes.ts` (`OPERATIONS_CONFIGURE`) and
-`ManageHome.tsx`, and styles for groups, rows and windows.
+Tests: relay 156 (154 run here, 2 only on Supabase; +14: `http.test.ts` with the caps, the
+announced length, streams cut off, no body read without a token or credential, the largest order
+and no CORS on `server`; `roles.test.ts` with the two logins and the bucket's types;
+`diner-functions` rejected orders; `service-requests` the table's and the browser's limits and a
+burst, which lets three through without the lock; the Deno smoke test's large bodies and CORS);
+server's relay suites 73, Control Plane 180, contracts 965, the QR site's e2e 11/11 against the
+real relay; all 43 test tasks green; format, lint, typecheck, docs, compat, `pnpm security:threats`
+and `pnpm ci:test` green. Traceability: Must 264/287.
 
-Tests: contracts 551 (three settings fewer, one test each), server 743 (the disk alert test also
-moves the level), console 285 (the settings logic: every setting placed with an editor and words,
-values in their units, drafts checked, who may change what; the page for a manager and the Owner:
-groups and read-only badges, a number with its range, a percent with a reason, the default, the
-printer and window editors, the second factor, the server's conflict message, search and changed
-only; Settings in the modes), and 20 Playwright steps (was 19): Vikram sees the provider's pager
-check-in and the Owner's service charge read-only, sets tickets to turn amber after 8 minutes and
-the cashier's limit to 12.5 % with a reason, and the page fits a 360 px phone; Asha turns on the
-service charge after her password and a recovery code; Neha cannot open Settings.
+Not done or not verified:
 
-Gotchas:
-
-- `t()` throws on a missing key in tests, so a setting added to the catalogue without
-  `settingItems.<key>` words fails the test that places every setting. Give it words, a group in
-  `GROUP_OF_AREA` (a new area) and, if its schema is new, an editor in `fieldOf`.
-- The browser tests' setup changes two sign-in settings, so "changed only" lists them too.
-- Playwright's `getByText` and `getByRole` names match parts of words unless `exact: true`:
-  "Change Service charge" also finds "Change Service charge rate", and "On" finds "on bills".
-- Labels with brackets ("Reason (optional)") need escaping in a regular expression; the screen
-  tests use `labelled()`.
-- zod 4: the inner schema of a classic type is a core type; read its kind from `._zod.def.type`.
-
-Deferred: none (the notification rules and pager vibrations are P4-03b by design).
-
-Decisions: 242 to 250.
-
-### 2026-10-05: P4-02e Custom roles
-
-Merged #75 (P4-02d) once green.
-
-Built: `@rp/domain` `RoleCustomisation`, `PermissionHolder`, `grantOf`, `checkCustomRole` and
-`OWNER_ONLY_CAPABILITIES`; staff rules with custom roles (`isManagerRole`, `mayGiveRole`,
-`rolesOffered` for a target with a custom role); `decideDiscount` for a holder. Contracts:
-`PersonCustomRole` on sign-in, the current session and staff records, `customRoleName` on tiles,
-`customRoleId` on the staff requests, and the roles routes (`listRoles`, `createRole`,
-`updateRole`, `archiveRole`, `restoreRole`). Server: migration `20261005010000_custom_roles`
-(`removed_capabilities`, `archived_at`), `src/auth/custom-roles.ts` (the principal's custom role
-and a permission key that includes its grants), `src/staff/roles.service.ts`, roles given and
-checked in the staff service (role rows locked while given or changed), `src/staff/sections.ts`
-shared by both, and the custom role applied by the guard, the override approver check, socket
-rooms (now per capability), table sessions, waiter assignments, item rules and discounts.
-Console: `modes.ts` with `managePagesFor` and `manageLandingOf`, `ManageHome` built from them,
-Staff → Roles (`RolesScreen.tsx`, `RoleEditor.tsx`, `roles-view.ts`), the staff dialog's custom
-roles (`roleOptions`, `roleLabel`), tiles and rows with the custom role's name, and `grantOf` in
-the alert centre, the POS floor and the sections page. `@rp/ordering` `lineActions` and the
-waiter app's Move take the person, custom role included. i18n: `capabilities.*` and
-`customRoles.*`.
-
-Tests: domain 235, contracts 554 (snapshots for the roles schemas and `PersonCustomRole`), server
-743 (12 new roles tests: Owner-only with the second factor, refused permissions, unique names, a
-custom role's guard on REST routes, giving and changing roles with audit, manager-tier custom
-roles, an approver whose role took the action away, live connections closed and sections left on
-a change, archiving and restoring), ordering 39, waiter app 53, console 269 (role editor logic,
-the Roles page for a manager and the Owner, creating with the second factor, editing, archiving
-and restoring, custom roles in the staff dialog, a head cashier's dashboard), and 19 Playwright
-steps (was 18): Asha creates "Captain" after confirming her password and a recovery code, gives
-it to Ravi, and Ravi signs in as a captain, seats table 3, sends an order and settles the bill by
-UPI; the Roles page and the editor pass axe, and the editor fits a 360 px phone.
+- On Supabase itself: the `relay-supabase` CI job runs the new tests (bucket types included)
+  once GitHub is reachable (manual task 1); the logins' passwords are manual task 20.
+- The QR site still shows its generic error when a service request is refused for the limit;
+  only orders show the wait (P8-04 can word it).
 
 Gotchas:
 
-- The browser tests sign people in on one terminal far faster than people do, and the new flow
-  tipped them over the per-device sign-in limit (10 a minute, SEC-009): the step-up answered 429.
-  The global setup now raises `auth.attemptsPerMinutePerDevice` to its maximum for the run; the
-  limit itself is tested in `auth-login.int.test.ts`.
-- A cash payment needs an open shift; a captain without "Record cash and close a shift" pays by UPI
-  or card.
-- `StaffView.customRole` and the sign-in's custom role share `PersonCustomRole`; the audit keeps
-  only the role's id and name.
-- After editing `@rp/domain` or `@rp/contracts`, build them before typechecking apps that import
-  their `dist`.
+- Relay roles are cluster-wide and CI shares one PostgreSQL between packages: never grant a role
+  in one relay migration and revoke it in a later one, or a relay migrated by another package's
+  test flips it under `roles.test.ts`.
+- A `ReadableStream` test body needs `{ highWaterMark: 0 }` to count only what the reader pulls,
+  and Node's `Request` needs `duplex: 'half'` for it.
+- `serveRoutes`' `admit` runs after the route matched, so unknown routes and wrong methods still
+  answer 404/405 before the credential is looked at.
 
-Deferred: none.
+### 2026-10-10: P8-03b4a The Control Plane
 
-Decisions: 232 to 241.
+Split P8-03b4 into P8-03b4a (this one) and P8-03b4b (the QR relay). Decisions 754 to 761,
+ADR-0021. Seven threats of the Control Plane answered: CP-S1, CP-E3, CP-I2, CP-I3, CP-I4 and CP-D3
+mitigated, CP-T2 (the residual High) down to Low with the bucket's object lock left to manual task 26. 123 mitigated in all, 5 residual Highs.
 
-### 2026-10-05: P4-02d Menu editor
+Built:
 
-Merged #73 (P4-02c) and #74 (two development-only advisories with no fixed release accepted in the
-dependency audit, with a review date in `infra/ci/README.md`) once green.
+- `@rp/contracts`: `VendorUserView.resetRequest`, `VendorResetRequestedView` and the reset
+  route's 202 and 409, `VENDOR_RESET_REQUEST_HOURS`; `CLOUD_BACKUPS_PER_DAY`,
+  `CLOUD_BACKUP_CLOCK_MARGIN_MS` and the start route's 422 and 429; `DIAGNOSTICS_KEEP_DAYS`.
+- Control Plane: migration `20261010170000_control_plane_threats` (the reset request on
+  `vendor_users`, an index for the day's uploads); `VendorAuthService.signIn` (`canSignIn`,
+  `lockIfOver`, the in-memory count for emails without a usable account) and `reset` (the
+  request, a row lock, the second Super Admin); the controller's 202; `CloudBackupsService.start`
+  (the date check, the day's number under `lockFor`) and `prune` by `completedAt`;
+  `DiagnosticsService.purge` on an hourly timer; `OUTSIDE_SERVICES` in `cp-config.ts`;
+  `src/http/log-redaction.ts` (`REQUEST_LOG_REDACTION`, `maskedPath`) used by the logger and the
+  exception filter; `src/database/advisory-lock.ts` (`lockFor`) for AI menus, digital bills and
+  invoice numbers.
+- Vendor web app: the Staff page shows a reset asked for (by whom, until when), "Waiting for
+  another Super Admin" on one's own request, the dialog's text for asking and for carrying out,
+  and a toast for the 202; `CpResponse` takes 202.
+- Tests: `tenant-isolation.int.test.ts` (a case per PC endpoint of the registry);
+  `vendor-staff.int` (parallel guesses, one code twice, unknown and disabled accounts, the
+  two-person reset, no self-reset); `cloud-backups.int` (retention by stored day, future dates,
+  the day's number sent together); `diagnostics.int` (the purge); `menu-extractions.int` and
+  `digital-bills.int` (limits under parallel sends); unit `config.test` (https for each service)
+  and `log-redaction.test` (a real pino-http logger on a server); the vendor web app's two-person
+  reset. The test helper sets vendor accounts up through the service (the API's set-up limit of
+  20 per address was reached by the new tests).
+- Docs: ADR-0021; the Control Plane model's seven threats, the relay's six plans renamed
+  P8-03b4b, the summary; the runbook (https, isolation, backup limits), the access policy
+  (diagnostics deleted, one answer at sign-in, the two-person reset, three Super Admins), manual
+  task 26 (versioning, object lock, lifecycle, the IAM policy without version deletes),
+  `authorisation.md`, the Control Plane README, `ARCHITECTURE.md`, `phase-8.md`.
 
-Built: contracts `ItemView.stockCount`, a `MenuDraftResponse` with every combo, the published
-version and `unpublished`, and `MenuDraftChanged` (which part changed). Server: the draft's new
-fields (`differsFromPublished` compares the draft and the published snapshot through the same
-parse, without availability and stock), `MenuDraftChanged` appended by every draft edit in its
-transaction and heard only in `MENU_MANAGE` rooms, and choices checked when an item becomes a
-combo. ui-web: `TextArea`. Console: Manage → Menu (`src/manage/menu/`, form logic in
-`menu-view.ts`): the publishing bar, Items (grouped by category and sub-category, search,
-availability and stock counts, archive and restore), the item page (every MENU-002 field, the
-photo uploaded when chosen and shown from its 480 px rendition, sizes, modifier groups, the combo
-with fixed parts, choices, dates and hours, a reason when a price changes), Categories and Modifier
-groups (add, edit, archive with a reason, restore), and the controller's `photoSrc`.
+Tests: Control Plane 180 (+26), contracts 965 (+1, 5 schema snapshots changed), vendor web 75
+(+1), server 1252 (28 skipped; `cloud-backup.int` adjusted: its PC clock starts days back, and both
+backups stored the same day keep the newest); all other test tasks green; vendor web e2e 2/2;
+format, lint, typecheck, docs, compat, `pnpm security:threats` and `pnpm ci:test` green. The race
+tests were run five times each. Traceability: Must 264/287.
 
-Tests: domain 226 (unchanged), contracts 545 (snapshots for the draft and the new event), server
-730 (each edit announced once to menu editors and a refused one not at all, a choice's item
-cannot become a combo, the draft's combos, stock and publish state, the menu editors' rooms),
-ui-web 103 (`TextArea`), console 246 (the editor's logic; the list, publishing, availability,
-archiving, adding an item with sizes, a modifier group and a photo, a price change with its
-reason, combos including one saved without its combo, categories and modifier groups), and 18
-Playwright steps (was 17): Vikram adds a "Dip" modifier group and a "Paneer Kathi Roll" with two
-sizes, the dip and a photo (the server's 480 px rendition comes back 480 px wide), publishes
-version 2, and Neha's POS sells it with the Jumbo size and the cheese dip; the editor, the list and
-the publish dialog pass axe, and the editor and the list fit a 360 px phone.
+Not done or not verified:
 
-Gotchas:
-
-- Labels with regex characters, such as "Price (₹)", must be escaped in `getByLabel` regexes, and
-  required fields carry a marker, so match them with `^Label( \*)?$`.
-- Playwright matches role names as case-insensitive substrings: "Veg" also finds "Non-veg". Pass
-  `exact: true`.
-- The console's `FakeServer` checks responses against the contracts, so a fake `setCombo` must
-  return a valid `ComboView`; `{}` makes the call fail.
-- The browser test makes its photo in code (a PNG from `node:zlib` `deflateSync` and `crc32`), so
-  no binary fixture is committed. The server reads the content with sharp, so it must be a real
-  image.
-- A cashier never reaches `/manage` (`OPERATIONS_CONFIGURE`), so who may edit the menu is tested on
-  the server, not in the console's screen tests.
-
-Deferred: MENU-007 for single items (P6-05), bulk photo upload (P6-04).
-
-Decisions: 222 to 231.
-
-### 2026-09-28: P4-02c Devices
-
-Merged #67 (P4-02b) once green. Its first CI run failed the secret scan: a made-up pager password
-in a console test fixture looked like a key to gitleaks, and the scan covers the whole history,
-so changing the value was not enough. Fixed forward: the fixture now uses a plain repetitive
-value, and `.gitleaksignore` (new, at the repo root) lists that one old finding by fingerprint
-with a comment saying why.
-
-Built: contracts `DeviceView` (connected now, battery, `batteryLow`, firmware, serial),
-`DeviceParams`, `UpdateDeviceRequest`, `DeviceLocateRequested` (live-only) and the pager's locate
-topic (`PagerLocateMessage`, `locateTopic` in the credential); routes `renameDevice` and
-`locateDevice`. `@rp/domain`: `lowBatteryLevelFor` and the pager's `locate` topic. Server: the
-device list's state, rename (audited), locate (only to that device's room, never replayed, bridged
-to MQTT for pagers, 409 when not connected, 6 a minute), `RestaurantChanged` `DEVICES` for
-pairing, renaming, moving and unpairing, `last_seen_at` when a live connection closes, and an
-unpaired pager disconnected, ignored and its alerts cleared. Console: the Devices page
-(`src/manage/devices/`: grouped list, pair dialog with the code, QR code, addresses and
-fingerprint until the device pairs, rename, move a tablet, locate, unpair with a reason), the
-`LocateOverlay` on every screen of a paired console (name and chime), and the controller reading
-its own device again after device changes, so a renamed console's header follows.
-
-Tests: domain 226, contracts 544 (snapshots for the new schemas), server
-726 (device management: connected state and battery levels, last seen, rename, locate
-only to its device and never replayed, the announcements; pagers: locate over MQTT, an unpaired
-pager disconnected and refused), console 195 (Devices page, pairing, locate, live
-rename), and 17 Playwright steps (was 16): a manager pairs a kitchen screen in a second browser,
-locates it (the screen shows its name), renames it (its header follows) and unpairs it (it is back
-on the pairing screen within 5 s), on a 360 px screen too, with no axe violations; a cashier can
-open neither Staff nor Devices.
+- P8-03b4b, as split.
+- The object lock needs the bucket (manual task 26); the local object store does not model it.
+- With several Control Plane instances, an unknown email locks after five tries per instance;
+  real accounts lock once for all (the count is in the database).
 
 Gotchas:
 
-- The secret scan (`infra/ci/gitleaks.sh git .`) reads every commit. A value that looks like a key
-  fails CI even after it is changed; add its fingerprint to `.gitleaksignore` with a reason, never
-  rewrite history. Test fixtures use plain, repetitive values.
-- `lastSeenAt` was already written by device authentication (`DeviceTokenAuthenticator`, at most
-  once a minute), so the gateway only adds the moment a connection closes.
-- The console's `FakeServer` checks responses against the contracts: an id that is not a UUID in
-  a fixture makes the whole response fail, and `useLive` then keeps the old list silently.
-- The dialog's own close button is named "Close": do not give a footer button the same name.
-- A new device's connection can come a moment after the list re-read on its pairing, so it shows
-  Not connected until the next minute's read; the e2e test reloads the page.
-- A screen test that shows "today" or a date must fix the clock, or it passes only on the day it
-  was written: `vi.useFakeTimers({ toFake: ['Date'] })` with `vi.setSystemTime`. The Devices list
-  test did not, and failed a week later.
+- `test/helpers/vendor.ts`' `vendorAccount` no longer goes through `/v1/vendor/setup`: a test of
+  the API's set-up steps must call them itself (and stays under 20 per file and address).
+- `CloudBackupsService` retention reads `completedAt`: a test that wants backups on different
+  days drives `start` and `complete` with `now` (`storeAt` in `cloud-backups.int`); HTTP uploads in
+  one test all land on the same day, and only the newest is kept.
+- A server test that moves the PC's clock forward for backups must start it in the past, or the
+  Control Plane refuses the backups as dated after its own clock.
+- `DigitalBillView.id` is the PC's request id, not the bill's row id.
 
-Deferred: offline alerts for kitchen screens and tablets (P4-04), the tablet's battery, charging
-and its side of Locate (P3-01), the pager's side of Locate (P2-05).
+### 2026-10-10: P8-03b3b The update pipeline and the builds
 
-Decisions: 213 to 221.
+Decisions 748 to 753. Four threats mitigated: UPDATE-T1 (the residual High, now Medium), UPDATE-T3,
+UPDATE-E3 and LICENCE-D3. P8-03b3 is done.
+
+Built:
+
+- CI: every `uses:` in `ci.yml`, `android.yml` and `security.yml` at a full commit with its
+  release in a comment; `infra/ci/pinned-actions.test.mjs` (in `pnpm ci:test`) refuses a tag, a
+  branch, a short commit, a pin without its version, two commits of one Action, and Dependabot's
+  Actions block without a cooldown (added: 5 days, 14 for a major).
+- `@rp/domain`: `UPDATE_SIGNING` and `updateSigningOf`; `UNSIGNED_UPDATES` in `FLEET_ALERT_KINDS`
+  and `SELF_RESOLVING_ALERTS`, `FleetHealthInput.updateSigning` in `fleetAlertsDue`.
+- `@rp/contracts`: `HeartbeatRequest.updateSigning` (optional).
+- Server: `HeartbeatService` sends `updateSigning` from the installation's update settings;
+  `SIGNATURE_SCRIPT` also reads the installer's `VersionInfo.ProductVersion`, and the agent refuses
+  a download that is another version (`installerVersionProblem`), retried like a bad signature.
+- Updater (`RestaurantPlatform.Setup.psm1`): `Get-RPInstallerVersion`; `Invoke-RPUpdateStep`
+  refuses an installer whose product version is not the version asked for, after the signature
+  and before anything is stopped, and removes its copy.
+- Control Plane: migration `20261010160000_unsigned_updates`; the alert's details (the PC's
+  version) and its chat text. Vendor web app: its badge (red) and its sentence.
+- Desktop: `src/packaging/release-guard.ts` (`releaseRefusals`, `signedBuild`,
+  `stagedUpdateSettings`, `stagedKeys`); `package-cli.ts` runs it before electron-builder.
+- Docs: the four threats (117 mitigated in all, 6 residual Highs); the runbooks' "A PC that takes
+  unsigned updates" and the guard under "Signing"; manual tasks 23 and 30 (a signed release
+  refuses to build without their keys); `infra/ci/README.md`; `phase-8.md`.
+
+Tests: domain 409 (+2), server 1252 (+2, 28 skipped; `update-agent.int` refuses another version,
+`control-plane.int` checks the heartbeat's `updateSigning`, S9's `update-exit.int` sees the test
+build's alert), Control Plane 154 (+1), desktop 46 (+6), vendor web 74, contracts 964 (6 schema
+snapshots), CI scripts 19 (+4), Pester 139 (+1); all other test tasks green; lint, typecheck,
+format, docs, compat and `pnpm security:threats` green. Checked by hand on this Mac: the guard
+against a really staged payload (refuses a signed build: staged on darwin, no publisher, no
+licence key, no pager key; refuses an unsigned one without `--any-platform`), and a test
+installer built with `--product-version 0.1.1-rc.2` carries `ProductVersion` `0.1.1-rc.2`.
+Traceability: Must 264/287.
+
+Not done or not verified:
+
+- Windows' `VersionInfo.ProductVersion` on a real installer is read only in CI's "Windows
+  installer" job (S9 builds the next version with `--product-version` and updates to it, so a
+  mismatch would fail there) and by the Windows-only unit test on a file without a version
+  resource. Neither has run: GitHub is not reachable from this Mac (manual task 1).
+- The pins themselves were looked up with `git ls-remote`; CI has not run them yet (same reason).
+
+Gotchas:
+
+- To add or bump an Action by hand: `git ls-remote https://github.com/<owner>/<repo>
+'refs/tags/vX.Y.Z*'` and take the `^{}` line for an annotated tag (pnpm/action-setup and
+  gradle/actions have them); `supabase/setup-cli@v1` and `denoland/setup-deno@v2` were branches,
+  not tags.
+- The server's `AppConfig` is frozen: a test cannot switch a PC between signed and unsigned; build
+  another app (`createTestApp({ config })`), as S9 does with `updateAllowUnsigned: true`.
+- `stagedKeys` imports two files from the staged payload; Node caches modules by path, so a test
+  that changes them must use a new folder.
+
+### 2026-10-10: P8-03b3a The licence
+
+Split P8-03b3 into P8-03b3a (this one) and P8-03b3b (the update pipeline and the builds).
+Decisions 741 to 747. Five threats of the licence mechanism answered: LICENCE-T3 (the residual
+High, now Low and accepted for the time the server is stopped), LICENCE-T4, LICENCE-D2 and
+LICENCE-R3 mitigated, LICENCE-S3 accepted with what remains (the secret on the PC).
+
+Built:
+
+- `@rp/licensing`: `guardedNow` takes a reading (the clock, the last judged time and clock, the
+  monotonic time since, the signed floors) and reports a clock set back or held back an hour;
+  `fingerprintKnown`; `isOlderLicence` and `newestIssuedAt` in `evaluateLicence`, which no longer
+  judges the PC by an unknown read; `REACTIVATION_MAX_DAYS` and `lastReactivationDay`.
+- `@rp/domain`: `LICENCE_TAMPERING` in `FLEET_ALERT_KINDS`, `tamperAlertDue` and its constants.
+- `@rp/contracts`: `HeartbeatRequest.licence.reactivation` (the last code taken).
+- Server (`LicenceAgentService`): the sealed record gains `clockAt`, `newestIssuedAt` and
+  `lastCode`; each check moves the judged time on by `monotonicMs()` since the last (`mark`) and
+  floors it at the signed issue times; an older file counts as tampered and is never kept from an
+  answer; fingerprint reads that say too little are not kept and retried after 5 minutes; codes
+  reaching past 61 days refused; the last code reported until a heartbeat carrying it is answered
+  (`accept(answer, sent)`, the heartbeat service passes what it sent).
+- Control Plane: migration `20261010150000_licence_tampering` (the alert kind, and
+  `licence_reactivation_codes` backfilled from the audit log); `forHeartbeat` binds, compares and
+  renews nothing on an unknown fingerprint; `reactivationCode` keeps the code's day and counter;
+  `checkReactivation`; `FleetService.licenceTampering` from the heartbeat's transaction; the alert
+  closed by a person; its chat text.
+- Vendor web app: the alert's badge, what was reported, and closing it with a reason.
+- Docs: the licence model's five threats (113 mitigated in all, 7 residual Highs), the plans of
+  the other four renamed P8-03b3b; the runbook's "Licence tampering"; manual task 23's codes;
+  `packages/licensing/README.md`; `phase-8.md`.
+
+Tests: licensing 19 (+4), domain 407 (+2), contracts 964 (6 schema snapshots), server 1250 (+4,
+28 skipped; `licence-agent.int`'s "tampering offline" block drives the monotonic clock), Control
+Plane 153 (+4), vendor web 74 (+1); all other test tasks green; lint, typecheck, format, docs,
+compat, `pnpm security:threats` and `pnpm ci:test` green. Traceability: Must 264/287.
+
+Not done or not verified:
+
+- P8-03b3b, as split.
+- On Windows, `performance.now()` is QueryPerformanceCounter; whether it runs on through sleep
+  does not matter (the clock then wins), but nobody has watched a PC held back for a day: the lab
+  rig can, at the pilot's security check.
+
+Gotchas:
+
+- `LicenceAgentService.monotonicMs` is the clock the judged time moves on by: a test that moves
+  time sets it (`agent.monotonicMs = () => running`) and moves `running`; passing a later `now` to
+  `refresh` still works as before.
+- A test's fingerprint "of another PC" needs three identifiers that differ: two are an unknown
+  read now and never OTHER_PC.
+- The Control Plane's `checkReactivation` and the tamper alert run only for a heartbeat stored for
+  the first time (`count === 1`), like the tamper audit.
+
+### 2026-10-10: P8-03b2c Bodies, uploads, exports and erasure
+
+Decisions 737 to 740. Four threats of the LAN and the local server mitigated (PC-D1, PC-D4, PC-T8,
+PC-I9); P8-03b2 is done.
+
+Built:
+
+- Server: `src/http/body-limits.ts` (`bodyParsers`): the device token checked before any body is
+  read, the parser chosen by the device and the path (16 KB without a paired device, 1 MB, 7 MB
+  for photos and menu files, 55 MB for AI imports), an announced oversize body without a device
+  token answered 413 at once, and 401 `DEVICE_NOT_RECOGNISED` for one with a token that no longer
+  verifies. `rememberDevice`/`rememberedDevice` (`src/auth/device.ts`) keep the check's result for
+  `AuthenticationMiddleware`. `src/menu/import/zip-limits.ts`: `unpackWorkbook` inflates the XML
+  parts with `maxOutputLength` and checks size and CRC, `storedZip` packs them again for
+  `read-excel-file`. `csvCell` in `data-export.service.ts` (`csvField`) and `invoice-books.ts`.
+  `FeedbackService.erase` clears orders' and bills' numbers by their last ten digits, withdraws the
+  invoices' consent and gives up only queued digital bills.
+- `@rp/contracts`: `EraseDinerContactResponse` gains `orders`, `bills` and `invoices`; the route's
+  description.
+- Docs: the four threats `Mitigated` (110 mitigated in all, 8 residual Highs);
+  `docs/security/authorisation.md` says what a caller without a device may send; `phase-8.md`.
+
+Tests: server 1246 (+9, 28 skipped; new `body-limits.int`, the workbook's unpacking in
+`menu-workbook`, formulas in `data-export.int`, erasure in `digital-bills.int`), contracts 964 (the
+erase response's schema snapshot). All other test tasks green; lint, typecheck, format, docs,
+compat and `pnpm security:threats` green. Traceability: Must 264/287.
+
+Not done or not verified:
+
+- Nothing of P8-03b2c is left. The phones' and the console's handling of a 401 for a large upload
+  with an expired device token is the api-client's renewal, already tested; no device check was
+  run.
+
+Gotchas:
+
+- Supertest (superagent) asks for `Connection: close`, so when the server answers before a large
+  body is all sent, it closes the connection and the client's write fails with ECONNRESET. A test
+  of an early answer must use Node's client with a keep-alive `Agent` (`body-limits.int`'s
+  `post`), as browsers and the apps keep connections alive. body-parser itself reads off a
+  refused body before it answers.
+- Tests that post more than 16 KB without a device token now get 413 before the route: send them
+  from a paired device (`authHeaders(kit.deviceId)`), as `errors.int`'s body size test does.
+- The design-capacity seed writes invoices without bills; a test that needs a bill creates one
+  (`digital-bills.int`).
+
+### 2026-10-10: P8-03b2b The pager broker
+
+Decisions 730 to 736. Seven threats of the pager channel mitigated (PAGER-D3, the residual High,
+PAGER-D4, PAGER-D6, PAGER-E3, PAGER-R2, PAGER-R3, PAGER-T1) and the PC's part of PAGER-T4 (the
+pager's eFuse stays with P2-05).
+
+Built:
+
+- `@rp/domain`: `pagerHeartbeatTooSoon`, `lowersSecureVersion`.
+- `@rp/contracts`: `PagerView.signInFailures` and `lastSignInFailureAt`; `SECURE_VERSION_LOWER`.
+- Server: `src/pagers/broker-limits.ts` (`MqttPacketSizes` reads MQTT fixed headers as bytes
+  pass, `LimitedConnection` wraps each socket for aedes and ends it at an over-large header,
+  `ConnectionGate`, `TaskLimiter` for the Argon2id checks, `ThrottledLog`). `PagerBroker`: every
+  TCP connection admitted in a `connection` listener prepended before the TLS one (its ticket
+  found again by address and port after the handshake); `handshakeTimeout` and aedes'
+  `connectTimeout` from `signInMs`, and `tlsClientError` destroys the socket (Node only reports a
+  handshake timeout); sessions in a `WeakMap` by client from the sign-in, the connected list set at
+  `clientReady` and cleared only by its own client; wills refused at sign-in; retained and QoS 2
+  publishes refused; heartbeat rate per session on `PagerOptions.clockMs` and an acknowledgement
+  `TokenBucket`; the offline check closes the session; acks through
+  `NotificationsService.acknowledgeForPager`; wrong secrets counted on the device. Migration
+  `20261010140000_pager_broker_limits`. Every acknowledgement path passes its device
+  (`AcknowledgedBy`), service requests included. `PagersService.create` checks the licence's
+  limit. The firmware service keeps `secureVersion` in what it serves and refuses a lower one.
+- Console: the Pagers page's line for sign-ins with a wrong secret.
+- Docs: the pager-channel threat model (106 mitigated in all, 8 residual Highs),
+  `docs/security/authorisation.md`, and what the broker refuses in `firmware/pager/README.md`.
+
+Tests: server 1237 (+25, 28 skipped; new `pager-broker-limits.int` over MQTTS with tight limits
+and `pager-broker-limits` unit tests), domain 405, contracts 964 (5 schema snapshots), console 385,
+waiter app 70. The T1 test was checked to fail with the old manager reach.
+
+Not done or not verified:
+
+- P8-03b2c, as split.
+- The load test (`test/load/`, P8-01a) was not run again: its 30 pagers connect at once from the
+  PC's own address, which the gate does not limit per address, and 30 Argon2id checks two at a
+  time (16 ms each on this Mac) add about a quarter of a second to their reconnection after the
+  server restarts. Run it at the next performance check.
+
+Gotchas:
+
+- `PAGER_OPTIONS` takes any of `PagerBrokerLimits` besides `offlineCheckMs`; a test that sends
+  several heartbeats on one connection must move `clockMs` on (see `pager-firmware.int`'s
+  `brokerMs`), or the broker drops them.
+- An integration test against the broker over TLS: `config: { tls: true, mqtt: 'on' }`, `api(app)`
+  for REST (it trusts the CA) and `ca` from `TlsService.ca()` for mqtts.
+- `mqtt.connectAsync` does not reject when the server closes without a CONNACK; refusals the
+  pager must hear go through `authenticate` (CONNACK 5), as the will check does.
+
+### 2026-10-10: P8-03b2a Sign-in and approvals
+
+Split P8-03b2 into P8-03b2a (this one), P8-03b2b (the pager broker) and P8-03b2c (bodies, uploads,
+exports and erasure). Decisions 723 to 729.
+
+Built (six threats of the models mitigated: PC-S5, PC-D2, PC-T2, MOBILE-S3, MOBILE-D1, MOBILE-E3):
+
+- `@rp/domain`: `isEasilyGuessedPin`, `countFailure` and `isLockedAt` (`lockout.ts`, used for the
+  person's and the device's count), `OVERRIDE_RECORD_TYPES`, and the `SIGN_IN_LOCKED` alert with
+  its rule and vibration.
+- `@rp/contracts`: `SIGN_IN_LOCKED`; `DeviceView.pinsLockedUntil`; `unlockDevicePins`
+  (`POST /api/v1/devices/:deviceId/pins/unlock`, DEVICE_PAIR); `IDLE_HEADER`; three settings; the
+  routes' texts (423 `DEVICE_LOCKED`, 422 `PIN_TOO_EASY` and `OVERRIDE_RECORD_REQUIRED`).
+- Server: migration `20261010120000_device_pin_lockout` (the device's count and lock).
+  `AuthService` counts each wrong secret against the person (not on a tablet) and against the
+  device under a row lock, refuses a locked device first, audits `DEVICE_PINS_LOCKED`, and tells
+  `SignInLockouts`, a registry the notification engine's `LockoutAlerts` listens on (the engine's
+  module builds on the auth module, so auth cannot call it directly); unlocking a person, setting
+  their PIN and unlocking a device clear the alert. Approvals: the record is required when one is
+  given, `consumeOverride` matches it, the guard reads it from the route
+  (`RequireCapability(capability, { record })`), the discount from its bill. `StaffService` and
+  the first run refuse easy PINs. Sessions: `idleMsOf` reads the header; `authenticate` and
+  `refresh` count activity as of the last touch; the socket's handshake never counts.
+- `@rp/api-client`: `idleSeconds`, sent on every call and the refresh. `@rp/mobile-core`:
+  `DeviceSession.touched()` and the seconds since. `@rp/mobile-shell`: `ShellProvider` wraps the
+  app in a view whose touches call it.
+- Console: the alert's words and its place among staff alerts; the Devices page's lock badge and
+  "Take PINs again".
+- Tests and their fixtures: approvals now name their records (billing, order items, reports,
+  suspicious activity); PINs set through the API in tests are no longer easy ones (staff, roles,
+  first run); the matrix probe takes a record for the four approvable capabilities.
+- Threat models: the six threats `Mitigated` with their code and tests; the other twelve name
+  P8-03b2b or P8-03b2c; the summary rewritten (99 mitigated, 9 residual Highs).
+  `docs/security/authorisation.md` says what an approval and a tablet's PIN now do.
+
+Tests: server 1212 (+10, 28 skipped), domain 403, contracts 964 (schema snapshots updated for the
+alert and the device view), api-client 42, mobile-core 103, shell 49, console 384, waiter app 70;
+all 43 test tasks green, lint, typecheck, format, docs, compat and `pnpm security:threats` green.
+Traceability: Must 264/287.
+
+Not done or not verified:
+
+- P8-03b2b and P8-03b2c, as split.
+- The touch capture in a real React Native build (a `Modal`'s touches should reach the root view
+  through React's tree; jest checks the view only): the next device check (manual task 29) can
+  confirm that the phone signs out 10 minutes after the last touch with the Tables screen open.
+
+Gotchas:
+
+- The contracts' schema snapshots (`packages/contracts/test/__snapshots__/schemas/`) fail when a
+  response gains a field or an enum a value: update them with `npx vitest run -u
+test/snapshot.test.ts` in `packages/contracts` and read the diff.
+- Helpers that set PINs through the API need PINs that `isEasilyGuessedPin` accepts (`5938`,
+  `2468`, `9753`); `TEST_PINS` (`1111`...) are written straight to the database and stay.
+- Server tests that approve a void, a reopen, an invoice void or a big discount must send the
+  record (`entityType` from `OVERRIDE_RECORD_TYPES`, and `entityId`).
+
+### 2026-10-10: P8-03b1 STRIDE threat models
+
+Split P8-03b into P8-03b1 (this one) and three fix parts, P8-03b2 to P8-03b4 (`phase-8.md`,
+decision 713). Decisions 713 to 722.
+
+Built:
+
+- `docs/security/threat-models/`: a STRIDE model of each component SEC-000 and the spec name (the
+  LAN and the local server, the pager channel, the QR relay and site, the update pipeline, the
+  licence mechanism, the Control Plane, the desktop shell, the phones and tablets), each with its
+  scope, assets, entry points, trust boundaries, data flows and threats. 195 threats: 93
+  mitigated, 13 accepted with a reason, 89 with a dated plan; 11 residual Highs, all planned (PIN
+  guessing and a tablet's PIN prompt, a stolen PC without BitLocker, the PC's Windows
+  administrator, a rogue access point for pagers, flooding the pager broker, a compromised
+  dependency, unprotected `main`, holding the licence's clock back, patching the server's
+  JavaScript, a PC deleting its cloud backups). The index's summary lists every open threat by
+  date.
+- `infra/ci/check-threat-models.mjs` (`pnpm security:threats`, in `pnpm check` and the CI check
+  job) and its tests (`[SEC-000]`, `pnpm ci:test`): every file, function and test title a model
+  names exists; ratings follow the matrix; open threats have plans in open work packages or manual
+  tasks; the summary is current (`--write`).
+- `infra/ci/signing-policy.test.mjs` (`[SEC-013]`): the certificate only for a push to `main`.
+- `restore.int`'s check for databases a failed restore left behind looks at this test's two
+  databases only: across the shared cluster it caught another file's restore in progress, which
+  failed one full run.
+- Research: six read-only agents went through each component's code the way an attacker would;
+  every path and test title they gave was checked by the script, and each finding fixed here
+  started with a test that failed without the fix.
+
+Found and fixed (decisions 715 to 719): CI gave every pull request's build the code-signing
+certificate; the server's database role could change payments, cash movements and day-ends; an
+unpaired pager kept its MQTT session and its wearer; production started without TLS; the request
+log wrote a manager's approval token. ADR-0015 and ADR-0018 corrected (decision 721). Manual task 1
+now requires branch protection, two-factor sign-in and the `release-signing` environment; manual
+task 31 added (the code-signing certificate in an HSM).
+
+Found and planned (the models say where and by when), the most serious first:
+
+- P8-03b2: a manager's approval can be used on another record (voids, reopening an invoice);
+  bodies up to 55 MB parsed before authentication; PIN lockouts per person only, so guesses spread
+  over the staff and a diner at a tablet can lock managers out; weak PINs; the pager broker has no
+  packet or connection limits and a manager's pager can acknowledge any alert; erasure misses
+  orders and bills; the data export's CSV has no formula neutralising; the workbook's ZIP limit
+  trusts its directory; the waiter phone's pager card keeps its session from ever timing out.
+- P8-03b3: the licence's clock guard freezes judged time instead of advancing it; a failed
+  fingerprint read counts as another PC; a signed build can ship without vendor keys; Actions
+  pinned by tag.
+- P8-03b4: the Control Plane trusts the backup date a PC sends (a compromised PC can make
+  retention delete its real backups); diagnostics never deleted; no RLS and no ADR for it; the
+  relay's per-table order limit counts rejected orders; the functions' login holds the
+  provisioning role.
+
+Tests: server 1202 (+3, 28 skipped), `pnpm ci:test` 15 (+11). Traceability: Must 264/287 (SEC-000
+covered).
+
+Not done or not verified:
+
+- The fix parts P8-03b2 to P8-03b4, and the threats planned for P8-03c to P8-03e, P2-05 and the
+  manual tasks.
+- The `environment:` expression in `ci.yml` (empty for anything but a push to `main`) runs only
+  on GitHub: check on the first push that pull requests still run the Windows installer job
+  without the environment, and that a push to `main` waits for it.
+
+Gotchas:
+
+- A model's evidence is checked literally: renaming a test or a function a model names fails
+  `pnpm security:threats` until the model follows. Quote a title's literal part when it is built
+  from `%s` or a template.
+- A plan that names a work package stops the build once that package is ticked: finishing P8-03b2
+  means turning each of its threats into `Mitigated` with its code and tests (or a new plan).
+- Write the description of a threat directly under its heading, then the five fields;
+  `pnpm security:threats --write` rewrites only the summary.
+
+### 2026-10-10: P8-03a Authorisation sweep (local server and Control Plane)
+
+Split P8-03 into P8-03a to P8-03e (`phase-8.md`, decision 706). Decisions 706 to 712.
+
+Built:
+
+- `@rp/contracts`: `HTTP_DEVICE_TYPES`, `STAFF_DEVICE_TYPES`, `PairableDeviceType` (pairing codes
+  no longer take `PAGER`); `devices` on every `DEVICE` route, with 403 in their responses; the
+  docs generator emits `x-devices` and refuses a device route without devices, devices on any
+  other route, and a public route whose description is empty. The Control Plane registry gains
+  `uploadObjectStorePart` and `downloadObjectStoreFile` with `ObjectStoreGrantParams`.
+- Server: `@RequireDevice(devices)` (a required list) and the guard's 403 `DEVICE_NOT_ALLOWED`;
+  the health route overrides its controller's list; `SessionService` refuses to create or accept a
+  session on a device that is not a staff device.
+- Control Plane: the object-store routes read the grant through `ObjectStoreGrantParams`.
+- Tests:
+  - `apps/server/test/integration/authorisation-sweep.int.test.ts`, 12 tests, about 3,500 calls in
+    a few seconds;
+  - `apps/control-plane/test/integration/authorisation-sweep.int.test.ts`, 7 tests: the routes
+    against the registry, and the sweep;
+  - `test/helpers/served-routes.ts`, the served routes and their access, shared with the registry
+    test in `auth-guard.int`, which now compares device lists too;
+  - a pairing test for pagers, and contract tests for the device lists and the generator's rules.
+  - Both sweeps were checked by breaking the guard (the device check, the vendor role check): each
+    failed and named every endpoint.
+- `docs/security/README.md` (the index for P8-03) and `docs/security/authorisation.md` (the model
+  per surface, the public endpoints and why, the object-level checks with their tests, sockets,
+  MQTT, the relay, the Control Plane, the sweeps, and how to change who may call what).
+
+Found and fixed (decisions 709 to 711): staff could sign in with a PIN through a table tablet's
+credential; a pairing code could be made for a pager, giving it a device key; the Control Plane
+served two public routes missing from its registry and document. Changed answers: a kitchen screen
+or POS on a tablet-only route, or a kitchen screen asking for an app build, now gets 403
+`DEVICE_NOT_ALLOWED` (the tests that expected `NOT_A_TABLE_TABLET` or "no build" follow).
+
+Tests: server 1199 (+13, 28 skipped), Control Plane 149 (+7), contracts 961 (+6), console 383 and
+the 25 Playwright steps unchanged and passing. Format, build, contract docs, `contracts:compat`,
+lint, typecheck and every package's tests pass. Traceability: Must 263/287 (SEC-017 now covered).
+
+Not done or not verified:
+
+- P8-03b to P8-03e. The sweep does not cover the socket and MQTT surfaces by enumeration; their
+  handshake, rooms and ACL tests are listed in `authorisation.md`.
+- No security headers on the local server and the Control Plane yet (no CSP, HSTS or
+  `X-Frame-Options` from the API): that is P8-03c's DAST to find and fix.
+
+Gotchas:
+
+- `ROUTES` is a long `as const` union; widen it (`const routes: readonly RouteDefinition[] =
+ROUTES`) before filtering in tests, or TypeScript cannot index the permission matrix.
+- The sweep calls each endpoint with a fresh id for every path parameter: the guard decides
+  before validation and lookups, so the ids need not exist.
+- A route's devices are the decorator's (the handler's, else the controller's); the registry
+  test compares them sorted.
+
+### 2026-10-10: P8-01b Online and on-screen targets (NFR-P05, P06, P07, P12)
+
+Every NFR-P target of §7.1 is now measured and met at design capacity (`docs/build/performance.md`).
+Decisions 698 to 705.
+
+Built:
+
+- The QR side of the load run (`apps/server/test/load/`):
+  - `qr.ts`: the relay started in the harness with its Realtime stand-in, the server connected to
+    it (credential, a QR code per table), `qrReady`, `QrPage` (a diner's phone doing the QR site's
+    calls) and `inStepWith`;
+  - `slow-line.ts`: a TCP relay that delays each way (20 ms for the restaurant, 75 ms for 4G);
+  - `rush.ts`: QR orders (15 % of the mix) on the tables without a tablet, pages opened when
+    seated and closed when billed, targets NFR-P05 and NFR-P06, and two checks (each relay order
+    made once by the server; every change reached every open page);
+  - both servers take `relayUrl` (the in-process one starts its sync at once); the short run in the
+    integration suite and the full run have the relay.
+- `apps/console/e2e/speed.e2e.ts` (NFR-P07) on a design-size restaurant made by the e2e global setup
+  (`RP_E2E_SPEED_DATABASE_URL`).
+- An e2e test of the QR site: an open page follows the menu within the refresh and when the diner
+  comes back to it.
+
+Found and fixed (decisions 701, 702, 704):
+
+- QR pages asked for the menu every 60 s: now 20 s (`QR_MENU_REFRESH_MS`) and on `visibilitychange`;
+  the relay's `qr-menu` no longer reads the menu for a browser that has the latest.
+- QR pages followed every order for the whole visit: `qrOrderSettled` ends it.
+- The kitchen screen's first touch made the Web Audio context (112 ms at 4×): it is made when the
+  browser is idle (`KitchenSounds.prepare`).
+
+Result (2026-10-10): NFR-P05 p95 20.8 s at the pages (2.5 s at the relay), NFR-P06 p95 363 ms (9
+samples; 422 ms over 14 in the run before), NFR-P07 taps p95 24 ms (max 40 ms) and screens p95
+36 ms at 4× CPU, NFR-P12 LCP 544 ms. The in-restaurant targets held with the QR traffic added
+(NFR-P01 436 ms, NFR-P10 3.2 s, NFR-P11 3.9 s). Every check passed.
+
+Tests: server 1186 (+2: the slow line, `inStepWith`; the short rush now with the relay), ordering
+90 (+3), console 383 (the KDS sound test extended) and 25 Playwright steps (+1), QR site e2e 11
+(+1). Format, build, contract docs, `contracts:compat`, lint, typecheck and every package's tests
+pass. Traceability: Must 262/287.
+
+Not done or not verified:
+
+- Supabase's own time is not in the online figures; P8-01c measures NFR-P05 and NFR-P06 against
+  the deployed relay (manual task 20), and NFR-P07 on the Android phones and tablets.
+- The speed test's 4× slowdown is relative to the machine it runs on; on a slower CI runner it is
+  harsher. It asserts p95 only.
+
+Gotchas:
+
+- The generated history has QR orders of its own (no relay order behind them): checks of today's
+  QR orders must filter by business date.
+- The relay's `qr-menu` is read by every open page every 20 s: keep its unchanged path free of the
+  menu document.
+- The full run: `RP_PERF=1 RP_LOAD_ADMIN_URL=postgresql://postgres@127.0.0.1:55432/postgres
+RP_LOAD_BASE=$HOME/.local/rp-load-lab/base pnpm --filter @rp/server test:perf load` (about 23
+  minutes with the base); reset `pg_stat_statements` in the `postgres` database at "Rush:".
+
+### 2026-10-09: P8-01a The simulated rush at design capacity
+
+Split P8-01: P8-01a (this one), P8-01b (NFR-P05 and NFR-P06 through the relay, NFR-P07 with the
+browser's Event Timing, NFR-P12 recorded) and P8-01c (S1 on the lab rig, [H]), in `phase-8.md`.
+Decisions 687 to 697, ADR-0020, `docs/build/performance.md`.
+
+Built:
+
+- `apps/server/test/load/`, the load harness:
+  - `plan.ts`: `DESIGN_CAPACITY` and `SMOKE_SHAPE`, the seeded open-loop schedule;
+  - `restaurant.ts`: §7.2's restaurant with its devices and pagers, a year of history in steady
+    state, `readyForToday`, and `saveRestaurant`/`loadRestaurant` to reuse it;
+  - `device.ts`, `tls-fetch.ts`, `pager.ts`, `printer.ts`: the simulated devices on the apps' own
+    client over pinned TLS, MQTTS pagers, raw TCP printers;
+  - `server.ts`: the built server in a process of its own, or in this process;
+  - `rush.ts`: the rush, the people's reactions, the restart, the figures per target and S1's
+    checks;
+  - `report.ts` and `stats.ts`.
+- `test/performance/load.perf.test.ts` (opt-in; `RP_LOAD_ADMIN_URL`, `RP_LOAD_BASE` to reuse a
+  set-up history), `test/integration/load-rush.int.test.ts` (the short run on every build).
+- `test-app.ts`: a `port` option, so an in-process server can start again where clients expect.
+
+Found by the load test and fixed:
+
+- `@rp/ordering` `liveRefresh`: live screens read 250 ms after the first event of a burst
+  (console's and phones' `useLive`); a kitchen's stream of events held a ticket back up to 1.3 s.
+- Audit entries written when their transaction ends (`PrismaService.beforeCommit`,
+  `AuditService.record` returns the id only): an order and a payment at the same table
+  deadlocked (40P01, 500s) through the chain's lock. `lock-order.int.test.ts`.
+- `KdsService.openTickets` and the not-collected sweep from the dishes still at the station: a
+  year of never-bumped tickets broke the kitchen screen (P2029). Regression test in
+  `kds.int.test.ts`.
+- Migration `20261009090000_load_test_indexes` (`order_items.parent_order_item_id`); the order
+  feed from its live items and without Prisma's `_count`.
+- The GST summary and the source report in one pass each.
+
+Result (2026-10-09, 20 minutes at 300 orders an hour, 200 connections, 30 pagers, 8 printers,
+365 days of history): every target met:
+
+| Target  | p95                          |
+| ------- | ---------------------------- |
+| NFR-P01 | 425 ms                       |
+| NFR-P02 | 51 ms                        |
+| NFR-P03 | 78 ms                        |
+| NFR-P04 | 75 ms                        |
+| NFR-P08 | 47 ms                        |
+| NFR-P09 | 27 ms                        |
+| NFR-P10 | 3.4 s at most                |
+| NFR-P11 | 3.9 s for the slowest client |
+
+Every order, KOT, print, bill and pager alert happened exactly once; no request failed. Before
+the fixes the same run gave NFR-P03 p95 18 s, NFR-P10 7.7 s and stalls of seconds everywhere.
+
+Tests: server 1184 (+13, 28 skipped: the short rush, lock order, the KDS regression, audit
+deferral, the harness's unit tests), ordering 87 (+3), console 383 and mobile-shell 48 unchanged.
+
+Not done or not verified:
+
+- P8-01b and P8-01c (above). The figures are from the build Mac, which was in use meanwhile;
+  P8-01c measures S1 on the lab rig's PC.
+- The full run's 110 extra connections are manager consoles reading the alert list after every
+  alert, the heaviest choice; a real restaurant has a handful.
+
+Gotchas:
+
+- PostgreSQL 16's default `CREATE DATABASE … TEMPLATE` writes the whole copy to the WAL (5 GB for
+  the base): the harness uses `STRATEGY FILE_COPY`.
+- The year's set-up took 10 minutes on one run and an hour on another, with the Mac busy; use
+  `RP_LOAD_BASE` to set it up once. A base needs `restaurant.json.migrations`, written by the
+  set-up, so later runs apply only newer migrations.
+- 60 device-token requests a minute per address: the harness signs the devices' tokens at set-up.
+- zsh does not split `$VAR` into words: run psql loops through `bash`.
+- Ending the turn kills background runs in the headless autorun: poll with foreground waits.
+
+### 2026-10-09: P7-10 Phase 7 exit test, S8, S9, S10 (Phase 7 done)
+
+Built three scenarios in the server's integration suite (decisions 682-686):
+
+- `licence-exit.int.test.ts`, S8, 6 steps, a real Control Plane signing the licences and running
+  the billing, the PC behind a line the test cuts:
+  - active, a table served;
+  - an invoice unpaid: payment due, then grace with 7 days left, service as usual;
+  - offline, the grace runs out at 21:00: the PC judges it by itself (GRACE_ENDED), restricted from
+    04:00 tomorrow, and the evening's table is seated and sent to the kitchen;
+  - the next morning: new tables and orders refused (423 `LICENCE_RESTRICTED`); last night's table
+    billed and paid; the sales report, a CSV export and the full data export work;
+  - offline reactivation: the vendor's code read over the phone, typed in by the Owner, tables
+    again;
+  - online reactivation: the payment recorded, "Check now" takes the vendor's active licence,
+    which holds after the code's day; no tamper events.
+- `update-exit.int.test.ts`, S9, 5 steps, a real Control Plane publishing 1.2.0 to the channel:
+  - downloaded during the evening's service, waiting for the window;
+  - at 03:30 the backup and the hand-off, the vendor told it is installing;
+  - the updater's steps: database copied, 1.2.0 changes it and fails its health check, the
+    rollback request, the copy switched back as the service host does, 1.1.0 answers;
+  - the rollback recorded, audited and reported; the rollout halts by itself, the fleet shows
+    `UPDATE_FAILED`, the release is offered no more and the agent is idle;
+  - the next morning: last night's bill there, the failed version's changes gone (kept in
+    `<db>_failed_update` for support), a table served, the audit chain valid.
+- `data-exit.int.test.ts`, S10, 4 steps, one restaurant's history made through the API on the
+  days it happened (30 and 31 March, 1 April 2024, and today):
+  - FY 2023-24 archived to the USB drive, read back in full, purged; FY 2024-25 and today whole;
+    the purge audited and the audit chain valid;
+  - the archive viewer: the year's days, an invoice by date, as printed;
+  - a backup to the USB drive and the Owner's recovery key;
+  - the PC lost: the restore tool on a new PC with the recovery key; the same POS and PINs,
+    today's bill and payment, FY 2023-24 still purged, the next invoice number follows today's,
+    the audit chain valid, the new PC's own backup key, and the old PC's archive opening in the
+    archive viewer.
+
+Fixed (found by S10): after a restore onto a new PC the archive viewer refused the old PC's
+archives (`ARCHIVE_KEY_MISMATCH`). `src/backups/backup-keys.ts` keeps the earlier PCs' backup keys
+sealed in `system_meta`; `restoreBackup` carries them; `ArchiveViewerService` opens a file with
+the key its header names. Runbooks `backups.md` (step 6 on a new PC) and `data-lifecycle.md`.
+
+Also: `test/helpers/small-restaurant.ts` (a small menu and floor, a table's visit through the
+API); `@rp/control-plane/testing` exports `BillingService`, `LicencesService` and
+`ReleasesService`.
+
+Tests: server 1171 (+20, 27 skipped): the three scenarios (15), `backup-keys` unit (5). Format,
+build, contract docs, `contracts:compat`, lint, typecheck, every package's tests and the server's
+`test:coverage` pass. Traceability: Must 254/287, Should 18/24.
+
+Result: S8, S9 and S10 pass on every build; Phase 7's exit criterion ("licence and data
+scenarios S8 and S10 pass") is met, and S9 too.
+
+Not done or not verified:
+
+- The real S9 with the installer, the scheduled task and the TLS health check runs in the CI job
+  "Windows installer" on the first push (manual task 1, `gh` login); not run yet.
+- The licence keys are test keys: the vendor's KMS key and reactivation master secret are manual
+  task 23.
+
+Gotchas:
+
+- A POS allows only a few PIN sign-ins a minute (429 `RATE_LIMITED`); with `Date` frozen by
+  `vi.setSystemTime` the minute never ends, so sign each person in once per moment and reuse it.
+- `StartBackupResponse.run` has no file name yet (a backup gets its name after the read-back);
+  take it from `GET /backups` once `settled()`.
+- `POST /orders` answers 200, `POST /tables/:id/open` 201: the helper accepts any 2xx.
+- After changing `@rp/control-plane`'s `testing.ts`, build the Control Plane before the server's
+  tests (they import its `dist`).
+
+### 2026-10-08: P2-04b2 Scan a pager's QR code with a camera (P2-04b done)
+
+Built registering a pager by reading its QR code with the device's camera on the Pagers page
+(PGR-012; ADR-0019; decisions 677-681):
+
+- `@rp/contracts` `pagers.ts`: `PagerSerial` (now used by `CreatePagerRequest`, the same rule),
+  `PAGER_QR_PREFIX`, `pagerQrText`, `pagerSerialFromQr`. The OpenAPI document names
+  `PagerSerial`; the schema is unchanged.
+- `@rp/ui-web`: `QrScanner` (the camera into a video, frames drawn on a canvas and decoded with
+  `jsqr` 1.4.0, the camera off on unmount, a mirrored preview for a webcam, `CameraProblem`),
+  `browserQrCamera`, `hasCameraApi`, `decodeQr`, `frameSize`, `cameraProblemOf`; the `scan` icon;
+  styles in `qr.css`; a workbench story with the real camera.
+- console: the register dialog's "Scan the QR code", "not a pager's code", the serial read into
+  its field, the camera's problems in words (`pagers.scan.*`); `serialTyped` for barcode scanners
+  that type the whole code.
+- desktop: `isAllowedPermission` refuses `media` with audio; the shell passes Electron's
+  `mediaTypes` and `mediaType`.
+- docs: ADR-0019, the ARCHITECTURE table, `firmware/pager/README.md` (what P2-05's pairing screen
+  shows), the phase spec, the READMEs, manual task 14's camera check with
+  `manual-tasks/assets/pager-qr-test.svg` (`RP-PAGER:TEST-0001`).
+
+Tests:
+
+- contracts 955 (+6, with the `PagerSerial` snapshot);
+- ui-web 120 (+17): codes drawn by `uqr` decoded by jsQR, light on dark too; the browser camera
+  with `getUserMedia`, `play` and the canvas stubbed; the component with a fake camera;
+- console 383 (+7): the dialog through the real `browserQrCamera` with stubbed browser APIs, and
+  the view helpers;
+- desktop 40 (+1);
+- Playwright: the console's pager step now scans `RP-PAGER:WP-0101` through Chromium's fake camera
+  (`--use-file-for-fake-video-capture`); 24 of 24 pass.
+
+Format, build, contract docs, `contracts:compat`, licences, lint, typecheck, the tests of every
+package (server 1151, 27 skipped) and `test:coverage` of every touched package pass. The console
+bundle grew by 135 kB (jsQR); the QR menu's and the vendor web app's builds hold no jsQR.
+
+Not done or not verified:
+
+- No real camera has read a pager's code: manual task 14 checks the PC's webcam in the shell and a
+  phone's browser. The pager's own pairing screen comes with P2-05.
+
+Gotchas:
+
+- The sandboxed shell sets `PLAYWRIGHT_BROWSERS_PATH` to an empty cache; run the console e2e with
+  `PLAYWRIGHT_BROWSERS_PATH="$HOME/Library/Caches/ms-playwright"`. A `-g` filter on one console
+  e2e test fails because the steps share one browser context; run the whole file.
+- jsQR is CommonJS with `exports.default` (and `jsQR.default = jsQR`): import the default and use
+  `.default`, which works under Node and Vite alike.
+- jsdom has no `navigator.mediaDevices`; tests define it with `Object.defineProperty` and remove it
+  with `Reflect.deleteProperty` (stubbing the whole `navigator` breaks user-event).
+
+### 2026-10-05: P2-04b1 Pager firmware through the restaurant PC
+
+Split P2-04b: P2-04b1 (this one) and P2-04b2, scanning a pager's QR code with a camera (spec in
+`phase-2.md`). Built over-the-air pager firmware through the PC (PGR-011, UPD-001, UPD-003,
+UPD-004, UPD-007; ADR-0018, `docs/runbooks/pager-firmware.md`, manual task 30; decisions
+668-676):
+
+- `@rp/domain` `pager-firmware.ts`: `pagerFirmwareVerdict` (UP_TO_DATE, OFFER, IN_PROGRESS, WAIT
+  with the reason, GAVE_UP), `pagerFirmwareTimedOut`, `PAGER_FIRMWARE_RULES`; `pager.ts`: the `ota`
+  topic, which a pager may subscribe to and never publish on.
+- `@rp/contracts`: `PAGER_FIRMWARE` in `RELEASE_COMPONENTS`; the heartbeat's `pagerFirmware`
+  (served version, report) and the answer's `pagerFirmware` (newer release, halted);
+  `PagerFirmwareOffer`, `PagerOtaReport`, `charging` and `ota` in `PagerHeartbeat`;
+  `PagerFirmwareResponse` and friends; the routes `getPagerFirmware`, `updatePagerFirmwareNow`,
+  `downloadPagerFirmware`; the AsyncAPI channel `pagerOta`.
+- Control Plane: the enum migration; `ReleasesService.recordHeartbeat` by component (the PC's
+  report or its pagers', no fleet alert or error spike for firmware); `pagerFirmwareFor`; offers
+  ignore a PC's hold for firmware; `release:publish --component`; the vendor web app's "What it
+  updates" and the releases' component column.
+- server `src/pager-firmware/`:
+  - `firmware-image.ts`: the ESP-IDF header and app description, and the secure boot v2 blocks
+    (magic, CRC-32, image digest, key digest, RSA-PSS with the little-endian numbers);
+  - `firmware-keys.ts` (empty), `RP_PAGER_FIRMWARE_KEYS` (refused in production);
+  - `firmware-state.ts` (`system_meta`: served, offered with the version it was for, problem,
+    report);
+  - `PagerFirmwareService`: fetch and check, refuse or retry, offer to free pagers one decision at
+    a time, tokens, reports from heartbeats, "Update now", the Pagers page's view;
+  - the controllers; the `pager_firmware_updates` table (`attempts` since "Update now", `offers`
+    ever).
+    The broker: `onHeartbeat`, `connectedPagers`, `offerFirmware`, `charging` stored. The heartbeat
+    sends `pagerFirmware` and keeps the answer. `TlsService.listeningPort` is public (the offer's
+    port).
+- console: the Pagers page's firmware notice, each pager's update in words, "Update now" for
+  those with `UPDATE_INSTALL_NOW`.
+- docs: ADR-0018, the runbook, manual task 30, `firmware/pager/README.md` (what P2-05 must do),
+  the phase spec.
+
+Checked against Espressif's own tool: `rp-pager-1.0.0.bin` in `apps/server/test/fixtures` was
+signed by espsecure 5.4 and verifies with the server's check against espsecure's key digest; an
+image signed by the tests' TypeScript signer verifies with `espsecure verify-signature`, with the
+same key digest. esptool reads the test images' app description.
+
+Tests:
+
+- domain 376 (+12);
+- contracts 949 (+8, with the new schema snapshots);
+- Control Plane 142 (+2: firmware offers by rollout and hold; rollbacks halt it and tell PCs);
+- vendor web app 73 (+1);
+- console 376 (+5);
+- server 1151 (+19, 27 skipped): the image check (7, the espsecure fixture), the config, the
+  firmware integration test (10, a real MQTT client as the pager, a real download), and the PC
+  and Control Plane together (1).
+
+Format, build, contract docs, `contracts:compat`, lint, typecheck, the tests of every package and
+`test:coverage` of every touched package pass. The relay's suite failed once under four parallel
+suites (a connection terminated as its database was dropped, after all its tests passed); alone
+its 140 tests pass.
+
+Not done or not verified:
+
+- Nothing has run on a pager: the pager's side is P2-05 (`firmware/pager/README.md`), and a pager
+  can be updated only after manual task 30 builds the signing key's digest into the software.
+- P2-04b2: scanning a pager's QR code with a camera.
+
+Gotchas:
+
+- A pager at or below 15 % battery raises the wearer's low-battery alert, and an open alert keeps
+  the pager from updating; tests of the battery rule use 20 %.
+- The Control Plane's Prisma client must be generated before its build after a schema change, or
+  `tsc` fails on the new enum value.
+- vitest drops `console.log` from code running between a test's awaits; trace to a file instead.
+
+### 2026-10-05: P7-04e2 The in-app APK updater through the restaurant PC (P7-04 done)
+
+Built new APKs of the waiter app and the table tablet from the restaurant PC (WTR-001, UPD-001,
+UPD-007; ADR-0017 addendum, `docs/runbooks/app-updates.md`, manual task 29 section 4; decisions
+661-667):
+
+- `@rp/domain` `app-update.ts`: `apkUpdateVerdict` (OFFER, UP_TO_DATE, NOT_SERVED, UNKNOWN) and
+  `mayInstallApkUnattended`.
+- `@rp/contracts` `app-builds.ts`: `AppBuildsFile` (`apps.json`), `AppBuildView`,
+  `CurrentAppBuildResponse`, `SystemAppBuild`; the routes `getCurrentAppBuild` and
+  `downloadCurrentAppBuild`; `SystemStatusResponse.clients.builds`.
+- server:
+  - `src/updates/app-builds.service.ts`: reads `RP_APPS_DIR/apps.json` and checks each APK's size
+    and SHA-256 (cached by file size and time): OK, MISSING or DAMAGED;
+  - `app-builds.controller.ts`: the device's own build and its download (`sendFile`, no-store);
+  - `client-version.ts`: those routes and the device token's challenge and renewal are open to
+    refused apps;
+  - `installationPaths().appsDir` and `RP_APPS_DIR` from the installation file; the System page's
+    builds.
+- api-client: `authorizedRequest(operationId)`, the address and headers for a download another
+  HTTP client makes.
+- mobile-core: `DeviceSession.downloadRequest`; `ApkUpdater` (checks on connect, refusal and every
+  30 minutes; `install()`; needs-permission; Android's answers; unattended on a device-owner tablet
+  while free or refused).
+- mobile-native:
+  - Kotlin `ApkInstalls`: OkHttp over `LanTrust`, size and SHA-256 while streaming, the package
+    and `versionName` read from the APK, a `PackageInstaller` session with a mutable explicit
+    pending intent;
+  - `RpApkInstallReceiver`, `RpPackageReplacedReceiver`, `RpApkInstallerModule`;
+    `REQUEST_INSTALL_PACKAGES`;
+  - the TypeScript `AndroidApkInstaller`.
+- mobile-shell: `ApkOffer`, `useApkUpdate`, `useApkUpdater`, `ShellProvider`'s `apkUpdater`;
+  `useAppUpdateWhenFree` tells it too; the sign-in screen and "Update this app" show the offer
+  (`mobile.update.fromPc`, `mobile.apk.*`).
+- apps: the waiter app's `apkUpdater()` in `session.ts`; the tablet's in `Root`, and `ApkOffer`
+  in its opened staff panel.
+- console: the System page lists the app versions the PC serves, or a damaged one.
+- desktop packaging: `app-builds.ts`, `package:stage --apk <folder>` (or `RP_APK_DIR`) with
+  `waiter-app.apk` and `table-tablet.apk`. The payload's `apps/apps.json` is required; it lists
+  none without APKs.
+- CI: the Android job checks `REQUEST_INSTALL_PACKAGES` and that the install receivers are not
+  exported.
+- docs: the ADR-0017 addendum, the runbook's "New APKs from the restaurant PC", manual task 29
+  section 4, the READMEs, the phase spec.
+
+Tests:
+
+- domain 364 (+5);
+- contracts 941 (+11, with the new schema snapshots);
+- api-client 41 (+2);
+- mobile-core 102 (+11);
+- mobile-native 41 (+3);
+- mobile-shell 48 (+5);
+- waiter app 70 (+1), table tablet 31 (+1);
+- console 371 (+1);
+- desktop 39 (+2);
+- server 1132 (+9, 27 skipped), 7 of them the new integration test with real APK files.
+
+Format, build, contract docs, `contracts:compat`, lint, typecheck and `test:coverage` of every
+touched package (the server's included) pass. The Control Plane's rollout test timed out once
+under four parallel suites; alone its 140 tests pass in 8 s.
+
+Not done or not verified:
+
+- The Kotlin is not compiled here (no Android SDK on this Mac). The Android CI job compiles it and
+  checks the manifest on the first push.
+- Nothing has run on a phone or tablet: manual task 29 section 4 (needs the Expo account and the
+  app-signing keystore). It also checks that `MY_PACKAGE_REPLACED` reaches the unexported receiver
+  and that a device owner may start its activity from the background.
+- No release pipeline passes `--apk` yet (no EAS account); the runbook gives the steps.
+
+Gotchas:
+
+- zsh does not split an unquoted `$files`: run file lists through `bash -c`. The server's
+  integration tests took about 36 s per half.
+- `vitest run <filter>` matches substrings: `restore.int` also runs `cloud-restore.int`.
+- A new exported schema writes its snapshot under `packages/contracts/test/__snapshots__/schemas/`
+  on the first local run; commit them (CI never writes snapshots).
+
+### 2026-10-05: P7-04e1 Phone and tablet EAS updates gated by the server's client API
+
+Split P7-04e: P7-04e1 (this one) and P7-04e2, the in-app APK updater through the restaurant PC
+(spec in `phase-7.md`). Built over-the-air updates of the waiter app and the table tablet
+(ADR-0017, `docs/runbooks/app-updates.md`, manual task 29; decisions 654-660):
+
+- `@rp/domain` `app-update.ts`:
+  - `otaUpdateVerdict`: APPLY, WAIT_FOR_SERVER, NOT_SERVED or UNKNOWN, from the server's range
+    and the update's client API;
+  - `mayApplyAppUpdate`.
+- `@rp/mobile-core` `app-updates.ts`, `OtaUpdater`:
+  - checks on connecting, on a 426 refusal and every 30 minutes;
+  - reads `/version` before downloading, and judges again what the download brought;
+  - restarts the app when `setBusy(false)`, or at once when refused;
+  - reports failures and an emergency launch;
+  - a snapshot for the screens.
+- `@rp/mobile-native` `ota-updates.ts`: `ExpoOtaUpdates` over `expo-updates` (now its peer and
+  dev dependency), reading `extra.expoClient.extra.clientApi` from the manifest.
+- `@rp/mobile-shell`:
+  - `ShellProvider`'s `updater`;
+  - `useAppUpdate` and `useAppUpdateWhenFree` (the app's own "in use", plus `AppState`);
+  - "Update this app" says when an update is on its way (`mobile.update.onItsWay`).
+- Apps:
+  - `app.config.ts`:
+    - `checkAutomatically: NEVER`;
+    - `extra.clientApi`, read from the contracts' source;
+    - a preview or production build with `EAS_PROJECT_ID` and no signing certificate fails.
+  - The waiter app creates the updater with the screen (`appUpdater` in `session.ts`). It is in
+    use while someone is signed in.
+  - The tablet creates it in `Root`. It is in use while guests are at its table or staff mode is
+    open.
+- Docs: ADR-0017 (also decides the APK route for P7-04e2), the runbook, manual task 29, the
+  READMEs, and the phase spec split.
+
+CI's coverage step (`pnpm test:coverage`, which `pnpm check` does not run) would have failed on
+the first push, from gaps that built up while CI could not run. Fixed in this WP with tests only:
+
+- contracts functions 70.6 % → 98.8 %: `refinements.test.ts`, every multi-field refinement taken
+  and refused;
+- mobile-shell 82.8 % → 96.7 %: `ordering.test.tsx`, the item sheet, the suggestion row and
+  `useSuggestions`;
+- table tablet functions 79 % → 83.4 %: `cart.test.tsx`, the diners' cart;
+- console functions 79.77 % → 80.12 %: the page error watcher, and opening a table's bill from
+  its details.
+
+The server's coverage run also failed once on an unhandled `57P01` from the relay test harness
+(`@rp/relay/testing`). There, `pool.end()` resolves before the last client's socket closes, and
+`DROP DATABASE … WITH (FORCE)` then terminates it. The harness now ignores connection errors once
+it is stopping; before that they still fail the run.
+
+Tests:
+
+- domain 359 (+7);
+- contracts 930 (+14);
+- mobile-core 91 (+15);
+- mobile-native 38 (+6);
+- mobile-shell 43 (+7);
+- waiter app 69 (+5);
+- table tablet 30 (+8);
+- console 370 (+3);
+- Control Plane 140;
+- relay 140 (2 skipped);
+- server 1123 (27 skipped), with coverage.
+
+Format, build, contract docs, `contracts:compat`, lint and typecheck pass. `test:coverage` passes
+in every package.
+
+Not done:
+
+- No EAS project or update signing key yet (manual task 29). Updates stay off, and nothing has
+  run on a phone. The check on devices is in the manual task.
+- Devices do not report which update they run (ADR-0017, consequences). Add it with P7-04e2 if
+  support needs it.
+
+Gotchas:
+
+- React Native's Jest preset mocks `AppState.currentState` as a function. Tests that need the app
+  on screen set it (`Object.assign(AppState, { currentState: 'active' })`) and take the change
+  listener from `jest.spyOn(AppState, 'addEventListener')`.
+- `rerender` in React Native Testing Library replaces the whole tree. Wrap the new element in
+  `ShellProvider` again.
+- Run `pnpm test:coverage` (or each package's `test:coverage`) before merging. The console's
+  function coverage is at 80.1 % against 80 %, so new console code needs its tests.
+
+### 2026-10-05: P7-04d Client compatibility (N-1) and the version matrix
+
+Split P7-04d: phone and tablet updates (EAS Update, the in-app APK updater) move to P7-04e. Built
+the N-1 rule and the version matrix (ADR-0016, `docs/runbooks/client-compatibility.md`; decisions
+645-653):
+
+- `@rp/domain` `client-api.ts`:
+  - client API versions and N-1 (`oldestServedClientApi`);
+  - `clientCompatibility` (CURRENT, PREVIOUS, TOO_OLD, NEWER, UNKNOWN);
+  - the `x-rp-client` identity;
+  - `buildVersionMatrix`.
+- `@rp/contracts` `client-api.ts`:
+  - `CLIENT_API_VERSION` 1.0, `CLIENT_API_HISTORY` (empty until the first release),
+    `CLIENT_HEADER` and `CLIENT_TOO_OLD`;
+  - `VersionMatrix`, `ClientCompatibility` and `PAGER_PROTOCOL_VERSION`;
+  - the server's range on `/version`, `RealtimeHandshake.client`, `DeviceView.clientApi` and
+    `.compatibility`, `SystemStatusResponse.clients` and the offered release's `clientApi` and
+    `leavesBehind`;
+  - `ReleaseInfo.matrix` and `PublishReleaseRequest.matrix`.
+- The compatibility check, `packages/contracts/scripts/lib/compat.ts` and `api-compat.ts`:
+  - `pnpm contracts:compat` runs in `pnpm check` and in a CI step;
+  - `pnpm contracts:freeze --release <x.y.z>` freezes a version;
+  - frozen versions go in `docs/api/compat/`.
+- server:
+  - `http/client-version.ts`: the 426 check before everything else, the open paths, and the
+    socket refusal;
+  - devices keep `client_api` (migration `20261005120000_device_client_api`) and the app version
+    from pairing and the hourly token;
+  - the Devices list and the System page judge them.
+- api-client: the `client` option, `x-rp-client` on every call and in the handshake,
+  `onClientTooOld` (REST 426 and the socket refusal, which stops the socket).
+- mobile-core and mobile-shell: `appKind`, `clientTooOld` in the session snapshot, and
+  `UpdateRequiredScreen` (staff, or a table's guests). Both apps show it.
+- console:
+  - the controller sends `console/<version>`;
+  - `reloadForNewConsole` reloads once in 10 minutes, otherwise "This screen is out of date"
+    with "Load again";
+  - Devices: "Update soon", "Update needed", "Newer than the server";
+  - System: the apps to update, the apps an offered update leaves behind, and the "App
+    connection version" fact.
+- Control Plane:
+  - `releases.matrix` (JSONB, migration `20261005120000_release_matrix`), sent with offers;
+  - `MATRIX_MISMATCH`;
+  - the audit records the client API;
+  - `release:publish --matrix <file>`.
+- Vendor web app: the Releases page's "Apps it serves" column, with the matrix on hover.
+- desktop packaging: `version-matrix.ts`. The stage step writes `version-matrix.json` beside the
+  staged installer and in the payload; the CI job keeps it with the installer. The Expo apps take
+  their version from `package.json`.
+- docs: ADR-0016, the runbook, `docs/api/compat/README.md`, CONVENTIONS, the Control Plane
+  runbook's `--matrix`.
+
+Tests: `pnpm check` passes, run in parts (format, build, contract docs, `contracts:compat`, lint,
+typecheck, every package's tests). Domain 352 (+15), contracts 916 (+25), api-client 39,
+mobile-core 76, mobile-shell 36, console 367 (+8), server 1123 (+12, 27 skipped), Control Plane
+140, vendor web app 72, desktop 37 (+1), waiter app 64, table tablet 22. Playwright: console 24,
+vendor web app 2.
+
+Not done:
+
+- Nothing is frozen yet: the first release runs `pnpm contracts:freeze --release <x.y.z>`
+  (P8-06), and the check compares nothing until then.
+- Pagers report no protocol version (P2-04b, P2-05). The matrix records the protocol, and pagers
+  show as UNKNOWN.
+- No release pipeline publishes yet (no Control Plane deployment, manual tasks). The runbook gives
+  the CLI command with `--matrix`.
+
+Gotchas:
+
+- The 426 middleware runs before routing, so a refused app gets 426 even for a path that does not
+  exist. Tests must use real paths to see the served case.
+- A new required field in a response schema is a break for apps one version ahead reading an
+  older server: `VersionResponse.clientApi` is optional for that reason. The compat check covers
+  the other direction (old apps, new server).
+- The vendor web app's publish form parses with `PublishReleaseRequest`, so it now sends
+  `matrix: null`; only the release CLI sends a matrix.
+- The headless autorun ends its process when the turn ends, which kills a background
+  `pnpm check`. The first run of this WP stopped that way, uncommitted. Run the check's parts in
+  the foreground instead (each under the 10-minute tool limit).
+
+### 2026-10-05: P7-04c The update agent on the restaurant PC
+
+Built the restaurant PC's software updates (`docs/runbooks/software-updates.md`; decisions
+635-644):
+
+- `@rp/domain` `software-update.ts`:
+  - `updateTiming`: UPD-004's window, "Install now", open tables, security-critical releases and
+    no retry by itself after a failure;
+  - `isNewerVersion`;
+  - the download back-off.
+- contracts:
+  - `SystemStatusResponse.update.agent` (state, waiting reason, error, retry time, last outcome);
+  - `BackupKind` UPDATE (migration `20261005100000_update_backups`).
+- server `src/updates/`:
+  - `UpdateAgentService`, every minute and after each heartbeat answer or "Install now":
+    - the outcome of a hand-off;
+    - the download over HTTPS with size, SHA-256 and Authenticode (`authenticode.ts`, PowerShell
+      on Windows);
+    - the timing;
+    - the full backup (`BackupService.backUpForUpdate`) and the half-done-migration check;
+    - then INSTALLING reported and the request written.
+  - It records, audits and reports the outcome (`update-state.ts`: `updates.agent`, and
+    `updates.report`, sent with the heartbeat until answered).
+  - `update-files.ts`: the request (`<data>\run`), the outcome (`%ProgramData%\RestaurantPlatform`).
+- installation:
+  - `update-snapshot.ts`: the database copy, its drop and the switch back, run once per request
+    by the service host before its server starts;
+  - `setup-cli health` and `setup-cli update-snapshot create|drop`;
+  - the installation file's `updates` (publisher, allowUnsigned) and `RP_UPDATE_PUBLISHER` /
+    `RP_UPDATE_ALLOW_UNSIGNED` for the server;
+  - `UPDATER_TASK`, `programDataDir`, `updatesDir`.
+- watchdog: starts the updater's task for a request the updater has not taken (again after 2
+  minutes if still not taken; a minute after a failed start); `WindowsServiceControl.runTask`.
+- console System page:
+  - the agent's state (downloading, failed with the retry time, downloaded, backing up,
+    installing, unavailable);
+  - the last update's outcome with the backup's name;
+  - "Install now" again after a failure.
+  - Backup kind "Before an update".
+- `infra/installer/windows`:
+  - `Update-RestaurantPlatform.ps1` with `Invoke-RPUpdate` in the module:
+    - copies and checks the installer in `installers` (administrators only);
+    - run once by request id;
+    - maintenance, the services stopped and the database copied;
+    - the installer and the health check;
+    - going back through the previous installer;
+    - the outcome in ProgramData.
+  - Install registers the task (`Register-RPUpdateTask`: scripts to `updater`, both folders
+    closed, `schtasks /Create /XML`) and keeps its own installer (`-InstallerPath`). Uninstall
+    removes the task. `-UpdatePublisher` and `-AllowUnsignedUpdates` reach `write-installation`.
+- packaging: `RP_UPDATE_PUBLISHER` / `RP_ALLOW_UNSIGNED_UPDATES` defines (refused together; a
+  signed build needs the publisher), the updater script in the payload, `-InstallerPath
+"$EXEPATH"` from NSIS, and `package:win --product-version`.
+- CI job "Windows installer" (90 minutes):
+  - builds the next version from the same payload;
+  - `ci/Test-Update.ps1` installs, runs S9 (a forced failed health check, rolled back with the
+    database, the restaurant still answering), then updates for real through the watchdog and
+    the task, and uninstalls.
+- docs: `software-updates.md`, `windows-installer.md`, `windows-services.md`, manual task 14 and
+  the signing item in `MANUAL_TASKS.md` (the repository variable `RP_UPDATE_PUBLISHER`).
+
+Tests:
+
+- domain 9;
+- server unit +17 (downloads, signatures, hand-off files, the watchdog's trigger and retry,
+  `schtasks`, the set-up tool's update options and `health` against a TLS stand-in, the scripts
+  agreeing with the server);
+- server integration:
+  - the agent 10 (real backups);
+  - the database copy and switch back 4 (real cluster);
+  - the report reaching a real Control Plane 1;
+- console 4;
+- desktop 1;
+- Pester 102 → 138 (the updater 28 and the install, uninstall and script changes).
+
+Self-review changed the design before merging. The first version had the updater (SYSTEM) remove
+the request and write its outcome and rollback request in the data folder, which the server's
+account controls: a link there could steer SYSTEM's writes and deletes. Now it only reads there.
+
+Not done or not verified:
+
+- The CI job has not run (`gh` not logged in, manual task 1): `Test-Update.ps1`, the task
+  registration and the real `Get-AuthenticodeSignature` run on the first push. Expect small
+  Windows-only fixes.
+- Signing waits for the certificate; until then CI builds take unsigned updates (test PCs only).
+- The POS window is not reopened after an update (decision 644, P8-04).
+
+Gotchas:
+
+- Pester cannot mock provider parameters (`Get-Content -Raw`, `Get-ChildItem -File`): wrap them
+  in module functions (`Read-RPTextFile`, `Get-RPInstallerFile`). `Test-Path -LiteralPath` binds a
+  list: mocks must compare `[string]$LiteralPath`. `Split-Path` turns `\` into `/` off Windows:
+  use `Get-RPParentPath`.
+- The Write tool turned `\uFEFF` in TypeScript into a literal byte order mark, which ESLint
+  rejects; write the escape from a script.
+- Approvals are stamped with the real clock; agent tests on a fake clock re-save them with it.
+
+### 2026-10-05: P0-16d Packaging and the windows-latest CI job
+
+Built the restaurant PC's installer (`docs/runbooks/windows-installer.md`, "The installer"):
+
+- `apps/desktop/src/packaging/`:
+  - `components.ts`: Node.js 24.21.0, PostgreSQL 16.15 and WinSW 2.12.0 (+ its licence) pinned
+    by SHA-256; `download.ts` fetches into `node_modules/.cache/rp-installer` and checks the hash
+    at every use.
+  - `stage.ts` (`package:stage`): the shell bundled by esbuild; the server by `pnpm deploy`
+    (hoisted), trimmed by `prune.ts`, with `notices.ts`' third-party notices; the console;
+    Node.js and PostgreSQL unpacked (`payload.ts` decides what of EDB's zip ships); WinSW as
+    `RPServer.exe`/`RPWatchdog.exe`; the set-up scripts; `installer-defines.nsh` (`nsis.ts`). It
+    checks the payload against the staged server's `setup-cli paths` and loads every service
+    program and the native modules.
+  - `builder-config.ts` and `package-cli.ts` (`package:win`): NSIS per machine, fuses, signing
+    when `WIN_CSC_LINK` is set, `release/RestaurantPlatform-Setup-<version>.exe`.
+- `apps/desktop/installer/installer.nsh`: the data-drive page; Stop before files are replaced,
+  Start when an update cannot go ahead; Install after the copy; the uninstall page with "delete the
+  data too" and Uninstall before the files go; `/DATADIR=`, `/STAFFSUBNET=`, `/MINFREEGB=`,
+  `/DELETEDATA`.
+- The shell reads the installation file for the port and the CA's folder (`config.ts`, `main.ts`).
+- `infra/installer/windows`: `Get-DataDriveChoice.ps1 -IniFile` (UTF-16 INI for the page),
+  `Stop-` and `Start-RestaurantPlatform.ps1`, comma lists for `-StaffSubnet`/`-TlsHostnames`.
+- CI job "Windows installer" (`ci.yml`): build, stage, package, then
+  `infra/installer/windows/ci/Test-Installer.ps1` installs silently, checks the services (running,
+  automatic), the health check and the firewall, kills the server (back within 10 s), repairs,
+  refuses `/DELETEDATA` without permission, uninstalls keeping the data, installs again and
+  uninstalls. Logs and the installer are kept as artifacts.
+- `manual-tasks/14-windows-installer.md`: the person's check on a clean Windows 11 PC.
+- `apps/server/package.json` `files`; `PostgreSQL` in the licence policy; ESLint and git ignore
+  `apps/desktop/staging` and `release`.
+
+Tests:
+
+- Desktop 14 → 35 (coverage 99.6 % of lines; the stage step and the command-line tools run in the
+  CI job): the pins, downloads (cache, mismatch, tampered cache, HTTP error), what of PostgreSQL
+  ships, the zip commands, the payload's required files, trimming with nested versions and optional
+  peers, notices, NSIS defines and escaping, the script's defines and scripts, the fuses and
+  installer settings, the installation file in the shell.
+- Pester 84 → 102 (+1 Windows-only, 7 in all): the drive page's INI, stop and start, comma lists,
+  the new scripts' exit codes; the CI script is ASCII and parses.
+
+Checked on this Mac:
+
+- `package:stage` ran end to end (payload: server 210 MB, PostgreSQL 91 MB, Node.js 89 MB,
+  console 9 MB), and the staged server's programs, sharp, Argon2, Prisma's query compiler and
+  pdfmake's fonts load from the trimmed packages.
+- `package:win --any-platform` built `RestaurantPlatform-Setup-0.1.0.exe` (138 MB): both NSIS
+  builds (installer and uninstaller) pass with warnings as errors; app.asar holds `main.js` and
+  `package.json` only; `@electron/fuses read` shows the fuses set.
+
+Not done or not verified:
+
+- The CI job has not run: `gh` is not logged in (manual task 1). The first push runs it; expect to
+  fix small Windows-only issues there (paths, `pnpm` through `cmd`, the runner's drives).
+- No real install has run anywhere yet. Manual task 14 is the person's check.
+- No product icon (OI-01); unsigned until the certificate exists. The PowerShell scripts are
+  unsigned too: a PC whose Group Policy sets the execution policy (AllSigned) overrides
+  `-ExecutionPolicy Bypass` and the set-up would fail. Sign them with the same certificate
+  (`Set-AuthenticodeSignature`) in the stage step once it exists (P8-03).
+- `pnpm audit --audit-level high` reports two advisories that were already there, both in the
+  table tablet's Expo and Jest tools (node-forge GHSA-86w9-cpqp-85rv through `@expo/cli`, braces
+  GHSA-vfj7-8cjw-p6xm through `@react-native/jest-preset`). The security workflow's audit will
+  fail on them until they are fixed or accepted in `auditConfig.ignoreGhsas`.
+
+Notes for P7-04c (the update agent):
+
+- Run the installer silently: `RestaurantPlatform-Setup-<v>.exe /S`. Exit 0 done; 1 the set-up
+  failed (the services may be stopped: run the previous installer to roll back) or the services
+  could not be stopped (nothing changed); 2 the installed version could not be replaced (it was
+  started again).
+- The installer stops `RPDatabase` too. The update agent cannot run it from the server's own
+  process tree: `Stop-RestaurantPlatform.ps1` stops `RPServer` (and the watchdog). Hand off to
+  something outside it (a scheduled task as SYSTEM, or the watchdog, which is LocalSystem).
+- The server's account cannot elevate; the installer needs an administrator.
+
+Gotchas:
+
+- `pnpm deploy --legacy` with a hoisted layout dropped `uuid@14` (the server's own dependency)
+  for exceljs' `uuid@8`. The non-legacy deploy (`--config.inject-workspace-packages=true`) is
+  right, but keeps the lockfile's `auto-install-peers`, hence the trimming.
+- electron-builder looks for node_modules in the project folder when the app folder has none, and
+  packs them; `beforeBuild` returning false stops it (only when `npmRebuild` is on).
+- electron-builder includes `installer.nsh` before its own script: functions that use MUI macros
+  must be defined in `customHeader`; variables and functions must be inside
+  `!ifdef BUILD_UNINSTALLER` / `!ifndef` per build, or warnings (errors) stop the build.
+- `apps/*/build/` is git-ignored, so the NSIS resources live in `apps/desktop/installer/`.
+- `GetOptions` matches by prefix: the uninstaller's `/S` check would match `/STAFFSUBNET=`, which
+  is an installer-only option.
+
+### 2026-10-05: P0-16c Windows set-up scripts
+
+Built `infra/installer/windows/` for Windows PowerShell 5.1 (`docs/runbooks/windows-installer.md`):
+
+- `RestaurantPlatform.Setup.psm1`:
+  - the data-drive choice (ONB-002);
+  - the folder-permission plan by SID, applied with icacls, removing entries the plan does not
+    name;
+  - the server's service SID, computed;
+  - the WinSW and `sc.exe` service set-up with accounts and recovery;
+  - the firewall rules for the staff network (SEC-008);
+  - `Invoke-RPInstall` (install and repair) and `Invoke-RPUninstall`.
+- `Install-RestaurantPlatform.ps1`, `Uninstall-RestaurantPlatform.ps1` (exit 3 when deleting the
+  data is not allowed), and `Get-DataDriveChoice.ps1` (JSON for the installer's drive page,
+  P0-16d).
+- `PSScriptAnalyzerSettings.psd1`, with the Windows PowerShell 5.1 and 7 compatibility profiles;
+  `Invoke-Tests.ps1`; `pnpm installer:test`.
+- CI job "Windows set-up scripts" on `windows-latest`: Pester and PSScriptAnalyzer under 5.1 and
+  under 7.
+
+The Owner's permission to delete the data (NFR-I02, decision 618):
+
+- `POST /api/v1/system/data-deletion` (DATA_ADMIN, reason, audited `DATA_DELETION_ALLOWED`, 30
+  minutes);
+- `dataDeletionAllowedUntil` on the System status;
+- "Removing the software" on the System page (`UninstallPanel`);
+- `setup-cli data-deletion`, and `setup-cli paths` for the scripts;
+- `installationPaths` gained `tlsDir` and `backupsDir`.
+
+`scripts/traceability.mjs` now counts Pester `*.Tests.ps1` files.
+
+Tests:
+
+- Pester: 84 pass on this Mac (PowerShell 7.6, Pester 5.7.1). They cover the drive choice and its
+  refusals, the permission plan and icacls calls, the firewall, the services, install, repair and
+  their failures (also a repair given another data folder, or whose folder is gone), uninstall with
+  and without permission, the files being ASCII and parsing,
+  PSScriptAnalyzer, and the scripts' exit codes. 6 more, tagged Windows, are not run yet (below).
+- Server unit +8: the permission's rules and file; `paths` and `data-deletion`; the scripts
+  agreeing with the server (service names, folders, the setup-cli commands called, the free-space
+  default).
+- Server integration +2: only the Owner with a fresh second factor; audited; the uninstaller sees
+  it.
+- Console +2: a manager sees why there is no button; the Owner allows it with the second factor.
+
+Not done or not verified:
+
+- The 6 Windows-only Pester tests (real icacls, firewall, `sc.exe showsid`, drives, services) and
+  the Windows PowerShell 5.1 run need the CI job. `gh` is not logged in on this Mac (manual task
+  1), so they run on the first push.
+- Running the scripts with the real packaged software is P0-16d (its CI job installs silently) and
+  manual task 14 on a clean PC.
+
+Notes for P0-16d:
+
+- The NSIS drive page runs `Get-DataDriveChoice.ps1 -MinFreeGB 20`. It offers `Default`, shows
+  `Warning` (SYSTEM_DRIVE, NO_DRIVE), and gives the refusal reasons in words. The installer's
+  strings belong to the NSIS pages.
+- After copying the files, run `Install-RestaurantPlatform.ps1 -InstallDir ... -ProductVersion ...
+[-DataDir ...] [-StaffSubnet ...]` and the cloud URLs. Repair is the same call.
+- Uninstall: run `Uninstall-RestaurantPlatform.ps1 -InstallDir ... [-DeleteData]` before
+  removing the files. On exit 3, tell the person the Owner must allow it on the System page.
+- Stop `RPWatchdog`, then `RPServer`, before replacing files on an update or repair (the script
+  does it too, but the files are copied first).
+
+Gotchas:
+
+- `pwsh` is not on the Mac by default. It is now at `~/.local/pwsh` (`~/.local/bin/pwsh`), with
+  Pester 5.7.1 and 6.2.0 and PSScriptAnalyzer 1.25.0 in `~/.local/share/powershell/Modules`.
+  `Invoke-Tests.ps1` pins Pester 5.x.
+- `Join-Path` uses `/` on macOS. The module builds Windows paths with `Join-RPPath`, so the tests
+  see what Windows sees.
+- `Get-ChildItem -Include` matches nothing without `-Recurse` or a wildcard path.
+- Windows PowerShell 5.1 turns a program's stderr into a terminating error under
+  `ErrorActionPreference = 'Stop'` when redirected. `Invoke-RPProgram` switches to `Continue`
+  locally.
+- PSScriptAnalyzer's compatibility rules do not know Pester, so they check only the shipped
+  scripts.
+
+### 2026-10-04: P0-16b The services' runtime and set-up commands
+
+Split P0-16b in `phase-0.md`: b is the server side, c the PowerShell scripts, d packaging (was c).
+Built in `apps/server`:
+
+- `auth/dpapi.ts` and `DpapiSecretStore` (`RP_SECRET_STORE=dpapi`): Windows DPAPI through
+  PowerShell's `ProtectedData`, one batch call, exclusive creation through hard links, and the
+  development store's plain `.key` files protected and removed. `replace` serves restores.
+  `INSTALLATION_SECRET_NAMES` holds the database passwords, which backups leave out.
+- `installation/`:
+  - `installation.ts`: the installation file, the paths, the logins, and the environments of the
+    server and of the restore tool;
+  - `postgres-setup.ts`: `initdb`, the managed `postgresql.conf` block, `pg_hba.conf` and
+    `pg_ctl register`'s arguments;
+  - `database-setup.ts`: the logins and the database;
+  - `migrations.ts`: the runner without the Prisma CLI;
+  - `winsw.ts`: the two service definitions;
+  - `setup-cli.ts`: `write-installation`, `secrets`, `postgres-init`, `postgres-register`,
+    `database`, `migrate`, `service-files`, `maintenance`, `status`.
+- `service/`:
+  - `service-host.ts` and `service-host-main.ts`: preparing, then supervising the server;
+  - `health-watch.ts`: when to give up on a running server, and the restart delays;
+  - `health-probe.ts`: the health check over TLS, trusting only the installation's CA;
+  - `host-state.ts`: the state file;
+  - `watchdog.ts` and `watchdog-main.ts`: the second line;
+  - `windows-services.ts`: `sc.exe` and `taskkill`;
+  - `maintenance.ts`: the maintenance flag.
+- `main.ts` stops on the host's IPC message or when the channel closes.
+- Migration `20261004200000_migration_history_read` (decision 615). Boolean flags accept on/off
+  (decision 616).
+- Docs: `docs/runbooks/windows-services.md`; the installer, server and desktop READMEs; the
+  installer sections of `backups.md` and `data-lifecycle.md`.
+
+Tests: server unit 53 new:
+
+- DPAPI store 12 (+1 run on Windows only);
+- installation, PostgreSQL settings, WinSW and the set-up tool 17;
+- health watch, watchdog, `sc.exe` (also a service stuck starting) and the maintenance flag 14;
+- the service host with a stand-in server process 9: crash back within 10 s, hang, 503, exit 75,
+  failing preparation, stop over IPC, forced stop, a leftover server;
+- on/off flags 1.
+
+Integration 10 on a real PostgreSQL 16: `initdb` and its settings; repair; the logins and all 42
+migrations applied as the non-superuser migrator; idempotence; each login's rights; `pg_dump` as
+the server; a later migration's table reaching `rp_app`; a failed migration undone whole.
+
+Checked by hand on this Mac with the built server: set-up tool → `initdb` → logins → 42 migrations
+→ the service host starts the real server over HTTPS in 2 s. A killed server was back in 1 s, and
+SIGINT stopped it cleanly.
+
+Not done here, for P0-16c:
+
+- the PowerShell scripts: folder permissions, `pg_ctl register` through `setup-cli`, WinSW
+  install/refresh, the service accounts, firewall rules, repair and uninstall;
+- deleting the data on uninstall after the Owner's password and second factor (NFR-I02);
+- repairing a PC whose DPAPI key was lost (re-imaged with the data drive kept). The secrets cannot
+  be read there, so the installer must reset the logins through a temporary local `trust` line;
+  the backups then need the recovery key.
+
+Notes for P0-16c:
+
+- Run order: `write-installation`, `secrets`, `postgres-init`, folder permissions, then
+  `postgres-register` and start `RPDatabase`. Then `database`, `migrate`, `service-files`, WinSW
+  `install` (or `refresh` on repair) for `RPServer` and `RPWatchdog`, then start them. Wrap it in
+  `maintenance on` and `maintenance off`.
+- Permissions:
+  - `<data>`: full control for `NT SERVICE\RPServer`;
+  - `<data>\postgres`: full control for Network Service;
+  - `<data>\backups\wal-staging`: written by Network Service, read and deleted by `RPServer`;
+  - `<data>\secrets`: Administrators and `RPServer` only, nothing inherited;
+  - `%ProgramData%\RestaurantPlatform`: writable by Administrators only.
+- Accounts: `sc.exe config RPServer obj= "NT SERVICE\RPServer"`; the watchdog stays LocalSystem.
+- Firewall: inbound TCP on the server's port and the MQTT port, from the staff subnet only
+  (`LocalSubnet` unless the installer is given one, SEC-008).
+- After a restore, the restored database gives PUBLIC its default CONNECT again until
+  `setup-cli database` runs. Only our logins exist, so the risk is small. Run it on repair, or let
+  the restore revoke it.
+- The Windows-only DPAPI round trip (`it.runIf(win32)`) and the Pester tests belong in the
+  `windows-latest` job.
+
+Gotchas:
+
+- `fork` with `execArgv: []` and IPC is how the host runs the server. `child.kill()` on Windows
+  always ends the process abruptly, so a graceful stop has to go over IPC.
+- `@rp/test-postgres` now exports `findPgBin`; rebuild it (`pnpm --filter @rp/test-postgres
+build`) before running the server's integration tests on their own.
+- The server's integration tests connect as a superuser. The new installer test is the only one
+  that runs the server's login as it is on the PC; add checks there when a feature needs a new
+  grant.
+
+### 2026-10-04: P0-16a Electron shell
+
+Built `apps/desktop` (`@rp/desktop`):
+
+- `security.ts`: the web preferences (context isolation, sandbox, no Node.js, no preload), the
+  navigation and permission rules, and the certificate verdict that pins the installation's CA
+  on loopback (`isIssuedBy` with `node:crypto`).
+- `shell.ts` (`startShell`): one instance per PC, login item, session handlers, the window with
+  its start-up page, waiting for `/api/v1/health` through Chromium's network stack, reopening,
+  crash reload and waiting again when the console fails to load.
+- `config.ts` (`RP_SHELL_URL`/`RP_SHELL_PORT`, `RP_SHELL_FULLSCREEN`, `RP_SHELL_OPEN_AT_LOGIN`,
+  `RP_SHELL_CA_FILE` or `RP_DATA_DIR`), `server-wait.ts`, `splash.ts` (a `data:` page with
+  `default-src 'none'`), `main.ts` (Electron's objects, not unit-tested).
+- i18n `desktop.*`; P0-16 split into a/b/c in `phase-0.md`.
+
+Tests: 14 (hardening, CA pin with certificate fixtures, settings, back-off, start-up page,
+reopening, sign-out, failed and aborted loads, crash reload, navigation, permissions, single
+instance).
+
+Not done here: fuses, ASAR integrity, NSIS and signing (P0-16c); the services and watchdog
+(P0-16b); running the shell on Windows (P0-16c's CI job and the person's checklist).
+
+Gotchas:
+
+- pnpm does not run Electron's postinstall, so its binary is not downloaded. Run
+  `node node_modules/electron/install.js` in `apps/desktop` once before `pnpm start`.
+- Chromium reports `did-fail-load` with `ERR_ABORTED` (-3) whenever a load replaces another. The
+  shell ignores it, or its own start-up page would start a second wait.
+- A self-signed CA presented as the leaf passes `checkIssued` against itself. That is fine, since
+  the TLS handshake proves the presenter holds that CA's key. Tests use another CA instead.
+
+### 2026-10-04: P7-04b Release management in the vendor web app
+
+Built: `releases/release-view.ts` (labels, the default share, the share check), `RolloutDialog`,
+and the reworked `ReleasesScreen`:
+
+- columns for the rollout with its halt reason, installs and the security badge;
+- the publish form's share, security flag and hotfix PC;
+- the rollout button.
+  Also: `tenants/UpdatesCard` (hold and release), and Support can close an update alert in
+  `AlertsTable`.
+
+Tests: vendor web 6 new (labels, hotfix and staged publish requests, widening with a pilot PC and
+a reason, read-only for Support, holding a PC, hidden without the right) plus the update alert's
+text and closing.
+
+### 2026-10-04: P7-04a Rollouts at the Control Plane
+
+Built:
+
+- domain: `rollout.ts` (`rolloutBucket`, `inRollout`, `releaseToOffer`, `haltReason`); `semver.ts`
+  moved here; fleet alert kind `UPDATE_FAILED`.
+- contracts: `ReleaseInfo.securityCritical`, `UpdateReport` in heartbeats, `VendorReleaseView`
+  with its rollout and installs, `UpdateRolloutRequest`, `PinInstallationRequest`,
+  `VendorInstallationView.pinnedVersion`; publish takes `securityCritical`, `rolloutPercent` and
+  `targetInstallationId`; routes `updateVendorRollout` and `pinVendorInstallation`.
+- Control Plane: release rollout columns, `installations.pinned_version` and `release_installs`.
+  `ReleasesService` gained the offer, publish, rollout changes, holds, heartbeat recording, the
+  silent sweep and the automatic halt. `FleetService` gained `updateFailed`/`updateSucceeded` and
+  manual closing of failed-update alerts. New `CP_ROLLOUT_*` settings.
+- vendor web app: the alert's text and tone; fixtures updated (the release pages are P7-04b).
+- docs: the Control Plane runbook's staged rollout and one-restaurant sections.
+
+Tests: domain 6 rollout plus the moved semver tests; CP integration 4. They cover the share and
+its widening, the cohort, pause and resume, the hold and its release, a hotfix with its security
+flag, the automatic halt from a rollback and a silent PC with their alerts, an alert closing when
+the PC runs the version and by Support, and an error spike.
+
+Gotcha: `SELF_RESOLVING_ALERTS` are closed by every heartbeat that does not show their condition.
+An alert opened from another source must not be in that list.
+
+### 2026-10-04: P7-09b Digital bills on the restaurant PC (P7-09 done)
+
+Built:
+
+- contracts: `DigitalBillEntry`, `InvoiceDigitalBillsResponse`, routes `listInvoiceDigitalBills`
+  and `sendInvoiceDigitalBill`, setting `bills.digitalBillChannel`.
+- server `src/digital-bills/`: `DigitalBillsService` (the `BillSettled` consumer, send again, the
+  queue with back-off, the request with the bill as printed), the controller and the module; the
+  `digital_bills` table (with `rp_purge` and the archive year); `ControlPlaneClient.sendDigitalBill`;
+  erasure stops waiting bills.
+- console: `DigitalBillLine` on the bill, the settle toast's note, the setting's labels and choices.
+- docs: the Control Plane runbook's restaurant-PC part.
+
+Tests: server integration 5, end to end through a real Control Plane and a stand-in WhatsApp
+(sent by itself once with the number forgotten, the link opening the bill, consent and channel
+refusals, retries then sent, given up after a day, an undeliverable number, erasure); console 3.
+
+### 2026-10-04: P7-09a Digital bills at the Control Plane
+
+Built:
+
+- domain `digital-bill.ts`: `indianMobile`, `maskPhone`, `nextDigitalBillAttempt` (1, 5, 15, 60
+  minutes, then every 3 hours, given up after a day).
+- contracts (control plane): `DigitalBillRequest`, `DigitalBillView`, `DigitalBillPageParams`;
+  routes `sendDigitalBill` (signed) and `getDigitalBillPage` (public).
+- Control Plane `src/digital-bills/`: `BillSender` and `WhatsAppCloudSender`,
+  `DigitalBillsService` (send, page, purge sweep), `bill-page.ts`, the controller; the
+  `digital_bills` table; `CP_PUBLIC_URL`, `CP_DIGITAL_BILL_*` and `CP_WHATSAPP_*` settings.
+- docs: the Control Plane runbook's digital bills section, `manual-tasks/28-digital-bills.md`.
+
+Tests: domain 5; CP unit 7 (the WhatsApp request, number rejected, busy and unreachable retried,
+set-up errors not, configuration, page escaping) and integration 5 (sent once with its link and
+only four digits stored, failed then retried, expiry and purge, unset channels and the daily
+limit, no signature and wrong links).
+
+### 2026-10-04: P7-06d Data-volume test (P7-06 done)
+
+Built: `test/performance/volume-model.ts` (`projectVolume`), `volume.perf.test.ts` (opt-in,
+`RP_PERF=1`), `seedDesignRestaurant` split out of `seedDesignCapacity`; `docs/build/data-volume.md`
+with the measured numbers: about 50 GB for five years at design capacity, half the 100 GB target.
+
+Tests: unit 4 (the projection: scaling, larger count, estimates, assumptions, retention); the
+volume run itself at 30 and 180 days.
+
+### 2026-10-04: P7-06c Archive viewer and full data export
+
+Built:
+
+- contracts: `ArchivedDaysResponse`, `ArchivedInvoiceQuery`/`ListResponse`/`Params`/`Response`,
+  `DataExportView`/`Response`, `StartDataExportRequest`; routes `getArchivedDays`,
+  `listArchivedInvoices`, `getArchivedInvoice`, `getDataExport`, `startDataExport`; `listArchives`
+  now REPORTS_VIEW_EXPORT.
+- server `src/lifecycle/`: `archive-reader.ts` (`scanArchive`, `camelRow`),
+  `ArchiveViewerService`, `DataExportService` and its controller, `invoice-books.ts` (the
+  register and PDF books, moved out of `ArchiveService` and shared with the export).
+- console: "Open" on each finished archive, the archive viewer page (`/manage/archives/:id`) with
+  the day-by-day report, invoice search and the invoice as printed (print styles), "Export all
+  data…" for the Owner; old years visible to managers.
+- docs: the data lifecycle runbook's archive viewer and full export sections.
+
+Tests: server integration 1 new in archive-purge (days, search by date and number, one invoice as
+printed, waiter and cashier refused) and 3 in data-export (every table in both formats, no
+secrets, register and PDF books by year, while the licence is restricted; a relative folder
+refused; managers refused); console 3 new and 1 updated.
+
+Note: this WP was started by the headless autorun and finished from the chat panel after the
+autorun paused on the weekly limit (it resumes Thu 8 Oct 09:32 and continues the same session).
+
+### 2026-10-03: P7-06b Archive-then-purge
+
+Built:
+
+- domain `archive.ts` (`statutoryRetentionEnd`, `withinStatutoryPeriod`, `purgeableYears`,
+  `financialYearOfLabel`); contracts `archives.ts` and the routes `listArchives`/`startArchive`.
+- server `src/lifecycle/`: `ArchiveService`, `ArchiveController`, `business-archive.ts`
+  (format, `verifyBusinessArchive`), `year-records.ts`, `text-pdf.ts`; `billTextLines` from the
+  receipt renderer; `invoiceView` exported; `RP_PURGE_DATABASE_URL`; migration (archive runs, the
+  purge role's grants, the invoice-line guard); archives in the cloud upload.
+- Control Plane: cloud files have a kind (BACKUP or ARCHIVE); retention, restore and the fleet's
+  newest backup use backups only.
+- console: "Old years" on the System page for the Owner.
+- docs: the data lifecycle runbook's archive-then-purge and purge login sections.
+
+Tests: domain 3; server integration 3 (years offered and refused, archive with export, read back,
+purge of FY 2023-24 through a real `rp_purge` login with FY 2024-25 untouched, the audit
+records) and the cloud upload of an archive; console 1 new and 1 updated.
+
+Gotcha: unreferenced `$n` parameters make PostgreSQL refuse a statement, so each table's clause
+takes exactly its own parameters (`paramsFor`).
+
+### 2026-10-03: P7-06a Automatic retention
+
+Built: domain `retention.ts` (`monthsBefore`, `retentionCutoffs`, `lastVisitOf`); server
+`src/lifecycle/` (`RetentionService`, `retention-state.ts`, `LifecycleModule`), the migration
+granting DELETE on the three operational tables, `SystemStatusResponse.storage.retention`;
+console: the retention line on the System page; `docs/runbooks/data-lifecycle.md`.
+
+Tests: domain 3; server integration 2 (every kind removed or kept as it should be, files, the
+audit entry once, the System page) and the schema test's deletable tables; console 1 updated.
+
+Gotcha: tests run as a superuser, so a missing grant only shows on a database queried for
+`has_table_privilege`; the schema test is where to add each table a feature deletes from.
+
+Also: the REC-011 p95 timing tests may retry twice (201 ms against 200 ms once, with four test
+packages running); the P7-05e cloud-retention test no longer computes the retention per backup.
+
+### 2026-10-03: P7-05e Key escrow and restore from the cloud
+
+Built:
+
+- contracts: `EscrowOffer`, `EscrowBackupKeyRequest`, `RestoreCodeRequest`/`View`,
+  `CloudRestoreRequest`/`Response`, `RestoreCodeNotice`; heartbeat `backupKeyId` and
+  `restoreCodesSeen`, answer `backupKeyEscrow` and `restoreCodes`; fleet `backupKeyEscrowedAt`;
+  capability BACKUP_RESTORE; alert type `VENDOR_RESTORE_CODE` (domain rule, pager, strings);
+  `CloudBackupStatusView.keyEscrowedAt`.
+- Control Plane: `escrow-keys.ts` (local key, AWS KMS adapter), `backup-escrow.service.ts`
+  (offer, escrow, codes, release, notices), routes, models `BackupKeyEscrow` and `RestoreCode`,
+  `CP_ESCROW_*` configuration.
+- server: `BackupEscrowAgent` (escrow on offer, Owner alerts), `escrow-state.ts`,
+  `cloud-restore.ts` and `restore-cli cloud`, heartbeat fields, the System page's escrow line.
+- vendor web app: "Backups in the cloud" on a PC's page, with "Issue a restore code" for Support
+  and the Super Admin; the fleet's "(key in escrow)".
+- docs: the runbooks (backups, Control Plane), the vendor access policy (§3, the role table, the
+  quarterly review), `manual-tasks/27-key-escrow.md`, the OI-10 line in MANUAL_TASKS.
+
+Tests: CP unit 4 (escrow keys, KMS calls, config) and integration 4 (escrow, codes, release once,
+expiry, rate limit); server integration 1 end to end (escrow, upload, code, Owner alert once,
+restore on a fresh PC with `restore-cli cloud`, the code refused a second time); vendor web 3;
+domain matrix and console updated.
+
+P7-05 is complete. Next: P7-06 Data lifecycle.
+
+### 2026-10-03: P7-05d Cloud backup
+
+Built:
+
+- contracts: `control-plane/cloud-backups.ts` (start, complete, abort, list; the vendor's list),
+  `HeartbeatBackup.cloud`, `FleetInstallationView.cloudBackupAt`; locally
+  `BackupsResponse.cloud` and `BackupRunView.cloud`.
+- domain `cloudBackupState`.
+- Control Plane `src/cloud-backups/`: `aws-sigv4.ts`, `object-store.ts`, `s3-object-store.ts`,
+  `local-object-store.ts`, `object-store-for.ts`, `cloud-backups.service.ts` (records, retention,
+  audit), the controller (signed routes, the vendor's list, the local store's PUT and GET);
+  model `CloudBackup` and its migration; `CP_BACKUP_*` configuration; the fleet view's
+  `cloudBackupAt`.
+- server: `CloudBackupService` (newest waiting backup, parts with MD5 and retries, hourly retry,
+  alert), `backup_runs.cloud_*` columns, the client's cloud calls, the heartbeat's `cloud`, the
+  System page's state; `CloudModule` now imports `SettingsModule`.
+- vendor web app: "Cloud backup" on a PC's page. Console: the cloud state and the newest backup
+  in the cloud in Backups.
+- docs: the backups and Control Plane runbooks, the vendor access policy, and
+  `manual-tasks/26-cloud-backup-storage.md` (the S3 bucket in India).
+
+Tests: domain 3; CP unit 9 (SigV4 vectors, the S3 adapter against a fake S3, the local store,
+config) and integration 5; server integration 4 (a real Control Plane with the local store:
+byte-for-byte upload, failure, retry and alert, newest only, opt-out audited and reported);
+vendor web 1 updated; console 1 updated.
+
+Gotchas: a stream given a `data` listener before an `await` flows into it alone (hash in a
+Transform instead); S3 can answer 200 with an `<Error>` inside on completing an upload.
+
+Next: P7-05e (key escrow, restore from the cloud) needs the vendor KMS key and OI-10; its code
+can be built with a stand-in KMS like the licence signer.
+
+### 2026-10-03: P7-05c Continuous WAL archiving
+
+Built:
+
+- domain `continuous-backup.ts`: `walSwitchEveryMs`, `baseBackupsToRemove`,
+  `walFilesToRemove`, `continuousBackupState`.
+- contracts:
+  - `ContinuousBackupView` in `BackupsResponse.continuous`;
+  - `RestoreBackupRequest` is now a file or `{ pointInTime: { to } }`, and the response gains
+    `pointInTime`;
+  - `lastRestore.restoredTo`;
+  - the setting `backups.pointInTimeDays`.
+- server `src/backups/`:
+  - `wal-stage.ts`, the archive_command (Node's own modules only);
+  - `tar.ts`, a reader for `pg_basebackup`'s tar that refuses links and paths leaving the folder;
+  - `wal-archive.ts`, the archive layout and encrypt, copy and read steps;
+  - `base-backup.ts`;
+  - `continuous-backup.service.ts` (two lanes: archive every 30 s, base backups and retention
+    every 5 min);
+  - `point-in-time.ts`;
+  - `restore-cli pitr`;
+  - pending restores and the Owner's request for a moment;
+  - `RP_BACKUP_DATABASE_URL`.
+- `@rp/test-postgres` `startLocalPostgres(settings)`: a throwaway cluster with extra settings.
+- console: the continuous backup's state in Backups, and "The latest moment" and "A moment I
+  choose" in the restore dialog.
+- docs:
+  - the runbook's continuous backup, installer set-up, problems and restore to a moment;
+  - `docs/build/restore-timing.md`, with the RPO and the restore to a moment measured;
+  - part D of `manual-tasks/25-restore-rehearsal.md`.
+- Fixes found on the way: the restore's in-use check (autovacuum), and the licence agent's
+  shutdown.
+
+Tests:
+
+- domain: 9;
+- server unit: 6;
+- integration `continuous-backup.int.test.ts`: 3, on its own cluster with archiving on, skipped as
+  root;
+- console: 1 new and 2 updated;
+- an opt-in performance run.
+
+Gotchas:
+
+- `recovery_target_time` refuses ISO's `T` and `Z`.
+- `pg_last_xact_replay_timestamp()` is null when nothing was replayed.
+- `pg_ctl` start must be waited for on `exit`, not `close`, because the server keeps running.
+- Each recovery attempt needs its own log file.
+- Running one test with `-t` skips the one that takes the base backup.
+
+### 2026-10-03: P7-05b Restore
+
+Built:
+
+- server `src/backups/`:
+  - `restore.ts`, `restoreBackup`: verify, unpack, refuse while in use, restore to
+    `_restoring`, apply default privileges for `rp_owner`, remove the stream id, record, swap
+    secrets, files and the database, undo on failure;
+  - `pending-restore.ts`: the request and outcome files, `runPendingRestore`;
+  - `restore-cli.ts`: `verify`, `restore` and `pending`; `pnpm backup:restore`;
+  - `recovery-key.ts`.
+- `FileSecretStore.replace` and `WritableSecretStore`.
+- `ServerLifecycle` (exit code 75), and the restore before start-up in `main.ts` when
+  `RP_ADMIN_DATABASE_URL` is set.
+- `BackupService`: `requestRestore`, `recoveryKey`, and `auditRestore` at start-up.
+- Routes `POST /backups/restore` and `/backups/recovery-key` (DATA_ADMIN). `BackupsResponse`
+  gains `restorePending` and `lastRestore`.
+- console `BackupRestore.tsx` (the restore dialog and the recovery key, Owner only) in the Backups
+  panel.
+- docs:
+  - the runbook's recovery key, restore and going-back sections;
+  - `docs/build/restore-timing.md`;
+  - `manual-tasks/25-restore-rehearsal.md`.
+- The design-capacity seeding is shared by the performance runs (`test/performance/design-capacity.ts`).
+
+Tests:
+
+- server unit +2 (recovery key).
+- server integration +3:
+  - the new PC, with the RTO and RPO measured: CLI restore with the recovery key, PIN and device
+    still work, later data gone, new stream id, audited, grants, ownership and default privileges;
+  - refused for a damaged file, the wrong key, or a database in use, with nothing changed;
+  - the Owner's one-click restore: manager 403, stale second factor 403, 404, recovery key,
+    request, audit, restart requested, pending restore once, previous database kept, restored
+    data, audited with the Owner.
+- `restore.perf.test.ts` (opt-in).
+- console +2.
+
+Gotchas:
+
+- PostgreSQL 15+ gives `public` to the database owner, so the restore database is created with
+  `OWNER rp_owner`.
+- `events.once(stdin, 'drain')` rejects on EPIPE when `pg_restore --list` stops reading. Larger
+  dumps hit this; wait on drain, close or error instead.
+- Vitest hides `console.log` from passing tests. Use `--silent=false` to see the timing report.
+
+### 2026-10-03: P7-05a Encrypted local backups
+
+Built:
+
+- `@rp/domain` `backups.ts`:
+  - `backupsToRemove` (14 daily + 8 weekly);
+  - `lastNightlySlot` and `nightlyBackupDue`;
+  - `backupHealth`.
+- contracts `backups.ts` (`BackupsResponse`, `BackupRunView`, `StartBackupResponse`), two routes
+  and the setting `backups.nightlyAt`.
+- server `src/backups/`:
+  - `backup-file.ts`: the RPBK chunked AES-256-GCM format, `ByteQueue`;
+  - `backup-archive.ts`: named, framed entries;
+  - `backup-contents.ts`: the entries, the manifest and `verifyBackupFile`;
+  - `pg-tools.ts`: `pg_dump` and `pg_restore` with the password in their environment;
+  - `backup.service.ts`: schedule, make, check, copy, prune, record, alert, audit;
+  - `backup-state.ts`, the controller and the module.
+  - Also: migration `backup_runs`, secret `backup-key`, config `RP_PG_BIN` and `RP_BACKUPS`.
+  - The heartbeat and the System page now report the backups.
+- console `BackupsPanel` on the System page (state, locations, latest backups, "Back up now",
+  polled while running).
+- `docs/runbooks/backups.md`.
+- CI: the check job sets `RP_PG_BIN`, and installs the PostgreSQL 16 client if missing.
+
+Tests:
+
+- domain +6;
+- server unit +7 (format: round trip, a changed byte, a cut, a swapped chunk, extra data, another
+  key, the header) and +1 config;
+- server integration +8:
+  - a backup of everything, to both places;
+  - the contents and the secrets;
+  - `pg_restore --list`;
+  - the audit;
+  - tamper and cut detection;
+  - one at a time;
+  - retention;
+  - partial and failed backups alerting, on the System page and in the heartbeat;
+  - an interrupted backup;
+  - the nightly schedule;
+  - a waiter refused;
+- console +1.
+
+Gotchas:
+
+- The Mac's embedded PostgreSQL has no `pg_dump`. Use the EDB PostgreSQL 16 binaries in
+  `~/.local/pg16-edb/pgsql/bin` (set `PG_BIN` to it).
+- Test databases have no `_prisma_migrations` table, so `schemaVersion` is null there.
+- `pg_restore --list` stops reading early. Writes after that are dropped, and its exit status is
+  what counts.
+
+### 2026-10-03: P7-07c Go-live test, settings export and the readiness checklist (P7-07 done)
+
+Built:
+
+- `@rp/domain` `goLiveCheck` (`GO_LIVE_PATHS`; `goLivePassed` in the onboarding facts);
+- contracts: `GoLiveView`, `SettingsExport`, `SettingsImportResponse` and four local routes;
+- server: `OnboardingService.goLive` and `startGoLive`, plus `SettingsService.exportValues` and
+  `importValues` behind `GET /settings/export` and `POST /settings/import`;
+- console:
+  - `GoLivePanel` on the set-up page, which polls every 5 s while the test runs;
+  - `SettingsTransfer` (export, and import with a result list) on the Settings page;
+  - `ReadinessChecklist` at `/manage/setup/readiness`, with print styles.
+
+Tests: domain +1; server +2 integration:
+
+- the go-live test, with paths from the paired devices and evidence after the start;
+- export and import, covering the skip reasons, a conflict and a waiter's 403.
+
+Console +5:
+
+- go-live start and ticks;
+- go-live passed;
+- the readiness checklist prints;
+- settings export and import;
+- the export's file name.
+
+Gotcha: imported keys this version does not know have no label in the catalogue. The import
+result shows the raw key for those (`reason: UNKNOWN`), because `t()` throws on a missing key.
+
+### 2026-10-03: P7-07b First run on a fresh install
+
+Built:
+
+- contracts: `FirstRunStatus`, `FirstRunRequest`, `FirstRunResponse` and two public routes;
+- server: `FirstRunService` and `FirstRunController` (loopback only, once, advisory-locked);
+- console: `ThisPcSetup` on the pairing screen (create, then pair this PC; or just pair it);
+- e2e: a second empty database in the console's global setup, `startServer(port, install)`, and
+  `e2e/first-run.e2e.ts`;
+- `docs/build/onboarding-timing.md` (ONB-009 timing notes).
+
+Tests: server +2 integration (creates once, roles, series, Owner PIN hashed, audit, PIN length,
+then bootstrap pairing works; refused off the PC); console +3; e2e +1 (empty database to the
+Owner on the set-up page: 0.4 s to signed in).
+
+Gotcha: the login PIN pad uses `auth.pinLength`; a 6-digit first-run PIN could not sign in. The
+first run now asks for that many digits.
+
+### 2026-10-03: P7-07a Activation and the set-up checklist
+
+Built:
+
+- `@rp/domain` onboarding (`onboardingProgress`, `stepReady`, `markProblem`);
+- contracts `onboarding.ts` and three local routes;
+- server `src/onboarding/` (`OnboardingService`: facts, marks, activation; controller; module),
+  and `enrolInstallation` takes the actor;
+- console: the Manage "Set up" page (`SetupScreen`, `setup-view.ts`) with activation, steps,
+  confirm, skip and undo, and the Overview's `SetupBanner`.
+
+Tests: domain +4; server +3 integration (progress and marks by role, activation against a
+stand-in Control Plane: Owner only, wrong code, typo, done, audited, twice); console +4.
+
+### 2026-10-03: P7-08d Error reporting (P7-08 done)
+
+Built:
+
+- `packages/error-reporting` (`parseDsn`, `buildEvent`, `envelopeOf`, `SentryReporter`);
+- server: `RP_ERROR_DSN`, the reporter behind `ERROR_REPORTER` (still counted for heartbeats),
+  `ClientErrorsController` (`POST /api/v1/client-errors`), and crash reporting in `main.ts`;
+- CP: `CP_ERROR_DSN`, `CP_ERROR_REPORTER`, the exception filter reporting unexpected errors, and
+  crash reporting;
+- console: `createErrorReporting` and `watchPageErrors`;
+- mobile-core: `createDeviceErrorReporting` and `watchUncaughtErrors` (React Native's global
+  handler), wired in the waiter app and the table tablet;
+- manual task 24 and the runbook section.
+
+Tests: error-reporting +5; server +2 integration (a stand-in service: scrubbed server error,
+counted; app errors with device type, rate limit, 401); CP +1 integration; console +2;
+mobile-core +2.
+
+Gotcha: the observability module and its controller share tokens through
+`observability/tokens.ts`; importing them from the module file was circular.
+
+### 2026-10-03: P7-08c Remote configuration
+
+Built:
+
+- contracts: `REMOTE_SETTING_KEYS`, `features.aiMenuImport`, `control-plane/remote-settings.ts`,
+  the heartbeat's `vendorSettings` both ways, four vendor routes and the `REMOTE_CONFIG`
+  capability;
+- CP migration `20261003090000_remote_settings` (with `installations.settings_digest`),
+  `RemoteSettingsService`, `RemoteSettingsController`, `settingsDigest`, and the push in
+  heartbeat answers;
+- server: `SettingsService.applyVendorSettings`, `VendorSettingsAgent` (on each answer), the
+  digest twin and the reported digest, and the AI import gate;
+- the web app's Remote settings page and a PC's Remote settings card;
+- runbook "Remote settings and feature flags"; the access policy table.
+
+Tests: CP integration +4 (definitions, Super Admin only and validation, push until held, digest
+vector); server +1 unit (the same vector), +1 integration (apply, ignore, revert), +1 acceptance
+(pushed, applied, reported, flag enforced, manager cannot change, reverted); web +3.
+
+### 2026-10-03: P7-08b Support asks for diagnostics
+
+Built:
+
+- contracts: diagnostics requests, the heartbeat answer's `diagnosticsRequests`, three CP routes
+  and three local routes;
+- the `SUPPORT_REQUEST` alert event (domain rules, pager, contracts, strings, alert text,
+  console group);
+- CP migration `20261003080000_diagnostics_requests`, `DiagnosticsService` requests, pending,
+  decline and fulfil, and the heartbeat answer;
+- server: `HeartbeatService.onAnswer`, the stored requests (`system_meta`), the alert raised
+  and cleared, allow and decline, and `ControlPlaneClient.declineDiagnosticsRequest`;
+- the console's System page request list;
+- the web app's "Ask for diagnostics" and request history.
+
+Tests: CP integration +3 (decline, fulfil once, lapse and inactive PC); server acceptance +1
+(the real PC alerts, a manager allows one and declines one); console +1; ordering +1; domain
+matrix row; web +2.
+
+Also: the web app's tests wait up to 5 s for `findBy…` (`configure({ asyncUtilTimeout })`).
+Under a full `pnpm check`, a PC's page with its seven loads took longer than the default 1 s.
+
+### 2026-10-03: P7-08a Diagnostics bundle
+
+Built:
+
+- `@rp/domain` scrub (`scrubText`, `scrubValue`);
+- contracts `control-plane/diagnostics.ts`, three CP routes and two local routes;
+- CP migration `20261003070000_diagnostics`, `DiagnosticsService` and `DiagnosticsController`,
+  with a 5 MB body limit on `/v1/diagnostics`;
+- server `log-tail.ts`, `DiagnosticsService` (bundle, send) and
+  `ControlPlaneClient.uploadDiagnostics`;
+- the console's System page `DiagnosticsPanel`;
+- the web app's `DiagnosticsCard` on a PC's page.
+
+Tests: domain +3; CP integration +3; server +2 integration (the secret scan: planted and real
+secrets, patterns) and +1 acceptance (a manager sends, the real CP lists and opens it); console
++2; web +3.
+
+Gotcha: the secret scan first caught a PEM key split across log lines; logs are now scrubbed
+per file, not per line.
+
+Also: `pnpm test` runs at most 4 packages at once (`--concurrency=4`). Ten at a time, each with
+a vitest worker per core, made fast tests hit the 5 s timeout on this Mac. The 90-day learning
+test now has a 30 s timeout above its own 20 s budget.
+
+### 2026-10-03: P7-03b Fleet dashboard (P7-03 done)
+
+Built in `apps/control-plane-web`:
+
+- the Fleet page (`src/fleet/`): open alerts with closing chain alerts, and the PC table with a
+  filter and minute refresh;
+- on a PC's page, its health card, alert history and audit log fingerprints;
+- `vendorApp.fleet` strings.
+
+Tests: web +7 (fleet page for Read-only and Support, a PC's health, helpers, alert texts; nav
+lists Fleet); e2e +1 step (the new PC is listed and no alerts are open).
+
+Gotcha: plain ICU number arguments are grouped ("Entry 3,900").
+
+Gotcha: `pnpm check` on this Mac runs every package's tests at once. Under that load the
+REC-011 p95 test can reach about 220 ms, and a relay diner test once got an error response; both
+pass when run alone. The relay test now prints the response body when it fails.
+
+### 2026-10-03: P7-03a Heartbeat health and alerts
+
+Built:
+
+- `@rp/domain` fleet-health: `openSince`, `fleetAlertsDue`, `offlineMinutesDuringHours`,
+  `checkChainHead`, `checkCheckpoint`.
+- Contracts:
+  - the heartbeat's `devicesConnected`, `errorCount`, `backup`, `businessHours` and
+    `auditCheckpoint`, and the answer's `auditCheck`;
+  - `fleet.ts` and four vendor routes.
+- CP:
+  - migration `20261003060000_fleet_monitoring` (`audit_chain_heads`, `fleet_alerts`);
+  - config `CP_OFFLINE_ALERT_MINUTES`, `CP_DISK_ALERT_PERCENT`, `CP_FLEET_SWEEP_SECONDS` and
+    `CP_ALERT_WEBHOOK_URL`;
+  - `FleetService` (on each heartbeat, the minute sweep, delivery, the views, resolving),
+    `FleetController` and `WebhookAlertNotifier`.
+- Server:
+  - the heartbeat reports device health, the error count (`ErrorCounter` behind
+    `ERROR_REPORTER`), opening hours and the answer to the audit check;
+  - `AuditService.checkpoint`.
+- Runbook "Fleet monitoring and alerts".
+
+Tests: domain +10; CP integration +10 (disk, backup, offline in and out of hours, chain rolled
+back and resolved, a checkpoint catching a rewrite, purged entries accepted, closing by hand,
+the fleet view, webhook retries); server +1 unit, +1 acceptance (the real PC answers checks, and
+a rewritten local log is caught).
+
+Gotcha: JSONB does not keep object key order, so the fleet view sorts devices by type.
+
+### 2026-10-03: P7-02f The vendor web app: billing, releases, audit and staff (P7-02 done)
+
+Built in `apps/control-plane-web`:
+
+- Plans: list, add, edit, archive.
+- A restaurant's Subscription tab: put on a plan or change it.
+- Invoices: filters, recording payments, voiding, the billing run.
+- Releases: list and publish.
+- The audit log: filters and older pages.
+- Staff: add with a setup link, change role or access, reset, the quarterly access review.
+
+Also: the nav by capability with a route table; the `vendorApp` strings for all of the above;
+Playwright e2e (`e2e/`) against the built CP and its CLI; the CI e2e step.
+
+Tests: web +21 (per-role sections, plans, subscription, invoices and payments, releases, audit,
+staff, review), e2e 2 (setup, MFA with code replay refused, restaurant, PC, note, staff, audit,
+sign-out, CSP headers).
+
+Gotcha: the TOTP window accepts the next step, so a test can sign in right after setup with
+`hotp(secret, step + 1)`. The step used at setup is refused, as intended.
+
+### 2026-10-03: P7-02e The vendor web app: sign-in and restaurants
+
+Built: `apps/control-plane-web` (`@rp/control-plane-web`), with:
+
+- a typed client over `CONTROL_PLANE_ROUTES`;
+- the session store, sign-in (MFA) and account setup (QR code and typed key);
+- a layout with the role's sections;
+- the restaurant list with search and adding;
+- one restaurant: details and editing, PCs and activation codes, support notes, QR ordering
+  (set up and rotate);
+- one PC: a new code, moving, disconnecting, and its licence (change, re-bind, reactivation
+  code).
+
+Also: the `vendorApp` strings in `@rp/i18n`; CP `CP_WEB_DIR` with `webMiddleware` (CSP,
+caching, app shell, never for `/v1`); the CLI prints the setup link; runbook "The web app for
+vendor staff" and "The first Super Admin".
+
+Tests: web +27 (client, sign-in and session end, setup, per role for Read-only, Onboarding,
+Support, Finance and the Super Admin, form logic, axe on each screen); CP integration +3
+(serving the app).
+
+Gotchas:
+
+- `VendorTenantView` is strict (it extends `TenantRequest`), so a fake answer with extra keys
+  fails to parse.
+- `@testing-library/user-event` is a named import (`{ userEvent }`).
+
+Next: P7-02f.
+
+### 2026-10-03: P7-02d Support notes, QR provisioning, access policy
+
+Built: contracts for support notes and relay provisioning (4 vendor routes), plus heartbeat
+`relay.credentialDigest` and the answer's `relayCredential`; CP migration
+`20261003050000_support_and_relay` (append-only `support_notes`, `relay_provisioning`); config
+`CP_RELAY_DATABASE_URL`; `SupportService`, `SupportController` and `PgRelayProvisioner`. The
+local server reports its credential's digest and saves a delivered credential. The access policy
+is `docs/runbooks/vendor-access-policy.md`.
+
+Tests: CP integration +3 (notes by role and append-only; provisioning by role, delivery until
+held, sealed at rest; rotation revokes the old credential). Server acceptance +1 (the real PC
+receives its signed licence and its relay credential in heartbeats).
+
+Gotchas: `relay.verify_credential` returns a table, so select `tenant_id` from it. The CP's tests
+use `@rp/relay/testing` (dev dependency) for a stand-in relay in the same cluster.
+
+### 2026-10-03: P7-02c Subscriptions and payments
+
+Built: `@rp/domain` subscription-billing (months, periods, overdue stage, the licence state
+billing moves to); contracts `billing.ts` and 10 vendor routes; CP migration
+`20261003040000_subscriptions` (plans, subscriptions, invoices, payments, `set_by_billing`);
+config `CP_BILLING_*`; `BillingService` (plans, subscriptions, invoices, payments, the hourly run
+and follow-up) and `BillingController`; `LicencesService.change` marks what billing set.
+
+Tests: domain +3, CP integration +6 (plans by role, subscribing applies limits, issuing and
+catching up, payment due to grace to restricted, payments lifting it step by step, a vendor's
+restriction kept, voiding).
+
+### 2026-10-03: P7-02b Vendor API for the fleet
+
+Built: contracts `fleet-admin.ts` and 16 vendor routes; CP migration
+`20261003030000_tenant_details`; `FleetAdminService` (tenants, installations, moving a PC, the
+audit trail) and `FleetAdminController` over the admin, licence and release services; enrolment
+accepts a move code for an active installation; `ReleasesService.list`. (Its PROGRESS entry was
+written with P7-02c.)
+
+Tests: CP integration +7 (tenants by role, activation, moving a PC, licences by role, codes and
+re-binding, releases, the audit trail).
+
+### 2026-10-03: P7-02a Vendor staff accounts with mandatory MFA
+
+Built: `@rp/totp` (moved from the server); contracts `vendor.ts` (roles, capabilities, sign-in,
+setup, accounts, access review) and the vendor routes; CP migration `20261003020000_vendor_staff`;
+config `CP_SECRET_KEY`; `src/vendor/` (sealing, `VendorAuthService`, `VendorGuard` with
+`@Vendor(capability)`, controller); the installation guard leaves vendor routes alone; CLI
+`vendor-user:create`.
+
+Tests: totp 3, contracts +2, CP integration +7 (CLI bootstrap and setup, sign-in with the code,
+no reuse and lockout, roles, account changes and resets, the access review, sign-out and idle
+end), CP unit +1.
+
+### 2026-10-03: P7-01d Licence screens (P7-01 done)
+
+Built: `@rp/ordering` `licenceNotice`; console `LicenceBanner` in every mode and Manage →
+Licence (`manage/licence`); `@rp/mobile-shell` `LicenceBanner` in every staff `Screen`; strings
+`licence.*`; the console test harness answers a quiet licence by default.
+
+Tests: ordering +3, console +7 (grace, pending, reminder put off, nothing in development; the
+Owner's page, reactivation and check now, managers without the Owner's actions), waiter app +2.
+
+### 2026-10-03: P7-01c Local server: the licence agent
+
+Built: config `licenceEnforce`, `licenceKeys`; secret `licence-record-key`; contracts
+`LicenceView`, `ReactivateLicenceRequest`, routes `getLicence`, `reactivateLicence`,
+`checkLicence`, event `LicenceChanged`, heartbeat `tamper` and the licence's
+`reactivationCounter`; server `src/licensing/` (fingerprint reader, `LicenceAgentService`,
+controller, module), the heartbeat reporting and taking licences, enforcement on tables, orders,
+approvals, firing and device pairing; the Control Plane audits tamper reports.
+
+Tests: server integration +6 (missing licence, a valid one and details, device limits,
+restriction from the next business day, offline reactivation and attempts, clock rollback and an
+edited record), unit +3 (config, fingerprint parsing); CP +1.
+
+Next: P7-01d, the screens (reminder, grace banner, restricted notice, the Owner's licence page).
+
+### 2026-10-03: P7-01b Control Plane: issuing and renewing licences
+
+Built: CP migration `20261003010000_licences` (`installation_licences`, `licence_files`); config
+`CP_LICENCE_*`; `LicenceSigner`, `LicencesService` (issue and renew in heartbeats, fingerprint
+binding, vendor changes, re-binding, reactivation codes); heartbeat contract fields `licence`
+(request and answer) and `reactivationSecret`; CLI `licence:show|set|rebind|code`.
+
+Tests: CP integration +9 (issue, current, lost, daily renewal; state change at the next heartbeat
+and every minute; transitions and reasons; plan and limits; reactivation codes; following a part
+change, refusing another PC, re-binding; older installations).
+
+### 2026-10-03: P7-01a `@rp/licensing`
+
+Built: contracts `LicencePayload`, `SignedLicence`, `DeviceLimits`, `LicenceModule`,
+`LicenceState`, `ReactivationCode` (`@rp/contracts/control-plane`); the `@rp/licensing` package
+(signing and verification, fingerprint, `evaluateLicence`, reactivation codes, clock guard, the
+built-in vendor keys, empty until manual task 23); manual task 23 (KMS key, master secret, two
+reviewers).
+
+Tests: licensing 13 (files, fingerprint, every state and capability, next-business-day
+restriction, reactivation, clock guard); coverage 97 % lines.
+
+### 2026-10-03: P6-05g Printer auto-discovery (P6-05 done)
+
+Built: setting `printers.discoveryPorts`; contracts `PrinterDiscoveryResponse`, route
+`discoverPrinters`; server `printer-discovery.ts` (`networksOf`, `findOpenPorts`,
+`PrinterDiscoveryService`, the `PRINTER_NETWORKS` token); console Find printers on Kitchen and
+printers, with Add filling in the printer dialog; number lists in the settings editor.
+
+Tests: server unit +3 (networks looked at; open ports found 64 at a time), integration +1 (two
+stand-in printers found, one already added), console +1.
+
+### 2026-10-03: P6-05f Manage → Floor and the floor plan
+
+Built: `@rp/domain` floor-plan (grid, overlaps, placing, moving, resizing); contracts
+`TableLayout`, `TableView.layout`, `FloorLayoutRequest`, route `saveFloorLayout`; server
+`FloorService.saveLayout`, layouts on the floor, taken off on a section change; console Manage →
+Floor (`manage/floor`: sections and tables, archive and restore, the plan editor) and the POS
+Plan view.
+
+Tests: domain +5, server +2 (layouts saved, overlaps and unknown tables refused, audited once;
+taken off on a section change), console +5 (floor page: list, add, archive; the plan with the
+keyboard and save; the menu link; the POS plan and when it is offered).
+
+### 2026-10-03: P6-05e Amount in words, print the bill from the waiter app
+
+Built: `@rp/domain` `amountInWords`; settings `bills.amountInWords`, `bills.waiterMayPrint`;
+contracts `BillView.amountInWords`, `InvoiceParticulars.amountInWords`,
+`TableOverviewResponse.mayPrintBill`, `PrintTableBillResponse`, route `printTableBill`; server
+words kept on each invoice and printed under the total, `InvoiceActionsService.printTableBill`,
+`who-prints-bills.ts`; the console bill preview shows the words; the waiter app's Print bill.
+
+Tests: domain +2, server +2 (printed words; a waiter prints their own table's bill only when
+allowed, never twice), console +1, waiter app +1.
+
+### 2026-10-03: P6-05d Merge tables, move dishes, "Needs cleaning"
+
+Built: `@rp/domain` NEEDS_CLEANING, GUESTS_LEFT, CLEANED and `tableAfterGuestsLeft`; migration
+`20261003001000_merge_and_cleaning`; setting `tables.needsCleaning`; contracts
+`MergeTablesRequest`, `TransferItemsRequest`/`Response`, `TableStateView`, event `OrdersMoved`,
+`KdsTicketLine.movedTo`, routes `mergeTables`, `transferItems`, `markTableClean`; server
+`TableTransfersService` (merge, transfer, printer notes), cleaning after settle, close, move and
+merge, Mark clean, the KDS "Moved from" for merged orders and "Now for" per moved dish; console
+POS Merge into… and Move dishes… dialogs and Mark clean; the waiter app's Mark clean before
+opening; ui-web and ui-native styles for the new state.
+
+Tests: domain +1, server +6 (merge with tickets, audit and event; waiter's own tables only;
+move dishes with combo parts and KDS notes; whole order and refusals; needs cleaning after close
+and merge, mark clean; settle with cleaning on), console +4, waiter app +1.
+
+### 2026-10-02: P6-05c Takeaway from the waiter app and time-based availability
+
+Built: the waiter app's Takeaway screen (`TakeawayScreen.tsx`, "New takeaway" on My tables);
+migration `20261003000000_item_hours`; contracts `DailyHours`, `ItemRequest.timeWindow`,
+`ItemView.timeWindow`, `MenuItem.timeWindow`; `@rp/ordering` `itemHoursOnNow`, `hoursOf`
+(replaces `comboHours`), `itemsOffNow`, the line check refusing a dish or a combo part outside its
+hours, `unavailableReason` NOT_NOW for dishes; recommendations (server and QR) skip dishes out of
+hours; the console item editor's "Served from / until".
+
+Tests: ordering +4, server +2 (hours set, kept and cleared; the same refusal on POS, waiter app,
+tablet and QR), console +1, waiter app +1.
+
+### 2026-10-02: P6-05b Hold and fire
+
+Built: `@rp/domain` HELD and FIRE; migration `20261002235500_hold_and_fire`; contracts
+`OrderLineRequest.hold`, `FireOrderRequest`, route `fireOrder`, setting `orders.holdAndFire`;
+server: held lines at submission (no ticket, stock taken), `OrderItemsService.fire`, the
+`ITEMS_HELD` invoice guard; `@rp/ordering` `CartLine.hold`; the waiter app's and the POS's Hold
+toggle per cart line and "Fire held items" per sent order; HELD labels and chips everywhere.
+
+Tests: domain +1, ordering +1, server orders +4 (held from the kitchen with stock taken; fire
+some then the rest as new tickets, combo parts at their stations; cancel a held line with its
+stock back; refused when off), waiter app +1, console +1.
+
+### 2026-10-02: P6-05a Finishing what was half built
+
+Built:
+
+- KDS-002: migration `20261002235000_kds_stations`; `stationIds` on pairing codes, devices,
+  `AuthenticatedDevice` and the station actor; rooms per station; the KDS filter and
+  `stations` in its answer; `setDeviceStations` (service, route, gateway `reconnectDevice`);
+  console pairing with station checkboxes and a Stations dialog; the board's heading, the
+  station on each ticket, and the Orders (Expo) view (`expoOrders`).
+- KDS-006: `KdsEscalationService` and `KdsService.escalateNotCollected`.
+- NTF-009: `getMyBreak`; the waiter app's `BreakCard`.
+- BILL-013: the console's denomination count at shift close.
+
+Tests: server kds +3 (several stations and narrowing, changing a screen's stations, automatic
+escalation), notifications +1 assertion, rooms unit +1; console devices +1 and updated, KDS view
++1 and screen +1, billing +1; waiter app +1.
+
+### 2026-10-02: P6-04c Bulk photo upload (P6-04 done)
+
+Built: `@rp/domain` `matchPhotos`, `photoWords`; contract `ItemPhotoRequest` and route
+`setItemPhoto`; `MenuAdminService.setItemPhoto`; console **Manage → Menu → Add photos in bulk**
+(`BulkPhotosScreen`: previews, the match and how it was made, a dish list per photo, duplicates
+flagged, upload with each photo's result).
+
+Tests: domain `photo-matching.test.ts` 4; server `photos.int.test.ts` +1 (set, unchanged,
+unknown photo, cleared, archived dish, managers only, audit); console `bulk-photos.test.tsx` 1.
+
+### 2026-10-02: P6-04b AI menu import: review and import on the restaurant PC
+
+Built:
+
+- Contracts: `AiMenuImportRequest`, `AiMenuImportView`, `MenuReviewRequest`; routes
+  `startAiMenuImport`, `getAiMenuImport`, `commitAiMenuImport`.
+- `@rp/domain` `reviewedMenuSheets`, `uncheckedDishes`, `rupeesText`.
+- Server: `AiMenuImportService` (photos resized with sharp, the Control Plane's answers mapped,
+  the review enforced, `MenuImportService.commitSheets`); `ControlPlaneClient`
+  `createMenuExtraction` / `getMenuExtraction`; `HeartbeatService.connection()`; the route's body
+  limit.
+- Console: **Manage → Menu → Read a printed menu** (`AiImportScreen`, `ai-import-view.ts`):
+  choose files, reading, the review (sections with station and tax group, dishes with name,
+  price or sizes, food type, spice, description, the reader's doubts, checked, leave out), the
+  import report or the summary.
+
+Tests:
+
+- server `ai-menu-import.int.test.ts` 5 (the acceptance test): photos made smaller, sent to a
+  real Control Plane, read by a stand-in provider over HTTP with the vendor's key, the draft
+  back; nothing imported while a dish is unchecked; the checked draft imported, audited and
+  published; managers only; the vendor out of reach says so.
+- domain `menu-review.test.ts` 4; console `ai-import.test.tsx` 3.
+
+### 2026-10-02: P6-04a AI menu import: the Control Plane's reading service
+
+Built:
+
+- Contracts (`@rp/contracts/control-plane`): `MenuExtractionRequest`, `MenuDraft`,
+  `MenuExtractionView`, routes `createMenuExtraction` and `getMenuExtraction`, error codes.
+- Control Plane: migration `20261002235900_menu_extractions` (jobs and files);
+  `menu-import/` with `menu-reading.ts` (the tool schema and prompt, `draftFromReading`,
+  `paiseOf`), `AnthropicMenuExtractor`, `MenuExtractionsService` (worker, retries, restart,
+  purge, daily limit, audit) and the controller; config `CP_AI_*`; a 28 MB body limit on this
+  route only; `x-api-key` redacted from logs.
+- Manual task 22 (the key), CP README, phase-6 split.
+
+Tests: CP unit `menu-reading.test.ts` 6 (rupees to paise, the draft as printed, no menu, limits,
+the request sent with the key in a header only, busy / refused / too long / no menu / offline);
+integration `menu-extractions.int.test.ts` 6 (read in the background, files deleted, costs and
+audit; another restaurant cannot see it; types, sizes and counts refused; a busy reader retried
+later and a failure explained; a job cut off by a restart read again; the daily limit per
+restaurant; off without a key). The real provider is checked by manual task 22.
+
+### 2026-10-02: P6-02 Learned recommendations
+
+Built:
+
+- `@rp/domain` `learnAssociations` (support, confidence, lift; thresholds, activation, limits).
+- Server: migration `20261002230000_learned_associations` (`learned_associations`,
+  `learning_runs`); `LearnedAssociations` (the daily job, `learn`, `learnWhereDue`, `pairs`
+  cached, `status`); routes `getLearnedRecommendations` and `learnRecommendationsNow`; the
+  engine's layer 2 fed; the QR snapshot's `learned` filled.
+- Console: "Learned from your orders" on the Suggestions page, with "Learn again now".
+
+Tests:
+
+- domain `associations.test.ts` 7: known pairings with exact support, confidence and lift; what
+  goes with everything (no lift) and the rare left out; each threshold; nothing below the
+  activation volume; once per basket and the caps; order-independent; 63,000 visits in well
+  under a second.
+- server `learned-recommendations.int.test.ts` 5: nothing learned under 300 orders (cancelled
+  lines not counted); learned and suggested with "Often ordered with Biryani"; rules, then
+  learned, then best sellers; a visit's rounds are one basket; once a business day by itself,
+  managers only. `relay-sync` +1 (the QR snapshot), the recommendations performance test learns
+  30 busy days first (p95 still within 200 ms; learning time checked).
+- console +2.
+
+### 2026-10-02: P6-01 Combo and modifier parity on every surface
+
+Built:
+
+- Contracts: `MenuSnapshot.timeZone` (optional); the served menu sets it (`MenuPublishService.current`).
+- `@rp/ordering`: `unavailableReason` with NOT_NOW, `comboHours`, `unavailableText`,
+  `menuNote(…, now)`, `lineProblems(…, now)` with NOT_NOW; string `pos.menu.onlyAt`.
+- Surfaces: POS menu grid, waiter app menu, cart and "order again", tablet `DishCard`
+  (`unavailable` text instead of `soldOut`), QR dish rows; each with a 30 s clock.
+
+Tests:
+
+- server `combo-parity.int.test.ts` 4 (the acceptance test): the same order (Paneer Tikka Full
+  with two extras ×2, less spicy; a Thali with Chaas as its choice) built with the shared cart
+  logic and placed at the POS, in the waiter app, on a tablet and on the QR page through the
+  relay; identical lines, modifiers, combo parts and prices (equal to the surfaces' estimate),
+  identical kitchen tickets per station; a combo outside its hours shown as NOT_NOW and refused
+  with the same code and words on all four.
+- ordering +3 (hours by the restaurant's clock, dates, the cart); console +1 (the POS card).
+
+### 2026-10-02: P5-06 Phase 5 exit test, S2 (QR), S11, S13 (Phase 5 done)
+
+Built: `qr-exit.int.test.ts`, 10 steps, the local server against a real relay:
+
+- S2 (QR part), the restaurant's internet out for 30 minutes mid-service:
+  - before: a POS order at T1 and a QR order at T2 in the kitchen, the diner told;
+  - during: POS orders, kitchen steps and a dish running out all work; the System page shows
+    the relay unreachable;
+  - the QR page turns read-only with the menu still readable; orders and calls are refused with
+    "please call a waiter";
+  - after: one new menu version (with the dish out), the diner sees the dish served, and every
+    queue run again sends nothing and makes nothing twice; QR ordering works again.
+- S13: an order left at the relay reads expired once its pickup time passes and is never made;
+  a late pickup is rejected as expired whether the relay's job or the restaurant notices first.
+- S11 (relay part): another restaurant's server cannot see, take or change this restaurant's
+  orders; a diner cannot order another menu's dish or follow another table's order.
+- Duplicate replay: a diner's retry is the same order; an order offered again after its
+  acknowledgement was lost makes one order and one ticket; a repeated status push changes nothing.
+
+Fixed: an order offered again after it was dealt with is acknowledged again (decision 387;
+`relay-orders.int.test.ts` +1). `@rp/relay/testing` `cut('restaurant')`.
+
+Covered elsewhere and part of the exit: the QR site e2e (the "call a waiter" screen, read-only
+banner, ordering, suggestions, photos, calls), the relay's isolation and roles suites, the
+Realtime doorbell tests (P5-03d).
+
+Result: all Phase 5 scenarios pass on every build; the full check and both e2e suites are green.
+Real Supabase and the QR site's hosting are manual tasks 20 and 21.
+
+### 2026-10-02: P5-03d Realtime doorbell for new QR orders (P5-03 done)
+
+Built:
+
+- Relay:
+  - `session` returns `realtime.apiKey` and `realtime.changes` (orders and service requests);
+    503 without a JWT secret or an API key;
+  - migration `20261002233000_realtime_doorbell` (`relay_server` to `supabase_realtime_admin`);
+  - `@rp/relay/testing` `startFakeRealtime`: Phoenix socket at `/realtime/v1/websocket`, HS256
+    token check, heartbeats, token refresh, `phx_leave`, changes from a test-only trigger and
+    NOTIFY delivered to the restaurant's own subscribers; `relay.realtime`, dropped by `cut()`.
+    `ws` added to `@rp/relay`.
+- Server: `RelayRealtime` (`relay-realtime.ts`); `RelayOrdersService` starts it, rings the loop,
+  slows polling while subscribed, `realtimeSubscribed`, `startRealtimeNow()`; System status
+  `qrRelay.realtime`.
+- Console: the QR relay line says how new orders arrive (`qrRelayRealtime`, `qrRelayPolling`).
+- Docs: ADR-0015 (The Realtime doorbell), manual task 20 (API key, the check, report line),
+  phase-5 split, relay README.
+
+Tests:
+
+- server `relay-realtime.int.test.ts` 6: an order and a call arrive within a second with
+  polling at an hour; what came before the join is picked up; the token is renewed and it keeps
+  ringing; a cut falls back and joins again; the System page follows. (That Realtime shows a
+  restaurant only its own rows is RLS, tested in the relay's isolation and session tests.)
+- server unit `paced-loop.test.ts` +1: a change during the run that ends a back-off is kept.
+- server unit `relay-realtime.test.ts` 8: the join, a partial grant refused, a silent line
+  dropped, answered heartbeats kept, a closed channel rejoined, token renewal on the channel, no
+  Realtime at the relay, back-off.
+- relay: session contract, roles (Realtime may take `relay_server` only); console system test.
+
+Fixed: `PacedLoop` dropped a change that came during the run ending a back-off (that run had
+already read), so after an internet cut the first ring waited for the next poll. It now runs
+once more when that run works.
+
+Notes for the next session:
+
+- The real Supabase Realtime is checked only by manual task 20 (no Docker here). If it refuses
+  the join, the server falls back to polling, so nothing breaks.
+
+### 2026-10-02: P5-03c Menu photos on the QR page
+
+Built:
+
+- Relay:
+  - migration `20261002230000_photo_sweep`: `relay.photos.purged_at`, the public `menu-photos`
+    bucket (Supabase only), and `relay.purge()` now also forgets swept photos;
+  - `server` routes `PUT photos/:photoId/:width` and `POST photos/sweep`;
+  - `PhotoStorage` in the function context: Supabase Storage over HTTP in Deno, an in-memory
+    bucket in `startRelay` (served at `/storage/v1/object/public/menu-photos/...`);
+  - `qr-menu` returns `photoBase`.
+- Contracts: `photoBase` on `QrMenuResponse`; `QrPhotoWidth`, `RelayPhotoParams`,
+  `RelayPhotoUploadResponse`, `RelayPhotoSweepRequest`/`Response`; routes `uploadRelayPhoto`
+  and `sweepRelayPhotos`; `QrPhoto` and `QrPhotoSize` types.
+- Server: `RelayClient.uploadPhoto` and `sweepPhotos`; `RelaySyncService.syncPhotos` (the relay
+  module now imports `PhotosModule`).
+- QR site: `DishPhoto` in dish rows and the dish sheet.
+- Docs: ADR-0015 (Menu photos), relay README, manual task 20 (bucket check, report line).
+
+Tests:
+
+- relay `server-functions.test.ts` +5: sizes stored under the restaurant's folder and replaced
+  in place, `photoBase`; WebP only, known sizes, 2 MB, credential, `PHOTOS_OFF`; tenants apart;
+  the 90-day sweep, restore, purge and missing; a bad sweep. `retention.test.ts` +1.
+- server `relay-sync.int.test.ts` +3: each QR dish's sizes sent once and served from the bucket
+  (POS-only dish's photo not sent); a narrow photo lists each real width once; a swept photo is
+  sent again when the dish takes it back.
+- qr-menu unit +2 (`DishPhoto`), e2e +1 (the Dal photo loads through the CSP).
+
+Notes for the next session:
+
+- The relay's in-memory bucket in `startRelay` is exposed as `relay.photoFiles`.
+- The 1×1 WebP in `e2e/fixture.ts` reports a density-scaled `naturalWidth` (72) because of
+  `srcset`; check `complete && naturalWidth > 0` for "loaded".
+
+### 2026-10-02: P5-05c Call waiter and request bill from the QR page
+
+Built:
+
+- Relay:
+  - migration `20261002210000_qr_service_requests` (table, rules, RLS, publication; expiry and
+    purge cover it);
+  - the `service-request` function (POST to ask, GET to follow), and `server/service-requests`
+    routes;
+  - contracts and routes in `@rp/contracts/relay`.
+- Server:
+  - setting `qr.serviceRequests`;
+  - migration `20261002210000_qr_service_requests` (the inbox);
+  - `ServiceRequestsService.raiseFromQr`;
+  - pickup, raise and tell in `RelayOrdersService`, with the `relay.qr-service-requests`
+    consumer.
+- `@rp/ordering` `qrRequestStatusOf` and `qrRequestSteps`.
+- QR page `HelpButtons`, and `qrSite.help.*` strings.
+
+Tests:
+
+- relay `service-requests.test.ts` 9:
+  - one open per kind, from any phone; a retry finds it;
+  - followed at its own table only;
+  - off, offline, the per-browser limit;
+  - pickup and the status steps, received too late, another restaurant's request.
+- relay isolation and roles updated for the new queue.
+- server `relay-orders.int.test.ts` +3:
+  - waiter alerted, then on the way, then done;
+  - a bill request sets Bill requested;
+  - a closed table says it is not open.
+- ordering 1; qr-menu e2e 1 (call waiter, then notified, then on the way).
+
+### 2026-10-02: P5-05b QR suggestions and the speed budget
+
+Built:
+
+- Contracts `QrRecommendationRule` and `QrRecommendations` (optional in `QrMenuDocument`).
+- `@rp/ordering` `qrSuggestions` and `qrBestSellers`.
+- The relay sync publishes the snapshot (QR rules, rankings by daypart, dayparts, cut-off,
+  courses, preferences). `RecommendationRulesService` is now exported.
+- The QR page: a suggestion row with reasons, the best-seller filter, suggestion sources on cart
+  lines, and a live region in place of the add toast.
+- The e2e setup adds a second restaurant with a 300-dish menu for the speed test.
+
+Tests:
+
+- ordering `qr-suggestions.test.ts` 4;
+- server relay-sync 1 (only QR rules are published; rankings and cut-off present);
+- qr-menu e2e 2: the rule's suggestion reaches the cart and its source reaches the restaurant;
+  LCP ≤ 2.5 s on a 300-dish menu (548 ms).
+
+Gotcha: once a dish is also a best seller, "Add Dal Makhani" matches both the suggestion and the
+menu; tests scope to the menu section's region.
+
+### 2026-10-02: P5-05a QR menu site
+
+Built:
+
+- `apps/qr-menu` (Next.js 16.3.8, MIT):
+  - `src/app` pages: `/`, `/t/[token]`, `/privacy`, `/terms`, not-found;
+  - `src/site` parts: `QrMenu`, `ItemSheet`, `CartSheet`, `Orders`, `relay.ts`, `storage.ts`
+    (`useSyncExternalStore` values), `i18n.tsx`;
+  - `src/proxy.ts` (CSP), `qr.css`.
+- `qrSite.*` strings, including drafts of the privacy notice and terms.
+- The relay: `qr-menu` takes `?known=`, and the QR menu document has `priceMode`.
+- `@rp/relay/testing` exposes `databaseUrl`.
+- turbo caches `.next`; the CI e2e job runs the site's phone tests.
+- Manual task 21 (hosting), and a legal-review item.
+- Licence exceptions for exceljs's zip reader.
+
+Tests:
+
+- qr-menu e2e 6 on a Pixel 7 against a real relay:
+  - find, order and follow to the kitchen, with an axe check;
+  - sizes and extras;
+  - nobody picks up, so "call a waiter";
+  - read-only and back;
+  - an unused code;
+  - privacy, terms and headers.
+- qr-menu unit 5 (CSP, browser id, per-table storage, the status panel).
+- relay 1 (`known`).
+- Checked by eye: phone screenshots of the menu, the cart and the status.
+
+Gotchas:
+
+- Next.js resolves `headers()` in next.config at build time, so a CSP naming a runtime URL
+  must be set in `proxy.ts`.
+- A screenshot just after a dialog opens catches its fade-in and looks see-through: wait for the
+  animation first.
+
+### 2026-10-02: P5-04 Table QR codes and tents
+
+Built:
+
+- Migration `20261002190000_table_qr_codes` (`tables.qr_token` unique, `qr_token_issued_at`).
+- Config `RP_QR_SITE_URL`.
+- Contracts `table-qr.ts` and four routes.
+- `TableQrService` and its controller (registered before `TablesController`).
+- `table-tents.ts` (pdfmake A6 and A5), and `common/pdf.ts` shared with report exports.
+- The relay sync sends `tokenHash`.
+- Console `QrCodesScreen` with its navigation link and strings, and `app/download.ts`.
+- `@rp/relay/testing` `startRelay` makes its database under an advisory lock, because test files
+  starting relays at once raced to create the cluster-wide roles.
+- The relay-sync and relay-orders tests now use real codes.
+
+Tests:
+
+- server `table-qr.int.test.ts` 8:
+  - floor order;
+  - unique 22-character codes, audited without them, kept on a second run;
+  - only the hash at the relay, which opens the table;
+  - acceptance: a regenerated code is refused by the relay (404), and the new one opens;
+  - managers only;
+  - A6 PDF (3 pages, A6 media box); A5 tents for chosen tables (landscape);
+  - `QR_SITE_NOT_SET` and `NO_QR_CODES`.
+- console `qr-codes.test.tsx` 3.
+- Checked by eye: the A6 card and the A5 tent, rendered to PNG.
+
+### 2026-10-02: P5-03b Sync agent: orders
+
+Built:
+
+- Migration `20261002170000_qr_orders`: `order_items.client_line_id` and `relay_orders` (the
+  inbox and what the relay was told).
+- `OrdersService.submit` takes `{ tableId, externalRef }` for a QR order without a session, keeps
+  each line's `clientLineId`, and puts `tableId` in `OrderSubmitted`.
+- Alerts: the approval alert names the table, and the responsible waiter falls back to the table's
+  default waiter.
+- Approvals:
+  - a waiter's own list includes QR orders for tables they look after;
+  - approving opens the table (`floor/open-for-order.ts`).
+- `@rp/ordering` `qrStatusOf` and `qrSteps`.
+- `relay/paced-loop.ts`, with `RelaySyncService` moved onto it.
+- `relay/relay-orders.service.ts`: pickup, take, tell, and the `relay.qr-orders` consumer.
+
+Tests:
+
+- server `relay-orders.int.test.ts` 11, against a real relay:
+  - a closed table: priced here, waiter alerted, approval list, approving opens the table, KOT,
+    diner sees SENT and then PREPARING;
+  - an open table joins its session; a rejection's reason reaches the diner;
+  - lines this menu cannot serve are rejected with the reason;
+  - an expired order is never picked up; a late one by the relay's clock is told EXPIRED;
+  - three pickups at once give one order;
+  - a crash between received and made resumes;
+  - an internet cut on pickup, and on telling.
+- server unit `paced-loop.test.ts` 2;
+- ordering `relay-status.test.ts` 4.
+
+Gotcha: the schema conventions test wants `id`, `restaurant_id`, `created_at` and `updated_at` on
+every table, so the inbox keys on `id` with a unique `relay_order_id`.
+
+### 2026-10-02: P5-03a Sync agent: publishing
+
+Built:
+
+- `@rp/ordering` `qrChannelMenu` (QR dishes, combo parts, what they use; stock shown only as sold
+  out).
+- `@rp/relay/testing`: `startRelay` (schema in the cluster, functions over HTTP, `provision`,
+  `cut`/`restore`, a request log), `pgRelayDatabase` and `nodeListener`. The relay now builds
+  with tsc as well as esbuild.
+- `@rp/test-postgres` `createMigratedDatabase` takes preludes.
+- Server `src/relay`:
+  - `relay-client.ts` (contract-checked, timeouts, `RelayError`);
+  - `relay-credential.ts` (sealed with the `relay-credential-key` secret);
+  - `relay-sync.service.ts` (the loop);
+  - `relay-cli.ts` (`relay:credential`);
+  - `relay.module.ts`.
+- Config `RP_RELAY_URL`.
+- `SystemStatusResponse.qrRelay`, with its line on the System page.
+- Manual task 20: connecting a restaurant by hand.
+
+Tests:
+
+- server `relay-sync.int.test.ts` 10:
+  - presence, settings, tables and menu reach a real relay;
+  - nothing is resent while nothing changed;
+  - a dish running out shows as a new version within seconds;
+  - an internet cut, then catch-up with exactly one new version;
+  - QR settings sent;
+  - an archived table goes out of service;
+  - recovery from a forgotten version;
+  - which events matter;
+  - the credential is sealed;
+  - no credential means no calls.
+- ordering `qr-menu.test.ts` 4;
+- console System page 1 (the line).
+
+Gotcha: a call to `sync()` during a running sync used to get that older run's result, which
+broke tests under load. Now it waits and runs once more, and calls made meanwhile share that run,
+so the answer includes everything changed before the call.
+
+### 2026-10-02: P5-02b Relay functions for local servers (P5-02 done)
+
+Built:
+
+- Contracts (`@rp/contracts/relay`):
+  - `RelayCredential`, `TokenHash`, `QrRelaySettings`;
+  - presence, session, menu publishing and table sync requests and responses;
+  - `QrPickupOrder` and `QrPickupResponse`;
+  - `UpdateQrOrderRequest` and its response;
+  - six routes, `SERVER_CREDENTIAL`.
+- Relay:
+  - `src/server.ts`, a router (`serveRoutes`) with the six routes;
+  - `src/jwt.ts` (HS256 with WebCrypto);
+  - `Tx.savepoint` on both drivers;
+  - a 413 for bodies over 8 MB;
+  - the `server` entry and its `config.toml` block.
+- Manual task 20: `RELAY_JWT_SECRET`.
+
+Tests:
+
+- relay `server-functions.test.ts` 17:
+  - credentials: unknown, revoked, suspended, a table token in its place;
+  - presence and settings;
+  - publishing: new, replay, stale, invalid, own restaurant only;
+  - tables: regenerated code, left out, duplicates, own restaurant only;
+  - pickup;
+  - status: steps, rejection reason, received too late, another restaurant;
+  - Realtime token signature and claims, and 503 without a secret.
+- `deno-smoke.test.ts` adds the `server` function under Deno: presence, publish, tables, pickup,
+  receive, and receiving too late through the savepoint.
+- contracts `relay.test.ts` 4: the settings match the registry's limits; token and credential
+  sizes; no prices or table in a diner's order.
+
+Gotchas:
+
+- postgres.js remembers the first failed statement of a transaction and rethrows it at the end,
+  even if the code caught it. Only `sql.savepoint()` recovers.
+- `ROLLBACK TO SAVEPOINT` sent as SQL does not help there. The Deno smoke test caught it: the
+  late-receive path answered 500 on Deno and 410 on Node.
+- OpenAPI paths use `{orderId}`, not `:orderId`, so look them up converted.
+- Fixed a flaky "socket hang up" in server tests.
+  - Seen in full checks: about one run in three while the relay suite ran alongside, failing a
+    different test each time.
+  - Cause: supertest listened on the IPv6 wildcard `[::]:P` for each request, then connected to
+    `127.0.0.1:P`. On macOS another process can hold `127.0.0.1:P` or `0.0.0.0:P` at the same
+    time (a test PostgreSQL, a Deno function), so the request reached that process instead.
+  - Fix: server and Control Plane test apps now always listen on `127.0.0.1:0`, and the `listen`
+    option is gone. Deno functions bind `127.0.0.1` under `RELAY_PORT`. Tests turn keep-alive off.
+  - Result: 8 of 8 stress runs clean.
+
+### 2026-10-02: P5-02a Relay functions for diners
+
+Built:
+
+- `@rp/ordering` `resolveOrderLine`, `comboOnNow` and `rejectLine`: the local server's line check
+  and pricing, moved out of `OrdersService` and the menu module, which now call them. The QR relay
+  runs the same check.
+- `@rp/contracts/relay` (a new entry point):
+  - the headers, `TableToken`, `BrowserId`;
+  - `QrMenuDocument` and `QrMenuResponse`;
+  - `QrSubmitOrderRequest` and `QrSubmitOrderResponse`;
+  - `QrOrderStatus`, `QrOrderStatusDetail` and `QrOrderView`;
+  - `RELAY_ROUTES`, documented in `docs/api/relay.openapi.json`;
+  - schema snapshots under `relay/`.
+- Migration `20261002150000_qr_order_limits`: `relay.rate_limit_wait` (for diners, from the claims,
+  under advisory locks) and `relay.expire_orders`, run every minute by pg_cron.
+- `infra/supabase/src`:
+  - `db.ts` (transactions, token resolution, acting as the diner);
+  - `http.ts` (errors, CORS, methods, body checks, failure log);
+  - `diner.ts`, `qr-menu.ts`, `submit-order.ts`, `order-status.ts`;
+  - `deno/serve.ts` on postgres.js, and the entries.
+- `scripts/bundle-functions.mjs` (esbuild), and `config.toml` functions with `verify_jwt = false`.
+- The CI `relay-supabase` job builds the bundles and installs Deno.
+- Manual task 20 deploys the functions.
+
+Tests:
+
+- ordering `line-check.test.ts` 8;
+- relay `diner-functions.test.ts` 26:
+  - the menu, read-only and tokens;
+  - submission, replay, a burst of one key, a key used at another table;
+  - a request with a price is refused; every refused line is reported; combos; the latest menu;
+    the restaurant offline;
+  - limits per table and per browser, a burst under the limit, a replay not counted;
+  - status, overdue reads EXPIRED, other tables and restaurants;
+  - a regenerated code; CORS and methods.
+- `expiry.test.ts` 3;
+- `deno-smoke.test.ts` 2: the real bundles under Deno 2.7 on a `relay_edge` login.
+- contracts docs 1 (and the generated document).
+- Server order tests unchanged and passing after the move (61 in the order files).
+
+Gotchas:
+
+- postgres.js reads a parameter's type from the statement and JSON-encodes a string again when it
+  is `jsonb`; node-postgres turns a JS array into a SQL array. Pass JSON as a string with
+  `::text::jsonb`. Only the Deno smoke test caught this.
+- zod's `z` namespace keeps every locale in a bundle; minified it is about 500 kB, which is fine
+  for Supabase.
+- Against a shared Supabase database (`RELAY_DATABASE_URL`) the test files run one at a time,
+  since expiry and retention act on every restaurant.
+
+### 2026-10-02: P5-01 Relay database, RLS and isolation tests
+
+Built:
+
+- ADR-0015 (QR relay on Supabase).
+- `infra/supabase` as workspace package `@rp/relay`:
+  - `config.toml`: Mumbai project; `relay` not in the Data API; public photo bucket.
+  - Migration `20261002130000_relay_schema.sql` with:
+    - the roles;
+    - tables `tenants`, `credentials`, `tenant_settings`, `dining_tables`, `menu_snapshots`,
+      `photos`, `presence`, `qr_orders`;
+    - the claim helpers;
+    - the RLS policies and column grants;
+    - the order triggers;
+    - `resolve_table_token` and `verify_credential`;
+    - the provisioning functions;
+    - `purge` with its pg_cron schedule;
+    - the Realtime publication.
+  - Tests with a Supabase prelude.
+- `@rp/test-postgres` reads Supabase CLI migrations and takes prelude files.
+- Traceability now scans `infra/`.
+- CI job `relay-supabase`.
+- Manual task 20 (create the projects, push the schema, the `relay_edge` login, check retention).
+
+Tests: `@rp/relay` 75 (1 of them skipped without pg_cron):
+
+- isolation 33: each of A's roles against B's rows, reads, inserts, updates and moves; diners
+  held to their table; tokens and credentials; no or malformed claims; API roles; no deletes;
+- roles and grants 19;
+- tokens and credentials 9;
+- order rules 11;
+- retention 3.
+
+test-postgres has 1 more test.
+
+Mutation check: each of these makes the suite fail:
+
+- a writer policy opened to `true`;
+- the diner's table check removed;
+- RLS turned off on one table;
+- suspended tenants' tokens resolving;
+- the API roles keeping function grants.
+
+Gotchas:
+
+- `SET ROLE` checks the session user, so from a superuser connection every switch succeeds. The
+  role tests use `SET LOCAL SESSION AUTHORIZATION` to act as the edge functions' login.
+- A per-schema `ALTER DEFAULT PRIVILEGES ... REVOKE` cannot undo the global `EXECUTE` for PUBLIC.
+  Every migration must revoke it from new functions; `roles.test.ts` checks this.
+- Tables are not FORCE'd, so the definer-rights functions (owned by `postgres`) bypass RLS on
+  Supabase too, where `postgres` is not a superuser.
+- RLS `WITH CHECK` runs before unique checks, so a cross-tenant insert is refused (42501) before it
+  could reveal that a row exists.
+
+- In one full `pnpm check` run, `recommendations-performance.int.test.ts` failed with "socket hang
+  up". It was a port collision, found and fixed in P5-02b.
+
+Not verified here: the `relay-supabase` job (Docker is not running on this Mac, and nothing can be
+pushed yet), and the `supabase_admin` password of the CLI stack. Both get checked on the first
+CI run.
+
+### 2026-10-02: P3-06 Phase 3 exit test, S6 (Phase 3 done)
+
+Built: `tablet-session.int.test.ts`, 9 steps over the API and the tablet's live connection. It
+runs:
+
+- open (the tablet unlocks and hears it);
+- order (waits, the waiter is alerted);
+- approve in the waiter app (a ticket for the kitchen);
+- kitchen to served (the tablet follows);
+- approve at the table with the waiter's PIN;
+- Water once, then Cancel clears it;
+- bill printed and feedback;
+- paid and closed (the tablet is idle, with no orders);
+- reopened, with nothing carried over (no orders, requests or open alerts, and feedback asked
+  again).
+
+Manual task 12 has the lab-rig checklist.
+
+Result: S6 passes on every build: all 9 steps, and the full check is green. The lab-rig run waits
+for the tablet hardware (manual task 12, P0-H3).
+
+### 2026-10-02: P3-05b Feedback after the bill (P3-05 done)
+
+Built:
+
+- Migration `20261002120000_feedback`: `feedback` (unique per table session, rating checks) and
+  `diner_contacts` (consent purpose, words, time, source, device; `erasedAt`).
+- Contracts `feedback.ts`: `Rating`, `IndianMobile`, `TabletFeedbackRequest`, `FeedbackView`,
+  `FeedbackReportResponse`, `EraseDinerContactRequest`; three routes; the `FEEDBACK` export.
+- Server: `FeedbackModule` (`FeedbackService`, the tablet and erase controllers), the report route
+  and its document.
+- Tablet: `FeedbackCard` on the open table while the bill is printed.
+- Console: the Feedback report in Operations.
+
+Tests:
+
+- server `feedback.int.test.ts` 6 (open table and tablet only; once per visit; consent needed for
+  a number and kept with its words; report and export without numbers; erasure by the Owner only,
+  unlinked, audited without the number);
+- tablet 2 (asked after the bill, consent needed; not before);
+- console 1.
+
+Decisions: 315 to 318.
+
+### 2026-10-02: P3-05a Suggestion rows and tracking
+
+Built:
+
+- `@rp/mobile-core` `SuggestionTracker`.
+- `@rp/mobile-shell` `SuggestionRow`, `useSuggestions` and `sourceOf`; `ItemSheet` takes an
+  `extra` slot.
+- The tablet's menu, item and cart rows, with a tracker per open table.
+- The waiter app's upsell row with a tracker per table screen.
+- `reco.row.*` strings.
+
+Tests:
+
+- mobile-core `suggestions.test.ts` 2;
+- waiter app 1 (a suggestion added in one tap; its source on the KOT; impressions, taps and adds
+  sent);
+- tablet 1 (the same from the menu row).
+
+Decisions: 312 to 314.
+
+### 2026-10-02: P3-03c Ordering on the table tablet (P3-03 done)
+
+Built:
+
+- `@rp/ordering` `tablet-menu.ts`: `searchMenu`, `queryWords`, `filterMenu`, `sortMenu` and
+  `estimateCart`.
+- `ItemSheet` in `@rp/mobile-shell`.
+- The tablet:
+  - `MenuView`, `DishCard`, `CartView`, `MyOrders` (with approve at table), `use-cart.ts`, and
+    `OpenTableScreen` with tabs, the offline notice and the service buttons;
+  - `ToastProvider` in `App`; `@rp/ordering` as a dependency.
+- Contracts: `TabletTableView.priceMode`, and `endReason` on order lines.
+- Maestro `order-from-table.yaml` and manual task 12's ordering step.
+
+Tests:
+
+- ordering `tablet-menu.test.ts` 8 (the BRD's search examples, typos, filters, sorts, estimates).
+- Tablet `ordering.test.tsx` 6:
+  - the menu's marks, the bestseller badge, the tax note and sold out;
+  - search and the veg filter;
+  - add, review the estimate, send, then waiting and live status;
+  - approve at table with the PIN;
+  - a rejection's reason;
+  - offline and back.
+
+Decisions: 306 to 311.
+
+### 2026-10-02: P3-03b Approvals in the waiter app and the POS
+
+Built:
+
+- `@rp/ordering` `approval-view.ts`: `waitingLines`, `approvalChanges`, `approvalTotal`,
+  `anythingLeft`, `approvalsFor` and `affectsApprovals`.
+- The waiter app's `Approvals` on `TablesScreen` and `TableScreen`; the POS's `Approvals` with its
+  change and reject dialogs on `TableOverview`.
+- The `approvals.*` strings, shared by both.
+
+Tests:
+
+- ordering 3;
+- waiter app 3 (one-tap approve with what was chosen, change only after agreement, reject with a
+  reason), with diners' orders in the fake restaurant;
+- console 3 (the same at the POS, with an axe check).
+
+Decision: 305.
+
+### 2026-10-02: P3-03a Diners' orders and approval (server)
+
+Built:
+
+- Contracts: `TabletOrderRequest`, `TabletOrdersResponse`, `ApprovalChange`,
+  `ApproveOrderRequest`, `RejectOrderRequest`, `ApproveAtTableRequest`,
+  `PendingApprovalsResponse` and `BestSellersResponse`; seven routes; setting
+  `menu.bestSellerCount` (with a Menu area on the Settings page).
+- Server:
+  - `OrderApprovalsService` with `TabletOrdersController` and the approve, reject and
+    pending-approval routes on `OrdersController`.
+  - `OrdersService.sendToKitchen` is now public, and `orderView` and `ORDER_VIEW_INCLUDE` are
+    exported.
+  - `AuthService.pinOnDevice` is shared by `kioskExit` and the new `tableApprover`.
+  - `RecommendationsService.bestSellerIds` with `BestSellersController`.
+
+Tests: `order-approvals.int.test.ts` 10:
+
+- the table must be open, waiting lines and the waiter's alert, each tablet kept to its own table;
+- the inbox per role, changes needing agreement and own tables;
+- approve with a changed quantity and a removed line (KOT, alert cleared, audit, totals);
+- reject with a reason; refused when a dish ran out;
+- approve at table with a wrong PIN, kitchen staff, another waiter and the right waiter (stock
+  taken off);
+- bestsellers and their setting.
+
+Decisions: 298 to 304.
+
+### 2026-10-02: P3-02 Service requests on the tablet
+
+Built:
+
+- The tablet: `ServiceButtons` with `service-view.ts` (`requestButtonState`, `cancelPlan`,
+  `openRequests`) on `OpenTableScreen`; `@rp/domain` is now a dependency of the tablet app.
+- Maestro: `service-requests.yaml` (in `config.yaml` after the session flow).
+- Manual task 12 now covers calling the waiter.
+
+Tests: tablet 3 (lit until acknowledged, then Cancel clears it; choosing between two; the button
+and Cancel rules). The server side's repeats, escalation and anti-spam were tested in P2-06d.
+
+Decision: 297.
+
+### 2026-10-02: P3-01c Locate a tablet (P3-01 done)
+
+Built:
+
+- Contracts: `DeviceLocateRequested`, `LocateDeviceResponse`, `LOCATE_SECONDS` and the
+  `locateDevice` route.
+- Server: `DevicesService.locate`, and room routing to the device's own room.
+- Console: "Locate" on a connected tablet's row on the Devices page.
+- Tablet: `LocateOverlay` with `locateRequest`.
+
+Tests:
+
+- Server: 2 in `tablet.int.test.ts` (only that tablet hears it; refused when not connected, for
+  other devices and for waiters) and 1 in `realtime-rooms.test.ts`.
+- Console: 1.
+- Tablet: 2 (overlay and tone; another tablet's or a stale request ignored).
+
+Decision: 296.
+
+### 2026-10-02: P3-01b Table tablet app (kiosk, session, health, staff exit)
+
+Built:
+
+- `@rp/mobile-native`: `RpKioskModule.kt` (lock-task, keep-screen-on, health, locate tone),
+  `RpDeviceAdminReceiver.kt` with its XML and strings, and `ACCESS_NETWORK_STATE`; `AndroidKiosk`.
+- `@rp/mobile-core`: `Kiosk`, `DeviceHealthSource`, `HealthReporter`, `TabletSession` (restore,
+  refresh on events, wipe of `TABLET_GUEST_KEYS`).
+- The tablet app:
+  - `TabletHome` (kiosk, health, accent theme, which screen), `IdleScreen`, `OpenTableScreen`,
+    `StaffPanel` with `StaffCorner`, `use-tablet.ts` and `branding.ts`;
+  - `Root` loads the kiosk module;
+  - Maestro: `pair-idle-menu` updated, `session-lifecycle` new, and `config.yaml`.
+- CI checks that the tablet's device-admin receiver is bound by the system only.
+- Manual task 12 (kiosk and session on the chosen tablet) is ready to run.
+
+Tests:
+
+- mobile-core `tablet.test.ts` 8 (idle and unlock, wipe on close and only then, a different
+  session after a restart, unbound and offline, restore, coalesced reads, health reports and
+  retries).
+- mobile-native `kiosk.test.ts` 3.
+- Tablet app 8: the smoke flow, the cached table after a restart, the idle screen with a promotion
+  and the kiosk locked, unlock and wipe on close, staff exit with a wrong and a right PIN,
+  unbound, and accent contrast.
+
+Gotchas:
+
+- An element with `importantForAccessibility="no-hide-descendants"` needs
+  `{ includeHiddenElements: true }` in Testing Library queries.
+- Fake events must match their contract (`TableOpened` needs covers and waiter), or the client
+  drops them as invalid.
+
+Decisions: 290 to 295.
+
+### 2026-10-02: P3-01a Table tablet, server side
+
+Built:
+
+- Contracts: `TabletTableView`, `DeviceHealthRequest` with `NetworkKind`, `KioskExitRequest` and
+  `KioskExitResponse`; the routes `getTabletTable`, `reportDeviceHealth` and `exitKiosk`.
+  `DeviceView` gains `charging`, `network` and `rssi`; `DeviceStatusChanged` gains `charging`. The
+  profile gains `accentColor` (`AccentColor`); new setting `devices.offlineAlertSeconds`.
+- Server: `devices/tablet.service.ts` with `tablet.controller.ts`; `device-presence.monitor.ts`
+  (`PRESENCE_OPTIONS`, off in tests); `AuthService.kioskExit`; the trigger treats a charging device
+  as not low. Migration `20261002090000_tablet_health` (`restaurants.accent_color`,
+  `devices.charging`, `devices.network`).
+- Console: the accent colour on the Restaurant page (field and swatch); charging and the connection
+  on the Devices page.
+
+Tests:
+
+- Server `tablet.int.test.ts` 11: the table and promotions, unlocking on open with the event,
+  only for a bound tablet, health shown and its alert raised once and cleared on charge, refusals,
+  offline after the setting's time and back, never with 0, kiosk exit with the right PIN, a wrong
+  one, a waiter and a kitchen screen.
+- One more in `restaurant.int.test.ts` (the accent colour).
+- Console tests for the accent field and the tablet's battery and connection.
+
+Gotcha: jsonb does not keep object key order, so anything ordered must not rely on a setting's keys.
+
+Decisions: 284 to 289.
+
+### 2026-10-01: P4-07b Suspicious activity, the daily report and the cash drawer (P4 done)
+
+Built:
+
+- Contracts: `SUSPICIOUS_KINDS`, `SuspiciousFlag`, `SuspiciousActivityResponse` and
+  `getSuspiciousActivityReport`; `SUSPICIOUS` export kind; `OpenCashDrawerRequest` and `Response`
+  with `openCashDrawer`; the settings `audit.reprintFlagCount` and `bills.cashDrawerKick`; the
+  `SUSPICIOUS_ACTIVITY` alert type.
+- Domain: the factory rule and pager pattern for `SUSPICIOUS_ACTIVITY`.
+- Server: `SuspiciousActivityService` (eight queries over the audit trail, bills and shifts) with
+  its document for export; `SuspiciousActivityJob` (`DAILY_REPORT_OPTIONS`, off in tests);
+  `CashDrawerService` (kick, no-sale opening, kick after cash payments) with `renderDrawerKick`;
+  migration `20261001150000_suspicious_activity` (index on `invoice_lines.order_item_id`).
+- Console: `reports/SuspiciousReport.tsx` in the Controls group, with `flagSubject` and
+  `flagFigure` in `report-view.ts`; the no-sale card on the shift screen; the alert's detail in
+  `@rp/ordering` `describeAlert`.
+
+Tests:
+
+- Server `suspicious-activity.int.test.ts` 17. It is S12: one day with every pattern and the
+  people checked one by one. It also covers the thresholds as settings, waiting for the day to end
+  before calling an item unbilled, export, access, and the drawer (kick on cash, no sale audited,
+  unreachable printer, reason and rights). It covers the daily job too: off when turned off, once
+  per date, and the Owner's alert.
+- Unit tests for the kick bytes, the flag wording and the alert text.
+- Console tests for the report page and the no-sale card.
+- The year run (`RP_PERF=1`) now times the suspicious-activity report too. Its generator now
+  settles paid invoices, as the server does; before, every item looked unbilled. Over the year,
+  warm, the slowest parts are items never billed (2.0 s, a hash anti-join over the year's
+  invoice lines) and voids after print (0.4 s); one day takes about 30 ms in all, through the new
+  index.
+
+Gotchas:
+
+- An edited bill's `print_count` starts again at 0 (its next print is an original), so "was this
+  bill printed?" must be asked of the audit trail, not of the invoice row.
+- Await a supertest request's override token before building the request (as before).
+- A report's queries run one after another. Eight slow queries in parallel took most of the
+  10-connection pool, and a request waiting more than 5 s for a connection fails.
+
+Decisions: 281 to 283. Manual task 13 now checks the cash drawer.
+
+### 2026-10-01: P4-07a Audit viewer and chain check
+
+Built: contracts `AuditListQuery`, `AuditEntryView`, `AuditListResponse` and `listAuditEntries`
+(`GET /api/v1/audit`); `AUDIT` in `ReportKind` with `action` and `actorId` on export requests; the
+server's `AuditViewerService` (filtered, paged, names and devices) and the AUDIT document; the
+console's `AuditScreen` at `/manage/audit` with `audit-view.ts`, the period filter now shared as
+`reports/RangeFilter.tsx`, `useReport` reading again when filters change, and export buttons that
+carry filters.
+
+Tests: server `audit-viewer.int.test.ts` 4 (newest first with names and values, filters and pages,
+access and range, export with filters and refused to a waiter); console `audit.test.tsx` 4; one
+e2e step (23): the kitchen-timer change found in the trail and the chain checked.
+
+Decisions: 277 to 280.
+
+### 2026-10-01: P4-06 Report exports
+
+Built: `@rp/domain` `report-document.ts` (`columns`, `documentToCsv`, `csvValue`, `displayValue`,
+`reportRowCount`); contracts: every report in `ReportKind`, `ExportFormat` (CSV, XLSX, PDF),
+`EXPORT_ROW_LIMITS`, `EXPORT_CONTENT_TYPES` and the answer's `encoding`; the server's
+`ReportDocumentsService` (the 14 reports as typed tables), `report-files.ts` (Excel and PDF, the
+row limits) and the export service rebuilt on them; the console's `ExportButtons` (CSV, Excel,
+PDF) on every report.
+
+Tests: domain `report-document.test.ts` 2; server `report-files.test.ts` 3 (sheets, stamp,
+numbers and formats in Excel, a formula kept as text, PDF pages and landscape, limits) and 3 in
+`report-suite.int.test.ts` (each of the 14 reports as CSV, Excel and PDF files audited with their
+format, an unknown format and a waiter refused); the console export test also saves a PDF.
+
+Gotchas:
+
+- A type package with `/// <reference lib="dom" />` changes the server's global types (here
+  `Crypto`, so an overloaded `@peculiar/x509` call resolved differently): declare the few types
+  needed instead.
+- ExcelJS types `load` with an older `Buffer` than Node's; cast through its parameter type.
+
+Decisions: 273 to 276.
+
+### 2026-10-01: P4-05d Reports area (P4-05 done)
+
+Built: `apps/console/src/manage/reports/`: `ReportsArea` (range filter, report navigation,
+routes), `report-view.ts` (presets, range checks, rupees, percent, durations, axis labels),
+`use-report.ts` (reads a report for a range and keeps the old figures while a new range loads),
+`ReportParts.tsx` (stat tiles, single-series bar chart, CSV export button, typed table columns,
+order links), the reports in `SalesReports`, `TaxReports` (the register read a page at a time),
+`PeopleReports`, `ControlReports`, `OperationsReports`, and `OrderDrillDownScreen`; i18n
+`reportsPage`; Recharts 3 in the console. The discounts and reprints reports link a table's bill
+to the table's first order.
+
+Tests: console `report-view.test.ts` 3 and `reports.test.tsx` 6 (today's sales, a period kept
+across reports and a refused range, a free dish opening its order, CSV export, register pages,
+kitchen and suggestion figures); one e2e step (22): today's reports, the discount from the billing
+step opened to its order, and the area at 360 px.
+
+Gotchas:
+
+- Under a splat route (`reports/*`) a relative link resolves below the page that is open
+  (`/manage/reports/sales/discounts`), which hit the catch-all redirect, which was relative too:
+  an endless redirect inside React's `act`, a hung test at 100 % CPU. Use absolute paths there.
+- `Recharts` in jsdom: give charts a width (no ResizeObserver there); `<meter>` and charts are
+  checked by attribute, not by ARIA value.
+
+Decisions: 269 to 272.
+
+### 2026-10-01: P4-05c Twelve months at design capacity (RPT-018)
+
+Built: `apps/server/test/performance/` with `generate-year.ts` (set-based SQL, deterministic ids
+and figures) and `reports.perf.test.ts` (project `performance`, script `test:perf`, opt-in with
+`RP_PERF=1`, sizes from `RP_PERF_DAYS` and `RP_PERF_ORDERS`, `RP_PERF_HOLD` to tune against the
+year); the P1-13 sales, items, GST, register and shift reports in SQL; migrations
+`20261001130000_report_performance` (payments by shift) and `20261001140000_invoice_line_shares`
+(dish and tax share per invoice line, with the backfill); `billing/line-shares.ts` used when an
+invoice or a split part is issued; the register paged (`InvoiceRegisterQuery`).
+
+Timings for the whole generated year (730,000 orders), through HTTP on this Mac:
+sales 0.26 s, items 2.5 s (16 s before), payments 0.04 s, shifts 0.01 s, GST 3.8 s, invoice
+register page 0.1 to 0.3 s, sources 2.4 s, staff 1.9 s, discounts 0.2 s, cancellations 0.3 s,
+reprints 0.3 s, kitchen 0.7 s (6 s before), tables 0.7 s, suggestions 0.5 s (over 120 s before),
+sales export 0.3 s, order drill-down 0.03 s. Generating the year takes about 3.5 minutes. GST and
+sources are the closest to the limit; if a restaurant runs above §7.2 they are the next to move
+to stored figures.
+
+Tests: `reports.int.test.ts` 2 new (register pages, each line's dish and tax share adding up to
+the invoice), the earlier report tests unchanged with the SQL versions.
+
+Gotchas:
+
+- Bulk-filled tables need `ANALYZE` before the next statement, or the planner plans for the empty
+  template and one insert takes forever.
+- A materialised CTE has no column statistics: joining it on a second column (`version`) was
+  estimated 200 times too selective and turned into a 2.9-million-step nested loop. Mark such
+  CTEs `NOT MATERIALIZED`.
+- A hash join on a column that is mostly NULL puts every NULL in one bucket; join only the rows
+  that have a value.
+- Zod 4 `z.uuid()` checks the version and variant, so `md5(...)::uuid` ids are refused by the
+  API; the generator makes them version 4.
+- macOS has no `timeout`; `perl -e 'alarm N; exec @ARGV' …` stops a hung command.
+
+### 2026-10-01: P4-05b Report data II
+
+Built: contracts `KitchenReportResponse`, `TableReportResponse`, `RecommendationReportResponse`
+and their routes; `ReportSuiteService.kitchen`, `tables` and `recommendations` (SQL aggregates)
+behind `/api/v1/reports/kitchen`, `tables` and `recommendations`.
+
+Tests: `report-suite.int.test.ts` now 9 (3 new), with kitchen times, closed sessions and
+suggestion events set on the same day's data.
+
+Decisions: 260 to 263.
+
+### 2026-10-01: P4-05a Report data I
+
+Built: contracts `SourceSalesResponse`, `StaffPerformanceResponse`, `DiscountReportResponse`,
+`CancellationReportResponse`, `ReprintReportResponse` with their routes; the server's
+`ReportSuiteService` (SQL aggregates and audit-trail reads) behind `/api/v1/reports/sources`,
+`staff`, `discounts`, `cancellations` and `reprints`; migration `20261001120000_report_indexes`.
+
+Tests: server `report-suite.int.test.ts` 6, on a day with known answers built through the API
+(cancel, void with a PIN, discount, complimentary, print, reprint, KOT reprint, edit after print,
+voided and re-issued takeaway) plus seeded alerts and a service request.
+
+Gotchas:
+
+- Supertest: build a request only after awaiting what goes into its headers (an override token);
+  awaiting another request in between gives ECONNREFUSED.
+- Several contract enums are values only; derive their types from a response type
+  (`SourceSalesResponse['rows'][number]['source']`).
+
+Decisions: 255 to 259.
+
+### 2026-10-01: P4-04 System page
+
+Built: contracts `SystemStatusResponse`, `ApproveUpdateRequest` and the routes `getSystemStatus`
+and `approveUpdateInstall`; the server's `SystemModule` (`system.service.ts`, `storage-usage.ts`,
+`system-state.ts`); the console's `SystemScreen` at `/manage/system` with `system-view.ts`
+(sizes, uptime); the e2e setup seeds a disk alert and an offered update, and a new step
+acknowledges the alert and presses "Install now".
+
+Tests: server `system.int.test.ts` 6 and `storage-usage.test.ts` 3; console `system-view.test.ts`
+2 and `system.test.tsx` 3; one e2e step (21).
+
+Gotchas:
+
+- A `<meter>` has no `aria-valuenow` in jsdom; check its `value` attribute.
+- The server's disk check raises and clears the alert with dedupe key `disk`, so seeded alerts use
+  another key.
+
+Decisions: 251 to 254.
+
+### 2026-10-01: P4-03e Restaurant profile, tax groups and invoice series (P4-03 done)
+
+Built: the console's `RestaurantScreen` at `/manage/restaurant` over the P1-01b API with
+`ProfileDialog`, `LegalDialog`, `TaxGroupDialog` and `SeriesDialog`; `restaurant-view.ts` with the
+drafts, their checks (the contracts' own schemas and the domain's GSTIN and invoice-number rules)
+and the example number; `PhotoPicker` shared with the menu editor; CSS for the facts list and the
+opening-hours editor.
+
+Tests: console `restaurant-view.test.ts` 8 and `restaurant.test.tsx` 5 (the page for the Owner,
+a manager's profile change with the Owner's parts read-only, a tax group added through the second
+factor, archive and default series, a series with invoices kept fixed).
+
+Check: `pnpm check` passed everything but one server test that lost its socket ("socket hang up"
+in the manager-override test) while the check loaded every core; no server code changed and the
+server suite alone passes (733 tests). Such load flakes hit 3 of the last 5 full checks on this
+Mac; if they keep coming, run the tests with a lower Turborepo concurrency.
+
+Gotchas:
+
+- An accessible name collapses spaces, so labels built from values that may be empty ("Remove
+  Tuesday to ") never match: number such buttons instead.
+
+Decisions: 247 to 250.
+
+### 2026-10-01: P4-03d Stations and printers
+
+Built: the console's `PrintingScreen` at `/manage/printing` ("Kitchen and printers" in the
+dashboard navigation) over the P1-07 API: printers with address, paper, the stations they print
+for, state and redirect, with test page, change, send tickets elsewhere or print here again, and
+archive; stations with mode and printer, add, change and archive. `printing-view.ts` holds the
+drafts, their checks (the same patterns as the contracts) and the printer state. `ReasonDialog`
+takes an optional hint, tone and extra fields.
+
+Tests: console `printing-view.test.ts` 6 and `printing.test.tsx` 5.
+
+Gotchas:
+
+- Narrowing a union whose members share several `kind` literals needs an `in` check
+  (`'printer' in open`), not a comparison of `kind`.
+
+Decisions: 244 to 246.
+
+### 2026-10-01: P4-03c Suggestions page (recommendation rules, pin, boost and block)
+
+Built: `@rp/domain` `ITEM_PREFERENCES` and `recommend` with `preferences` (pinned first in up to
+half the places, boosted first among learned pairings and best sellers, blocked never) and the
+`FEATURED` reason; the `reco.itemPreferences` setting and the reason in `@rp/contracts`; the
+server passes the setting to the engine; `describeRecommendation` says "Recommended by the
+restaurant"; the console's `RecommendationsScreen` at `/manage/settings/recommendations` with the
+rules (add, change, pause, resume, archive with a reason) and the featured dishes, linked from
+the Settings page (the page-link editor now names its page).
+
+Tests: domain recommendations 22 (5 new), server recommendations 21 (2 new), ordering 1 new,
+console `recommendations-view.test.ts` 6 and `recommendations.test.tsx` 5, and an e2e step (a
+manager adds a rule and pins a dish; 20 steps).
+
+Check: `pnpm check` passed everything except one timing test in the server suite (30 nudges
+within 2 s took 3.6 s while the check held the load average at 83 on 10 cores); the server suite
+alone passes (733 tests).
+
+Gotchas:
+
+- A setting that has its own page needs `editorOf` to return `{ kind: 'RULES', page }`, or the
+  "every setting has an editor" test fails.
+- An invalid setting value is a 422 from the server, not a 400.
+- In Playwright, `getByRole('combobox', { name: 'Dish' })` also matches "Dish or category"; pass
+  `exact: true`. Toasts left from earlier steps cover buttons at the bottom of a page: dismiss
+  them first.
+- The engine's speed test runs in about 1 ms per call alone but over 50 ms at the 95th percentile
+  while `pnpm check` loads every core; it now checks the median under 50 ms and the 95th
+  percentile under the 200 ms budget, after five untimed warm-up runs.
+
+Decisions: 240 to 243.
+
+### 2026-10-01: P4-03b Notification rules
+
+Built: `@rp/domain` `recipientChoices`, `channelChoices`, `ruleOverride` and `checkRule`; i18n
+`notificationRules`; the console's `NotificationRulesScreen` (each event's rule in words with
+Change and "Use the factory rule", the rule dialog) at `/manage/settings/notifications`, linked
+from the Settings page.
+
+Tests: domain notifications 29 (3 new), console `notification-rules.test.tsx` 4 (factory rules
+with N and R, a change stored as its difference with the pager line checked, reset, read-only and
+the link from Settings).
+
+Gotchas:
+
+- A literal `{table}` in a catalogue message must be quoted ICU-style (`'{table}'`) or it is read
+  as a placeholder.
+- ESLint's `--fix` may drop a type assertion as "unnecessary" when the loader has no return type,
+  leaving `{}`: give such loaders an explicit return type.
+
+Decisions: 237 to 239.
+
+### 2026-10-01: P4-03a Settings page
+
+Split P4-03 in five (a settings, b notification rules, c recommendation rules, d stations and
+printers, e the Owner's profile, tax groups and invoice series).
+
+Built: `@rp/ui-web` `TextArea`; i18n `settingLabels`, `settingHints` (all 77 settings) and
+`settingsPage`; the console's Settings page (`src/manage/settings/`: `SettingsScreen` with its
+dialog, `settings-view.ts` choosing an editor from each schema and converting percent, rupees,
+lists, windows, fields and per-event choices), linked from the dashboard for Owner and Manager.
+No server change: the P1-01a settings API already lists editability and checks every value.
+
+Tests: ui-web `TextArea` (axe), console `settings-view.test.ts` 6 (every setting has an editor,
+label and hint, and its default round-trips) and `settings.test.tsx` 5, and the 19th Playwright
+step: a manager changes the amber threshold with a reason and sees it changed, on a 360 px phone.
+
+Gotchas:
+
+- Zod 4 schemas expose their shape through `schema.def` (`type`, `innerType`, `element`,
+  `keyType`, `valueType`, `format`) and numbers through `minValue`/`maxValue`.
+- Message keys with parentheses (`Why (optional)`) break `new RegExp` matchers in tests: match the
+  accessible name exactly instead.
+
+Deferred: the notification rules row links to its own page in P4-03b.
+
+Decisions: 232 to 236.
+
+### 2026-10-01: P4-02e Custom roles (P4-02 done)
+
+Built: `@rp/domain` `CUSTOM_ROLE_BASES`, `CUSTOM_ROLE_GRANTABLE`, `extraCapabilitiesOf`,
+`actorGrant`, `checkCustomRole`, and `evaluatePermission` with `extraCapabilities`; migration
+`20261001100000_custom_roles` (`roles.archived_at`); contracts `roles.ts` (`RoleView`,
+`RoleRequest`, routes `listRoles`, `createRole`, `updateRole`, `archiveRole`), `customRoleId` on
+staff requests and `customRoleId`/`customRoleName` on `StaffView`, and
+`LoginResponse.staff.capabilities`; server `Principal.capabilities` and `SessionStaff.capabilities`
+(`roleCapabilities`), the guard, settings, overrides and kitchen steps through `actorGrant`, the
+`RolesService` and `RolesController`, and custom roles given in the staff service; console
+`grantOf` and person-aware `modesFor`/`homeFor` in `app/modes.ts`, the Roles page
+(`RolesScreen.tsx`, `roles-view.ts`) under Staff, custom roles in the person dialog and row, and a
+dashboard that opens on the first page a custom role allows.
+
+Tests: domain permissions 9 (4 new), server `roles.int.test.ts` 6 (Owner-only with a fresh second
+factor, every refusal, a captain who may read reports until the Owner takes it away on the very
+next request, a hand-edited row that cannot grant staff management, archive and base-role
+rules, built-in roles unchanged) and the permission suites unchanged (227), console
+`roles.test.tsx` 6 and `modes.test.ts` with custom roles.
+
+Gotchas:
+
+- Never check a person's permission with `grantFor(role, …)` on the server or in the console:
+  use `actorGrant` (server, with `principal.capabilities`) or `grantOf(person, …)` (console).
+- `LoginResponse.staff.capabilities` is optional in the contract so older fixtures and devices
+  still parse; the server always sends it.
+
+Deferred: live real-time rooms for custom grants and showing them in the Android apps
+(decision 231).
+
+Decisions: 227 to 231.
+
+### 2026-10-01: P4-02d Menu editor
+
+Built: contracts `MenuDraftResponse.combos` and `ItemView.stockCount`, filled by
+`MenuAdminService.draft`; the console's menu editor (`src/manage/menu/`): `MenuEditor` (tabs and
+Publish), `ItemsTab` (category filter, search over names, short codes, tags and search words,
+archived dishes, stock), `ItemDialog` (every MENU-002 field in sections, photo upload, sizes, option
+groups, price-change reason, combo), `ComboFields` (set dishes and choices, dates and daily hours),
+`CategoriesTab`, `GroupsTab`, `ReasonDialog` and `menu-view.ts` with the server's checks.
+
+Tests: server (the draft holds combos and stock, stock leaves the dish's audit alone), console
+`menu-view.test.ts` 12 and `menu-editor.test.tsx` 10, and the 18th Playwright step: a manager
+adds Kulcha Platter with two sizes, Add-ons and a PNG photo, publishes, and the cashier opens it
+on the POS with its sizes and add-ons; axe on the editor and its dialog; the page fits 360 px.
+
+Gotchas:
+
+- The per-device sign-in limit (10 a minute) trips the browser tests once they sign people in
+  often; `e2e/global-setup.ts` raises it for the test browser.
+- Message keys must be names, not numbers (`menuEditor.item.spice.mild`, not `.1`): numeric keys
+  do not type as `MessageKey`.
+- `ReturnType<typeof within>` is `any` to the linter: give test helpers a structural type.
+
+Deferred: turning a combo back into a plain dish (decision 222); drag-and-drop ordering (display
+order numbers for now); time-based availability (MENU-007, S, P6-05).
+
+Decisions: 220 to 226.
+
+### 2026-10-01: P4-02c Devices (first session on the local Mac)
+
+The build moved from Claude Code on the web to the Business Owner's Mac. Set up: pnpm through
+corepack in `~/.local/bin`, PostgreSQL 16 binaries from `@embedded-postgres/darwin-arm64` in
+`~/.local/pg16` with `PG_BIN` (Homebrew there belongs to another macOS user), Playwright's
+Chromium. GitHub has no credentials on this Mac yet, so work packages are merged into local `main`
+and pushed once someone runs `gh auth login` (MANUAL_TASKS.md). Added `AGENTS.md`,
+`docs/PRD.md`, `docs/DESIGN_SYSTEM.md`, `docs/ARCHITECTURE.md`, `MANUAL_TASKS.md` and
+`manual-tasks/`.
+
+Built: contracts `DeviceView` (connected, battery, firmware, serial, unpaired at),
+`DeviceName`, `RenameDeviceRequest` and the `renameDevice` route; the server's
+`RealtimeGateway.connectedDeviceIds`, the device list from it, rename (audited), and
+`RestaurantChanged` `DEVICES` on pair, unpair, rename and move; `@rp/domain`
+`formatDisplayDate` and `displayDateTime` (DD-MM-YYYY, NFR-L03); the console's Devices page
+(`src/manage/devices/`: `DevicesScreen`, `DeviceDialogs` with pair, code, rename, move and unpair,
+`devices-view.ts`) linked from the dashboard for Owner and Manager.
+
+Fixed: every database session runs in UTC (decision 219, `utc-session.ts`). The Phase 4 dashboard
+browser test failed on this Mac (India time) and passes now; `database.int.test.ts` keeps a
+regression test with the database's own zone set to Asia/Kolkata.
+
+Tests: domain (2 new), contracts (snapshots for `DeviceView`, `DeviceName`), server device tests
+21 (was 15) and a real-time test that a live connection shows as connected, console 18 new
+(`devices-view.test.ts` 8, `devices.test.tsx` 10), and 17 Playwright steps (was 16): a manager
+pairs a second browser as a kitchen screen with the code shown, sees it connected, renames it on
+a 360 px phone with axe, unpairs it and the screen is back on the pairing page within 5 s.
+
+Gotchas:
+
+- Run the console's browser tests in the PC's own zone too (`pnpm --filter @rp/console e2e`); CI
+  runs in UTC and hides time-zone bugs.
+- `pnpm check` formats-checks untracked files as well: keep scratch notes out of the repository
+  root (`latest_context.md` and the root copy of the BRD PDF are git-ignored for this reason).
+- A test that counts a device's outbox events must filter by event type now that device changes
+  are also announced as `RestaurantChanged`.
+
+Deferred: "Locate" (S) to P3-01 (tablet) and P2-05 (pager).
+
+Decisions: 213 to 219.
 
 ### 2026-09-28: P4-02b Sections and pagers
 
@@ -2344,8 +8656,7 @@ Gotchas:
   (the pager card's minute refresh, `useNow`) runs on real time and never fires in the test.
 - Two settings hold the pager heartbeat: `pagers.heartbeatSeconds` (restaurant scope, used by the
   broker) and `pager.heartbeatSeconds` (vendor scope, unused). Left for P2-05, where the firmware
-  reads its heartbeat period, to settle on one. (Settled in P4-03a, decision 243: only
-  `pagers.heartbeatSeconds` is left, set by the vendor.)
+  reads its heartbeat period, to settle on one.
 
 Decisions: 119 to 123.
 
@@ -3490,7 +9801,31 @@ Notes for the next session:
 - P2-04: the MQTT broker reuses the server certificate and must pick up renewals too.
 - P4 (manager dashboard) or the device settings screen should show the CA fingerprint so people
   can compare it without the log.
-- P7-05: backups must include `<RP_DATA_DIR>/tls` and the secret store.
+- P7-05: backups must include `<RP_DATA_DIR>/tls` and the secret store. (Done in P7-05a.)
+- P0-16 (from P7-05): the installer sets `RP_PG_BIN` and ships `pg_dump.exe` and
+  `pg_restore.exe`.
+  - The DPAPI store provides `backup-key` and implements `replace`.
+  - The service runs `restore-cli pending` (with the administrator's connection) before starting
+    the server, and restarts it on exit code 75.
+  - It never gives the server `RP_ADMIN_DATABASE_URL`.
+- P0-16 (from P7-06b): the purge login `rp_purger` (LOGIN, IN ROLE rp_purge, a random password in
+  the installer's store) and `RP_PURGE_DATABASE_URL` for the server
+  (`docs/runbooks/data-lifecycle.md`).
+- P0-16 (from P7-05c): the continuous backup's set-up, as `docs/runbooks/backups.md` says:
+  - postgresql.conf: `wal_level = replica`, `archive_mode = on`, `archive_timeout = 3600`,
+    `max_wal_senders = 4`, and `archive_command` running `dist/backups/wal-stage.js` with the
+    bundled node and `<data>/backups/wal-staging`;
+  - pg_hba.conf: `host replication rp_backup 127.0.0.1/32 scram-sha-256`;
+  - the role `rp_backup` (LOGIN REPLICATION, EXECUTE on `pg_switch_wal()`), its password in the
+    installer's store, and `RP_BACKUP_DATABASE_URL` for the server;
+  - ship `pg_basebackup.exe` and `pg_ctl.exe` with the other client programs;
+  - the PostgreSQL service account writes the staging folder, the server's account reads and
+    deletes there;
+  - use the same administrator role name on every PC (a restore to a moment reaches its temporary
+    PostgreSQL by that name);
+  - optional, for databases above about 60 GB: a restore to a moment could switch PostgreSQL's
+    data folder in place (stop the service, rename the folders, start it) instead of dumping and
+    restoring, which keeps it within the two-hour RTO (`docs/build/restore-timing.md`).
 
 ### 2026-09-26: P0-14b web console shell
 

@@ -1,0 +1,120 @@
+{
+  "input": {
+    "type": "object",
+    "properties": {
+      "state": {
+        "type": "string",
+        "enum": [
+          "IDLE",
+          "DOWNLOADING",
+          "DOWNLOAD_FAILED",
+          "WAITING",
+          "PREPARING",
+          "PREPARE_FAILED",
+          "INSTALLING",
+          "UNAVAILABLE"
+        ]
+      },
+      "version": { "type": ["string", "null"] },
+      "waitingFor": {
+        "anyOf": [
+          { "type": "string", "enum": ["WINDOW", "OPEN_TABLES", "RETRY_APPROVAL"] },
+          { "type": "null" }
+        ]
+      },
+      "error": { "type": ["string", "null"] },
+      "retryAt": {
+        "anyOf": [
+          {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+          },
+          { "type": "null" }
+        ]
+      },
+      "lastOutcome": {
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "version": { "type": "string" },
+              "previousVersion": { "type": ["string", "null"] },
+              "outcome": { "type": "string", "enum": ["INSTALLED", "ROLLED_BACK", "FAILED"] },
+              "at": {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+              },
+              "error": { "type": ["string", "null"] },
+              "backupFileName": { "type": ["string", "null"] }
+            },
+            "required": ["version", "previousVersion", "outcome", "at", "error", "backupFileName"]
+          },
+          { "type": "null" }
+        ]
+      }
+    },
+    "required": ["state", "version", "waitingFor", "error", "retryAt", "lastOutcome"]
+  },
+  "output": {
+    "type": "object",
+    "properties": {
+      "state": {
+        "type": "string",
+        "enum": [
+          "IDLE",
+          "DOWNLOADING",
+          "DOWNLOAD_FAILED",
+          "WAITING",
+          "PREPARING",
+          "PREPARE_FAILED",
+          "INSTALLING",
+          "UNAVAILABLE"
+        ]
+      },
+      "version": { "type": ["string", "null"] },
+      "waitingFor": {
+        "anyOf": [
+          { "type": "string", "enum": ["WINDOW", "OPEN_TABLES", "RETRY_APPROVAL"] },
+          { "type": "null" }
+        ]
+      },
+      "error": { "type": ["string", "null"] },
+      "retryAt": {
+        "anyOf": [
+          {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+          },
+          { "type": "null" }
+        ]
+      },
+      "lastOutcome": {
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "version": { "type": "string" },
+              "previousVersion": { "type": ["string", "null"] },
+              "outcome": { "type": "string", "enum": ["INSTALLED", "ROLLED_BACK", "FAILED"] },
+              "at": {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+              },
+              "error": { "type": ["string", "null"] },
+              "backupFileName": { "type": ["string", "null"] }
+            },
+            "required": ["version", "previousVersion", "outcome", "at", "error", "backupFileName"],
+            "additionalProperties": false
+          },
+          { "type": "null" }
+        ]
+      }
+    },
+    "required": ["state", "version", "waitingFor", "error", "retryAt", "lastOutcome"],
+    "additionalProperties": false
+  }
+}

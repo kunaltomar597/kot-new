@@ -160,9 +160,20 @@ describe('[RPT-017] report exports', () => {
       { report: 'GST', from: '2026-09-30', to: '2026-09-01' },
       { report: 'GST', from: '2025-09-01', to: '2026-09-30' },
       { report: 'EVERYTHING', from: '2026-09-01', to: '2026-09-30' },
-      { report: 'GST', from: '2026-09-01', to: '2026-09-30', format: 'PDF' },
+      { report: 'GST', from: '2026-09-01', to: '2026-09-30', format: 'DOCX' },
       { report: 'GST', from: '2026-09-01', to: '2026-09-30', extra: 1 },
     ];
     for (const body of bad) expect(ReportExportRequest.safeParse(body).success).toBe(false);
+    // P4-06: Excel and PDF too, for every report.
+    for (const format of ['CSV', 'XLSX', 'PDF']) {
+      expect(
+        ReportExportRequest.safeParse({
+          report: 'KITCHEN',
+          from: '2026-09-01',
+          to: '2026-09-30',
+          format,
+        }).success,
+      ).toBe(true);
+    }
   });
 });

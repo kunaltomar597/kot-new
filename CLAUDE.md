@@ -7,6 +7,9 @@ control plane. It is being built by Claude, one work package at a time.
 
 Read this file fully at the start of every session. It tells you where everything is and how to work.
 
+Read AGENTS.md before any task. It adds the agent workflow and points to docs/PRD.md,
+docs/DESIGN_SYSTEM.md and docs/ARCHITECTURE.md. Where they differ, this file wins.
+
 ## Standing instruction from the owner (applies to every session)
 
 The Business Owner has said, repeatedly and explicitly: build everything, make every decision
@@ -22,6 +25,20 @@ yourself, and never stop to ask. So:
   once.
 - Pause only for what physically needs a person (hardware, a Windows PC, signing keys). For those
   WPs, prepare everything Claude can do, then move on to the next buildable WP.
+
+On 2026-10-01 the Business Owner repeated this for the local build on their Mac and widened it:
+Claude has full authority over the repository (code, docs, rules, branches, merges) and takes every
+decision itself without stopping. In practice:
+
+- Never stop to ask for confirmation, between WPs or inside one. Keep building until every
+  buildable WP is done.
+- Everything that needs a person goes into `MANUAL_TASKS.md` (index, repository root) with its
+  procedure in `manual-tasks/`; then carry on with the next WP.
+- If GitHub is not reachable (no credentials on the machine), build each WP on its own
+  `wp/<id>-<slug>` branch, verify it locally, merge it into local `main` with a merge commit, and
+  push everything once credentials exist.
+- If a tool call is refused by the permission system, do not look for a way around it: take
+  another legitimate route or note it in `MANUAL_TASKS.md`, and keep building.
 
 ## Sources of truth, in order
 
@@ -70,7 +87,8 @@ apps/
   waiter-app/      React Native (Expo) waiter app                                         [P2-01c, P2-02a, P2]
   table-tablet/    React Native (Expo) kiosk table tablet                                  [P2-01c, P3]
   qr-menu/         Next.js public QR menu                                                  [P5]
-  control-plane/   Vendor Control Plane (NestJS API + React web)                          [P0-17, P7]
+  control-plane/   Vendor Control Plane API (NestJS)                                      [P0-17, P7]
+  control-plane-web/ Vendor web app (React), served by the Control Plane                 [P7-02e+]
 packages/
   domain/          Framework-free business logic (money, tax, bill, dates, state machines) [done]
   contracts/       Zod schemas for APIs and domain events                                  [done, grows]
@@ -87,7 +105,7 @@ packages/
   config/          Shared tool presets                                                     [grows]
   test-postgres/   Throwaway PostgreSQL cluster for integration tests                      [done]
 firmware/pager/    ESP-IDF project for the ESP32-S3 wrist pager                            [P0-H1, P2-05]
-infra/             supabase/ (relay), installer/ (Windows), ci/ (pipelines, signing)
+infra/             supabase/ (relay), installer/ (Windows), ci/ (pipelines, signing), dast/ (ZAP scans)
 docs/              brd/, build/, adr/, runbooks/, api/, owner/
 scripts/           brd catalogue builder, traceability
 .claude/           session-start hook (installs deps), /next-step skill

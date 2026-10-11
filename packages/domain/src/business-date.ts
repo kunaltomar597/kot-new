@@ -103,6 +103,23 @@ export function formatIsoDate(year: number, month: number, day: number): IsoDate
   return `${String(year).padStart(4, '0')}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
 }
 
+/** A calendar date as people in India read it: DD-MM-YYYY (NFR-L03). */
+export function formatDisplayDate(date: IsoDate): string {
+  const { year, month, day } = parseIsoDate(date);
+  return `${String(day).padStart(2, '0')}-${String(month).padStart(2, '0')}-${String(year)}`;
+}
+
+/** An instant as the restaurant reads it: its local date (DD-MM-YYYY) and time (HH:MM). */
+export function displayDateTime(
+  instant: Date,
+  timeZone: string = DEFAULT_TIME_ZONE,
+): { readonly date: string; readonly time: string } {
+  return {
+    date: formatDisplayDate(calendarDateOf(instant, timeZone)),
+    time: timeOfDayOf(instant, timeZone),
+  };
+}
+
 /** Adds (or subtracts) whole days to a calendar date. */
 export function addDays(date: IsoDate, days: number): IsoDate {
   const { year, month, day } = parseIsoDate(date);

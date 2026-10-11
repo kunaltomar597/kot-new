@@ -11,6 +11,8 @@ export function isCustomerSource(source: OrderSource): boolean {
 
 export const ORDER_ITEM_STATES = [
   'PENDING_APPROVAL',
+  /** Ordered by staff but kept back from the kitchen until fired (ORD-016 hold and fire). */
+  'HELD',
   'SENT',
   'PREPARING',
   'READY',
@@ -25,6 +27,7 @@ export type OrderItemState = (typeof ORDER_ITEM_STATES)[number];
 export const ORDER_ITEM_EVENTS = [
   'APPROVE',
   'REJECT',
+  'FIRE',
   'START_PREPARING',
   'MARK_READY',
   'PICK_UP',
@@ -48,12 +51,14 @@ export const orderItemMachine = defineStateMachine<OrderItemState, OrderItemEven
   transitions: [
     { event: 'APPROVE', from: ['PENDING_APPROVAL'], to: 'SENT' },
     { event: 'REJECT', from: ['PENDING_APPROVAL'], to: 'REJECTED', requiresReason: true },
+    // ORD-016: a held item goes to the kitchen when the waiter fires it.
+    { event: 'FIRE', from: ['HELD'], to: 'SENT' },
     { event: 'START_PREPARING', from: ['SENT'], to: 'PREPARING' },
     { event: 'MARK_READY', from: ['SENT', 'PREPARING'], to: 'READY' },
     { event: 'PICK_UP', from: ['READY'], to: 'PICKED_UP' },
     { event: 'SERVE', from: ['READY', 'PICKED_UP'], to: 'SERVED' },
     // ORD-011: after Sent but before Preparing a waiter can cancel with a reason.
-    { event: 'CANCEL', from: ['SENT'], to: 'CANCELLED', requiresReason: true },
+    { event: 'CANCEL', from: ['HELD', 'SENT'], to: 'CANCELLED', requiresReason: true },
     // ORD-011: after Preparing only a void is possible, with a manager PIN and a reason.
     {
       event: 'VOID',

@@ -4,14 +4,20 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { FakeServer } from './fake-server.js';
 import { RESTAURANT_ID } from './fakes.js';
 import { expectNoAxeViolations, renderConsole, server, t } from './harness.js';
-import { board, line, minutesAgo, NOW, ticket } from './kds-fixture.js';
+import { board, KDS_IDS, line, minutesAgo, NOW, ticket } from './kds-fixture.js';
 
 /** Records the notes the kitchen sounds play (Web Audio is not in jsdom). */
 class FakeAudioContext {
   static played: { frequency: number; type: string }[] = [];
+  static made = 0;
+  static resumed = 0;
   currentTime = 0;
   destination = {};
+  constructor() {
+    FakeAudioContext.made += 1;
+  }
   resume() {
+    FakeAudioContext.resumed += 1;
     return Promise.resolve();
   }
   createOscillator() {
@@ -79,6 +85,8 @@ beforeEach(() => {
   vi.stubGlobal('isSecureContext', true);
   vi.stubGlobal('AudioContext', FakeAudioContext);
   FakeAudioContext.played = [];
+  FakeAudioContext.made = 0;
+  FakeAudioContext.resumed = 0;
 });
 
 afterEach(() => {
@@ -100,6 +108,8 @@ describe('[KDS-001] [KDS-002] [KDS-003] [KDS-004] the station board', () => {
           }),
           line(12, { name: 'Dal Makhani', comboName: 'Veg Thali' }),
           line(13, { name: 'Rasmalai', comboName: 'Veg Thali', state: 'PREPARING' }),
+          // [TBL-006] moved to another table's bill after the ticket.
+          line(14, { name: 'Lassi', movedTo: 'T6' }),
         ],
       }),
       ticket(2, {
@@ -121,6 +131,7 @@ describe('[KDS-001] [KDS-002] [KDS-003] [KDS-004] the station board', () => {
     expect(within(first).getByText('Veg Thali')).toBeInTheDocument();
     expect(within(first).getByText('Extra butter')).toBeInTheDocument();
     expect(within(first).getByText('less oil')).toBeInTheDocument();
+    expect(within(first).getByText(t('kds.movedTo', { table: 'T6' }))).toBeInTheDocument();
     expect(
       within(first).getByRole('button', { name: t('kds.bumpFor', { number: 1 }) }),
     ).toBeDisabled();
@@ -256,9 +267,15 @@ describe('[KDS-009] [KDS-012] sounds and reconnecting', () => {
     );
     const { user, sockets } = await renderKds(fake);
     await card(/^KOT 1/);
+    // [NFR-P07] Made before the first touch, which then only switches it on.
+    await waitFor(() => {
+      expect(FakeAudioContext.made).toBe(1);
+    });
+    expect(FakeAudioContext.resumed).toBe(0);
     await user.click(screen.getByRole('button', { name: t('kds.enableSound') }));
     expect(screen.queryByRole('button', { name: t('kds.enableSound') })).toBeNull();
     expect(FakeAudioContext.played).toEqual([]);
+    expect([FakeAudioContext.made, FakeAudioContext.resumed]).toEqual([1, 1]);
 
     act(() => {
       sockets.sync(0);
@@ -300,5 +317,43 @@ describe('[KDS-009] [KDS-012] sounds and reconnecting', () => {
     expect(await card(/^KOT 2/)).toBeInTheDocument();
     expect(screen.queryByText(t('kds.disconnectedTitle'))).toBeNull();
     expect(screen.getAllByRole('article')).toHaveLength(2);
+  });
+});
+
+describe('[KDS-002] a screen of several stations', () => {
+  it('names its stations, marks each ticket’s, and shows whole orders for the pass', async () => {
+    const kitchen = ticket(1, { lines: [line(11, { state: 'READY' })] });
+    const bar = ticket(2, { stationName: 'Bar', lines: [line(21, { state: 'READY' })] });
+    const view = board([kitchen, bar], {
+      station: null,
+      stations: [
+        { id: KDS_IDS.station, name: 'Kitchen' },
+        { id: '0199a0e0-0000-7000-8000-000000000902', name: 'Bar' },
+      ],
+    });
+    const fake = kdsServer(view, view, view)
+      .on('POST', `/api/v1/order-items/${line(11).orderItemId}/status`, () => ({
+        status: 200,
+        body: {},
+      }))
+      .on('POST', `/api/v1/order-items/${line(21).orderItemId}/status`, () => ({
+        status: 200,
+        body: {},
+      }));
+    const { user } = await renderConsole({ fake, path: '/kds' });
+    expect(await screen.findByRole('heading', { level: 2, name: 'Kitchen + Bar' })).toBeVisible();
+    const barTicket = screen.getByRole('article', { name: /^KOT 2/ });
+    expect(within(barTicket).getByText(/^Bar · /)).toBeVisible();
+
+    await user.click(screen.getByRole('button', { name: t('kds.viewOrders') }));
+    const order = screen.getByRole('article', { name: /^Order 3/ });
+    expect(within(order).getByText(t('kds.orderReady'))).toBeVisible();
+    await user.click(within(order).getByRole('button', { name: /^Picked up: / }));
+    await waitFor(() => {
+      expect(postsTo(fake, `/api/v1/order-items/${line(21).orderItemId}/status`)).toHaveLength(1);
+    });
+    expect(postsTo(fake, `/api/v1/order-items/${line(11).orderItemId}/status`)[0]?.body).toEqual({
+      event: 'PICK_UP',
+    });
   });
 });

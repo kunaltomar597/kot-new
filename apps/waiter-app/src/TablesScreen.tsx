@@ -16,7 +16,9 @@ import { useCallback, useMemo, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { NotificationsOff } from './notifications';
 import { OpenTableSheet } from './OpenTableSheet';
+import { BreakCard } from './BreakCard';
 import { PagerCard } from './PagerCard';
+import { Approvals } from './Approvals';
 import { ServiceRequests } from './ServiceRequests';
 import { UnsentHome } from './UnsentOrders';
 
@@ -33,7 +35,14 @@ const CLOCK_MS = 30_000;
  * tap opens an open table, or opens a free one with its guests first. Read again after table,
  * order, bill and service-request events.
  */
-export function TablesScreen({ onOpenTable }: { onOpenTable: (sessionId: string) => void }) {
+export function TablesScreen({
+  onOpenTable,
+  onTakeaway,
+}: {
+  onOpenTable: (sessionId: string) => void;
+  /** WTR-013: a takeaway order from the phone. */
+  onTakeaway?: () => void;
+}) {
   const session = useDeviceSession();
   const { person } = useSessionState();
   const t = useT();
@@ -97,6 +106,12 @@ export function TablesScreen({ onOpenTable }: { onOpenTable: (sessionId: string)
       <NotificationsOff />
       <UnsentHome onOpen={onOpenTable} />
       <PagerCard />
+      <BreakCard />
+      {onTakeaway === undefined ? null : (
+        <Button variant="secondary" testID="new-takeaway" onPress={onTakeaway}>
+          {t('mobile.takeaway.new')}
+        </Button>
+      )}
       <SegmentedControl
         label={t('mobile.tables.view')}
         options={[
@@ -108,6 +123,7 @@ export function TablesScreen({ onOpenTable }: { onOpenTable: (sessionId: string)
           setView(next === 'all' ? 'all' : 'mine');
         }}
       />
+      <Approvals />
       <ServiceRequests show={showRequest} />
       {data.status === 'loading' && <Note>{t('states.loading')}</Note>}
       {data.status === 'error' && (

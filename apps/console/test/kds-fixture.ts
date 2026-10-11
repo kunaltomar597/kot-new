@@ -17,6 +17,7 @@ export function line(n: number, overrides: Partial<KdsTicketLine> = {}): KdsTick
     comboName: null,
     state: 'SENT',
     readyAt: null,
+    movedTo: null,
     ...overrides,
   };
 }
@@ -49,6 +50,7 @@ export function board(
 ): KdsTicketsResponse {
   return {
     station: { id: KDS_IDS.station, name: 'Kitchen' },
+    stations: [{ id: KDS_IDS.station, name: 'Kitchen' }],
     tickets,
     recentlyBumped: [],
     settings: {

@@ -6,16 +6,8 @@ role-based modes:
 - POS (`/pos`): tables, order entry, billing, shifts, day-end (Phase 1);
 - KDS (`/kds`): kitchen station screens, device-authenticated (Phase 1);
 - Manager dashboard (`/manage`): overview, live order feed and alert centre (P4-01, P2-06c),
-  staff and the Owner's sign-in security (P4-02a), today's sections and pagers (P4-02b), devices
-  (P4-02c), the menu editor (P4-02d), custom roles (P4-02e) and settings (P4-03a to P4-03e);
-  more configuration and reports (Phase 4).
-
-Which modes and dashboard pages a person gets comes from the permission matrix with their custom
-role applied (`src/app/modes.ts`, `grantOf` in `@rp/domain`, AUTH-012): the POS for those who
-take orders, the KDS for those who cook, and the dashboard for anyone who may use one of its
-pages. The overview and the order feed need `OPERATIONS_CONFIGURE`; the setup pages need their own
-permission; Security is the Owner's. A cashier whose custom role manages staff starts at the POS
-and opens Manage on Staff. The server checks every call anyway.
+  staff and the Owner's sign-in security (P4-02a), today's sections and pagers (P4-02b); more
+  management, configuration and reports (Phase 4).
 
 Opened in Electron on the restaurant PC (P0-16) and in browsers on paired devices. Uses
 `@rp/ui-web`, `@rp/api-client`, `@rp/i18n` and `@rp/domain`. Built by P0-14b (shell); the mode
@@ -85,22 +77,8 @@ screens come with P1-08, P1-09, P1-12 and P4-01 to P4-07.
   again): add, edit, set or change the PIN (typed twice), unlock, deactivate with a reason, and
   reactivate. The add and edit form is checked with the contract schemas before it is sent and
   sends only what changed. The list follows `RestaurantChanged` from any screen. `StaffArea.tsx`
-  puts People, Today's sections, Pagers (for those who may pair devices) and Roles under one row
-  of links. Custom roles show as "Captain (Waiter)" on rows and the tiles show their name; the
-  dialog offers the custom roles the signed-in person may give (`roleOptions`: one that makes
-  someone a manager is the Owner's to give) and sends `customRoleId` with the role it is built on.
-- Roles (`/manage/staff/roles`, P4-02e, AUTH-012): `RolesScreen.tsx` lists the custom roles,
-  active first, with what each is built on, adds and takes away (permissions in words from
-  `capabilities.*`), how many active people have it, and "Counts as a manager" when it does.
-  Everyone who manages staff sees them; only the Owner gets New role, Edit, Archive (with a
-  reason, only for a role nobody active has) and Restore, each behind the second factor when it
-  is not fresh. `RoleEditor.tsx` (`/manage/staff/roles/new` and `/:roleId`, the Owner only) has
-  the name, the role it is built on and one choice per permission in four groups, each offering
-  only what changes something (`roles-view.ts`: what the base role allows can be taken away, what
-  it never allows added, own-tables and manager's-PIN grants given outright or taken away; what
-  only the Owner may do is not offered). Changing the base role keeps the changes that still mean
-  something. It says when the role makes people managers and how many people a change signs out
-  of their screens.
+  puts People, Today's sections and Pagers (for those who may pair devices) under one row of
+  links.
 - Today's sections (`/manage/staff/sections`, P4-02b, TBL-002): `SectionsScreen.tsx` lists the
   people who take orders, waiters first, with their sections, their own tables and how many
   tables that makes, and names the tables nobody looks after yet. A dialog per person ticks whole
@@ -115,122 +93,6 @@ screens come with P1-08, P1-09, P1-12 and P4-01 to P4-07.
   issue a new credential after a warning. The credential shows once, in a dialog only "I have
   entered it" closes. The list follows `RestaurantChanged` and `DeviceStatusChanged`, and reads
   batteries again every minute.
-- Devices (`/manage/devices`, P4-02c, MGR-006, for those who may pair devices):
-  `src/manage/devices/`. `DevicesScreen.tsx` groups paired devices by type (POS, manager
-  browsers, kitchen screens, waiter phones, table tablets, pagers) and shows for each what it is
-  bound to (table, station, the person a phone alerts or who wears a pager), Connected or Not
-  connected, its battery (low by the level of its type), app or firmware version, serial and when
-  it was last seen (IST, "today" or the date). This console is marked and cannot be located or
-  unpaired from itself. `DeviceDialogs.tsx`: pair a device (type, name suggested as "Kitchen
-  screen N" or "Table T7 tablet", a tablet's table, a screen's station, a phone's holder), then the
-  one-time code with the server addresses, the CA fingerprint and, for the phone and tablet apps, a
-  QR code, until the device pairs (it appears in the list) or the code expires ("Get a new
-  code"); rename; move a tablet to another table. Unpairing asks for a reason. The list follows
-  `RestaurantChanged`, `DeviceStatusChanged` and `DeviceRevoked`, and reads connection and battery
-  states again every minute.
-- Menu (`/manage/menu`, P4-02d, MGR-005, for the Owner and managers, `MENU_MANAGE`):
-  `src/manage/menu/`, with the form logic in `menu-view.ts` (tested on its own). `MenuArea.tsx`
-  reads the draft, tax groups and stations once for its three pages (Items, Categories, Modifier
-  groups) and again on `MenuDraftChanged`, `MenuPublished`, `ItemAvailabilityChanged` and
-  `RestaurantChanged`, so two managers editing at once see each other's changes. Its publishing
-  bar names the version every screen shows and says "Changes not published" until Publish menu
-  (after a confirmation). `ItemsScreen.tsx` groups items by category and sub-category with a
-  search over names, short codes, tags and search words, and shows price or price range, sizes,
-  food type, combo, out of stock, what is left of a counted item and the channels it is missing,
-  in words. Availability (`AvailabilityDialog.tsx`) applies at once without publishing; archive
-  asks for a reason, restore does not. The item page (`/manage/menu/items/new` and `/:itemId`,
-  `ItemEditor.tsx`) covers every MENU-002 field: photo (uploaded when chosen, shown from the
-  server's 480 px rendition), sizes, modifier groups, kitchen station, channels, tags and search
-  words, and a reason when a price changes. Food type is never preselected. `ComboSection.tsx`
-  makes the item a combo of fixed parts and choices with optional dates and hours; an item that is
-  part of a combo cannot be one, and a combo is stopped by archiving it. When the item saves but
-  its combo does not, the page stays on the saved item and says so. `CategoriesScreen.tsx` and
-  `ModifierGroupsScreen.tsx` add, edit, archive with a reason and restore categories (one level of
-  sub-categories) and modifier groups (fewest and most to choose, options with price changes and
-  availability). An empty place puts a new entry last.
-- Settings (`/manage/settings`, P4-03a, MGR-007, for people who configure operations,
-  `OPERATIONS_CONFIGURE`): `src/manage/settings/`, with the logic in `settings-view.ts` (tested on
-  its own). `SettingsScreen.tsx` lists every setting of the catalogue (`SETTINGS` in
-  `@rp/contracts`) in its group, with its name and what it does (`settingItems.*` in `@rp/i18n`),
-  its value in its unit (basis points as a percent, paise as rupees), its default when changed
-  and who changes it: "Set by your provider" for vendor settings (UPD-010), "Only the Owner
-  changes this" for the Owner's tax, invoice and data settings, "You cannot change this" for a
-  custom role without the permission. A search over names and descriptions and "Only settings
-  changed from their default" narrow the list. `SettingDialog.tsx` edits one setting with the
-  editor its schema calls for (`fieldOf`: a number with its range, a switch, a choice, lines,
-  text, the bill printer, a daily window, the daypart windows), checks the draft with the
-  catalogue's schema before sending it, offers "Use the default" and an optional reason for the
-  audit log, and asks the Owner for the second factor when the server wants it. The server's
-  checks across settings come back as the dialog's message. The page follows `SettingsChanged`
-  and `RestaurantChanged`. The notification rules have their own page, so they are not listed
-  here; `SettingsArea.tsx` links the pages (General, Notifications, Suggestions, Floor for people
-  who manage staff and sections, Stations and printers). A row is `SettingRow.tsx`, shared with
-  the Notifications page.
-- Notifications (`/manage/settings/notifications`, P4-03b, NTF-002, NTF-003, PGR-006):
-  `NotificationsScreen.tsx`, with the logic in `notification-rules-view.ts` (tested on its own)
-  over `@rp/domain`'s rule helpers. N, R and the nudge messages come first (the General page's
-  rows and editor), then a rule per alert of Appendix C in four groups: whom it alerts, where it
-  shows (badges), what the pager shows for table 7 and how it buzzes, how it repeats, whether it
-  goes on to the managers after N, and "Changed". The kitchen's order changes and the unreachable
-  waiter always happen and have no Change button. `RuleDialog.tsx` edits one rule: who gets it
-  (the event's choices), where it shows (pager and waiter app; POS and dashboard; the event's own
-  extras kept), the pager text with a live preview, the vibration, "send it on to the managers
-  after N", the repeat, "Back to the factory rule" and an optional reason. The rule is checked
-  with `ruleProblems` before it is sent; saving reads `notifications.rules` again and changes only
-  this event's entry (`withRule`), keeping only what differs from the factory rule.
-- Suggestions (`/manage/settings/suggestions`, P4-03c, REC-002, REC-009, REC-006):
-  `SuggestionsScreen.tsx`, with the logic in `suggestions-view.ts` (tested on its own). Before the
-  first publish it says to publish the menu. Rules: "If the order has X, suggest Y" (a dish or
-  any dish of a category, by the published menu's names; one no longer on the published menu
-  says so), the words shown with it (the restaurant's own or what the tablets say without them),
-  priority, hours, dates and where it shows, with Change, Pause or Turn on, and Remove with a
-  reason. `SuggestionDialogs.tsx` holds the rule dialog (checked as the server checks it; saved
-  unchanged sends nothing) and the dish dialog: pin, boost, block or back as usual, the words
-  shown with a pinned or boosted dish and an optional reason for the audit log. The dishes list
-  shows pinned, then boosted, then blocked dishes by name. The preview asks the server what a
-  table tablet, the QR menu, the waiter app or the POS would suggest now, with nothing or a
-  chosen dish in the order, and shows each suggestion with the reason the tablets show and where
-  it comes from (pinned, your rule, often together, boosted, best seller). It reads again after
-  every change on the page, a published menu and a dish's availability.
-- Floor (`/manage/settings/floor`, P4-03d, TBL-001, ONB-004 step 5; only for `STAFF_MANAGE`, as
-  the server's floor routes): `FloorScreen.tsx` and `FloorDialogs.tsx`, with the logic in
-  `floor-view.ts` (tested on its own). The sections in order with their tables in use, seats and
-  place, then each table's seats, place, state and paired tablet; archived ones on request, with
-  Restore. The section and table dialogs check names, labels (archived tables' included), seats,
-  section and place as the server does; a new table goes after its section's tables. Archive asks
-  why and keeps the server's refusal in the dialog. Reads again on `RestaurantChanged` and the
-  table events.
-- Stations and printers (`/manage/settings/printing`, P4-03d, KDS-008, ONB-004 step 6):
-  `PrintingScreen.tsx` and `PrintingDialogs.tsx`, with the logic in `printing-view.ts` (tested on
-  its own). Printers with their connection, paper, whether they print (in words), when they last
-  printed or since when they have not and why, where their tickets go while sent elsewhere and
-  the stations printing on them; Print a test page (the answer is a toast either way), Change,
-  Send tickets elsewhere or Print here again (with a reason), Archive. Stations with how they get
-  their tickets and their printer, flagged when it is not printing; Change, Archive. Reads again
-  on `RestaurantChanged` and `PrinterStatusChanged`.
-- Restaurant (`/manage/settings/restaurant`, P4-03e, ONB-004 steps 1 and 4, BRD §9.4):
-  `RestaurantScreen.tsx` and `RestaurantDialogs.tsx`, with the logic in `restaurant-view.ts`
-  (tested on its own). The name, phone, email and logo (choosing a logo uploads a menu photo, so
-  it needs `MENU_MANAGE`), the opening hours day by day (up to 4 windows a day, past midnight
-  allowed, Monday's hours copied to the week on request) and when the business day ends (before
-  12:00; the server's refusal while it would move today's business date stays in the dialog).
-  Every save sends the whole profile with an optional reason. Reads again on `RestaurantChanged`.
-- Tax and invoice (`/manage/settings/tax`, P4-03e, MGR-007, AUTH-006, BILL-002 to BILL-004):
-  `TaxScreen.tsx` and `TaxDialogs.tsx`, with the logic in `tax-view.ts` (tested on its own). The
-  invoice particulars (legal name, address, state, GSTIN checked for format, state and check
-  character, FSSAI number), the tax groups (total, taxes, SAC, items using them) and the invoice
-  series (first number this year, yearly or running, invoices issued, default). The Owner adds,
-  changes, archives and chooses the default behind the second factor (`useSecondFactor`);
-  managers see the page with a note and no buttons. Rates are typed as percentages and sent as
-  basis points; a series shows its first number as it is typed, and one with invoices keeps its
-  prefix and format. Reads again on `RestaurantChanged`, menu changes and `BillPrinted`.
-- `FormDialog.tsx`: the dialog frame (Cancel and Save, the server's refusal as an alert) and the
-  optional audit reason that the settings dialogs share.
-- Locate (`src/screens/LocateOverlay.tsx`, MGR-006): on every screen of a paired console, a
-  `DeviceLocateRequested` for this device shows "This is <name>" and chimes every 3 seconds (Web
-  Audio, unlocked by the first touch or key press) until OK or 15 seconds. A renamed console
-  shows its new name at once: the controller reads its own device again on `RestaurantChanged`
-  `DEVICES`.
 - The Owner's second factor (`src/owner/second-factor.tsx`, AUTH-006): `useSecondFactor` tries an
   action and, when the server answers SECOND_FACTOR_REQUIRED, asks for the Owner password and an
   authenticator code (or a recovery code, typed like a pairing code), confirms them with
@@ -267,20 +129,15 @@ the alert centre, a manager adding a waiter who signs in on a second tab and is 
 within 5 s of being deactivated, the Owner setting up password and authenticator (the test
 computes the authenticator's code from the key shown) and adding a manager with a recovery code,
 a manager giving waiters their sections and a pager at shift start (registered, its credential
-shown once, then handed to another waiter well within 30 s), a cashier refused the Staff,
-Devices and Settings pages, and the Owner creating a "Captain" role (a waiter who also takes payments) after confirming
-a recovery code, giving it to Ravi, and Ravi settling a table's bill by UPI, a manager
-changing the kitchen's amber age and the cashier's discount limit on the Settings page while the
-Owner turns on the service charge after a recovery code, and a manager sending water requests to
-the cashier too with a new pager text and three buzzes, setting N to 90 seconds and putting the
-factory rule back on the Notifications page, and a manager adding a suggestion rule (Paneer Tikka,
-then Sweet Lassi with "Cools the spice"), blocking Sweet Lassi and pinning Gulab Jamun with
-"Fresh today" while the preview follows each change, then putting it all back on the Suggestions
-page, and a manager adding table 11 on the Floor page, then a network printer on the Stations and
-printers page whose test page reaches a stand-in printer (a TCP server in the test, which checks
-the bytes it gets), a station printing on it, and sending the kitchen printer's tickets to it and
-back, before archiving the three. The tabs share one browser context, so
-they share the device key, as screens of one terminal would. axe runs through the browser's debugging protocol,
+shown once, then handed to another waiter well within 30 s), and a cashier refused the Staff
+page. The tabs share one browser context, so they share the
+device key, as screens of one terminal would. axe runs through the browser's debugging protocol,
 since the server's Content Security Policy refuses inline scripts, after entrance animations end
 (a dialog fading in would fail colour contrast). In cloud sessions they use the preinstalled Chromium
 (`/opt/pw-browsers`); CI installs Playwright's own.
+
+`e2e/speed.e2e.ts` measures NFR-P07 (P8-01b) on a restaurant of the design capacity's size (the
+seed grown to 1,000 dishes and 100 tables in global setup), with the browser's CPU slowed down 4
+times: each tap by the browser's Event Timing (input to the next painted frame), each screen
+change until a frame shows the new screen's heading. It prints the figures that
+`docs/build/performance.md` records.

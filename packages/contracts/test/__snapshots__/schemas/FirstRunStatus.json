@@ -1,0 +1,19 @@
+{
+  "input": {
+    "type": "object",
+    "properties": {
+      "needed": { "type": "boolean" },
+      "pinLength": { "type": "integer", "minimum": 4, "maximum": 8 }
+    },
+    "required": ["needed", "pinLength"]
+  },
+  "output": {
+    "type": "object",
+    "properties": {
+      "needed": { "type": "boolean" },
+      "pinLength": { "type": "integer", "minimum": 4, "maximum": 8 }
+    },
+    "required": ["needed", "pinLength"],
+    "additionalProperties": false
+  }
+}

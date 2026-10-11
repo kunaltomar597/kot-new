@@ -9,13 +9,16 @@ import {
   type DeviceTokenResponse,
   type DeviceView,
   deviceTokenMessage,
+  LOCATE_SECONDS,
+  type LocateDeviceResponse,
+  NetworkKind,
   type PairDeviceRequest,
   type PairedDevice,
   type PairingCodeResponse,
   type PairingQrPayload,
   pairingProofMessage,
 } from '@rp/contracts';
-import { businessDateOf, isLowBattery, lowBatteryLevelFor } from '@rp/domain';
+import { type ClientIdentity, businessDateOf, formatClientApiVersion } from '@rp/domain';
 import { AuditService } from '../audit/audit.service.js';
 import { AuthSettingsService } from '../auth/auth-settings.js';
 import {
@@ -27,23 +30,31 @@ import type { AuthenticatedDevice } from '../auth/device.js';
 import { DeviceTokenService } from '../auth/device-token.service.js';
 import type { Principal } from '../auth/principal.js';
 import { RateLimiter } from '../auth/rate-limiter.js';
+import { SignInLockouts } from '../auth/sign-in-lockouts.js';
 import { sha256Hex } from '../auth/tokens.js';
-import { currentBusinessDate } from '../common/business-dates.js';
 import { newId } from '../common/ids.js';
 import { ADVISORY_LOCKS } from '../database/advisory-locks.js';
 import { PrismaService, type TransactionClient } from '../database/prisma.service.js';
 import { AppError } from '../errors/app-error.js';
+import { LicenceAgentService } from '../licensing/licence-agent.service.js';
 import { appendEvent } from '../events/outbox.js';
-import { PagerBroker } from '../pagers/pager-broker.js';
+import { compatibilityOf } from '../http/client-version.js';
 import { RealtimeGateway } from '../realtime/realtime.gateway.js';
 import { announceSetupChange } from '../restaurant/setup-changes.js';
-import { SettingsService } from '../settings/settings.service.js';
 import { TlsService } from '../tls/tls.service.js';
 import type { Prisma } from '../generated/prisma/client.js';
 
 const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 
 const errors = {
+  /** LIC-001: the licence's device limit for this kind of device. */
+  deviceLimit: (type: string, limit: number) =>
+    new AppError(
+      409,
+      'DEVICE_LIMIT_REACHED',
+      `The licence allows ${String(limit)} paired ${type === 'KDS' ? 'kitchen screens' : type === 'PAGER' ? 'pagers' : type === 'WAITER_PHONE' ? 'waiter phones' : 'table tablets'}. Unpair one, or ask the vendor for more.`,
+      { type, limit },
+    ),
   codeInvalid: () =>
     new AppError(
       401,
@@ -81,12 +92,6 @@ const errors = {
     new AppError(409, 'NOT_A_TABLE_TABLET', 'Only table tablets are bound to a table.'),
   deviceRevoked: () =>
     new AppError(409, 'DEVICE_REVOKED', 'This device is unpaired. Pair it again first.'),
-  notConnected: (name: string) =>
-    new AppError(
-      409,
-      'DEVICE_NOT_CONNECTED',
-      `${name} is not connected, so it cannot show itself. Check that it is on and on the restaurant's Wi-Fi.`,
-    ),
   ownDevice: () =>
     new AppError(
       409,
@@ -116,6 +121,17 @@ function pairingCode(): string {
 type DeviceRow = Prisma.DeviceGetPayload<Record<string, never>>;
 type PairOutcome = { readonly error: AppError } | { readonly device: DeviceRow };
 
+/** Every station a kitchen screen shows, in order; empty for all of them (KDS-002). */
+function stationIdsOf(device: { stationId: string | null; extraStationIds: string[] }): string[] {
+  return device.stationId === null ? [] : [device.stationId, ...device.extraStationIds];
+}
+
+/** The stations a pairing asks for: one, several, or none (every station). */
+function requestedStations(request: CreatePairingCodeRequest): string[] {
+  if (request.stationIds !== undefined) return [...new Set(request.stationIds)];
+  return request.stationId === undefined ? [] : [request.stationId];
+}
+
 function summary(device: DeviceRow): DeviceSummary {
   return {
     id: device.id,
@@ -124,12 +140,46 @@ function summary(device: DeviceRow): DeviceSummary {
     status: device.status,
     tableId: device.tableId,
     stationId: device.stationId,
+    stationIds: stationIdsOf(device),
     staffId: device.staffId,
     pairedAt: device.pairedAt?.toISOString() ?? null,
     lastSeenAt: device.lastSeenAt?.toISOString() ?? null,
     appVersion: device.appVersion,
   };
 }
+
+/** The manager's view (MGR-006): a pager is connected by its heartbeats, an app by its socket. */
+function view(device: DeviceRow, connected: ReadonlySet<string>, now: Date): DeviceView {
+  return {
+    ...summary(device),
+    connected:
+      device.status === 'ACTIVE' &&
+      (device.type === 'PAGER' ? device.online : connected.has(device.id)),
+    batteryPercent: device.batteryPercent,
+    charging: device.charging,
+    network: NetworkKind.safeParse(device.network).data ?? null,
+    rssi: device.rssi,
+    firmwareVersion: device.firmwareVersion,
+    serial: device.serial,
+    revokedAt: device.revokedAt?.toISOString() ?? null,
+    clientApi: device.clientApi,
+    // Pagers speak MQTT, not the client API (their firmware is P2-04b).
+    compatibility: device.type === 'PAGER' ? 'UNKNOWN' : compatibilityOf(device.clientApi),
+    pinsLockedUntil:
+      device.pinsLockedUntil !== null && device.pinsLockedUntil > now
+        ? device.pinsLockedUntil.toISOString()
+        : null,
+  };
+}
+
+/** What an app says about itself (`x-rp-client`), as the device row keeps it (UPD-006). */
+function clientColumns(identity: ClientIdentity | undefined) {
+  return identity === undefined
+    ? {}
+    : { appVersion: identity.version, clientApi: formatClientApiVersion(identity.api) };
+}
+
+const deviceAggregate = (id: string) => ({ type: 'device', id });
 
 /**
  * Pairing and managing devices (AUTH-007 to AUTH-009). A manager creates a one-time code; the
@@ -144,16 +194,22 @@ export class DevicesService {
     private readonly audit: AuditService,
     private readonly limiter: RateLimiter,
     private readonly tls: TlsService,
-    private readonly gateway: RealtimeGateway,
-    private readonly pagers: PagerBroker,
-    private readonly restaurantSettings: SettingsService,
+    private readonly realtime: RealtimeGateway,
+    private readonly licence: LicenceAgentService,
+    private readonly lockouts: SignInLockouts,
   ) {}
 
   async createPairingCode(
     principal: Principal,
     request: CreatePairingCodeRequest,
   ): Promise<PairingCodeResponse> {
+    const limit = await this.licence.limitFor(request.type);
     return this.prisma.transaction(async (tx) => {
+      // Said at once, before anyone walks to the device; pairing checks again (LIC-001).
+      if (limit !== null) {
+        const paired = await tx.device.count({ where: { type: request.type, status: 'ACTIVE' } });
+        if (paired >= limit) throw errors.deviceLimit(request.type, limit);
+      }
       await this.checkBinding(tx, principal.restaurantId, request);
       return this.issueCode(
         tx,
@@ -182,7 +238,11 @@ export class DevicesService {
     });
   }
 
-  async pair(request: PairDeviceRequest, clientKey: string): Promise<PairedDevice> {
+  async pair(
+    request: PairDeviceRequest,
+    clientKey: string,
+    identity?: ClientIdentity,
+  ): Promise<PairedDevice> {
     this.throttle(`pair:${clientKey}`, 10);
     const now = new Date();
     const outcome = await this.prisma.transaction(async (tx): Promise<PairOutcome> => {
@@ -202,6 +262,13 @@ export class DevicesService {
           request.proof,
         );
       if (key === undefined || !proofOk) return { error: errors.proofInvalid() };
+      // LIC-001: never more paired devices of a kind than the licence allows.
+      const limit = await this.licence.limitFor(code.type);
+      if (limit !== null) {
+        await tx.$queryRaw`SELECT 1 AS locked FROM pg_advisory_xact_lock(hashtextextended(${`pair-limit:${code.type}`}, 0))`;
+        const paired = await tx.device.count({ where: { type: code.type, status: 'ACTIVE' } });
+        if (paired >= limit) return { error: errors.deviceLimit(code.type, limit) };
+      }
 
       const device = await tx.device.create({
         data: {
@@ -214,9 +281,11 @@ export class DevicesService {
           keyAlgorithm: request.algorithm,
           pairedAt: now,
           pairedById: code.createdById,
-          appVersion: request.appVersion ?? null,
+          appVersion: request.appVersion ?? identity?.version ?? null,
+          clientApi: identity === undefined ? null : formatClientApiVersion(identity.api),
           tableId: code.tableId,
           stationId: code.stationId,
+          extraStationIds: code.extraStationIds,
           staffId: code.staffId,
         },
       });
@@ -235,12 +304,12 @@ export class DevicesService {
           type: device.type,
           name: device.name,
           tableId: device.tableId,
-          stationId: device.stationId,
+          stationIds: stationIdsOf(device),
           staffId: device.staffId,
           keyAlgorithm: request.algorithm,
         },
       });
-      await this.announce(tx, code.restaurantId, device.id);
+      await announceSetupChange(tx, code.restaurantId, 'DEVICES', deviceAggregate(device.id));
       return { device };
     });
     if ('error' in outcome) throw outcome.error;
@@ -252,6 +321,7 @@ export class DevicesService {
       name: device.name,
       tableId: device.tableId,
       stationId: device.stationId,
+      stationIds: stationIdsOf(device),
       staffId: device.staffId,
     };
   }
@@ -264,7 +334,15 @@ export class DevicesService {
     return { challenge, expiresAt: expiresAt.toISOString() };
   }
 
-  async issueToken(request: DeviceTokenRequest, clientKey: string): Promise<DeviceTokenResponse> {
+  /**
+   * A new device token, about hourly. The app's version and client API are kept from its
+   * `x-rp-client` (UPD-006), so the manager sees which devices need updating.
+   */
+  async issueToken(
+    request: DeviceTokenRequest,
+    clientKey: string,
+    identity?: ClientIdentity,
+  ): Promise<DeviceTokenResponse> {
     this.throttle(`device-auth:${clientKey}`, 60);
     this.throttle(`device-auth:${request.deviceId}`, 30);
     if (!this.tokens.consumeChallenge(request.challenge, request.deviceId)) {
@@ -288,7 +366,10 @@ export class DevicesService {
       settings.deviceTokenMinutes * 60,
       now,
     );
-    await this.prisma.device.update({ where: { id: device.id }, data: { lastSeenAt: now } });
+    await this.prisma.device.update({
+      where: { id: device.id },
+      data: { lastSeenAt: now, ...clientColumns(identity) },
+    });
     return { deviceToken: token, expiresAt: expiresAt.toISOString() };
   }
 
@@ -298,31 +379,58 @@ export class DevicesService {
     return summary(row);
   }
 
-  /**
-   * Every device with its state now (MGR-006): connected or not (a live connection for apps and
-   * screens, heartbeats for pagers), its battery against the low level of its type, and its
-   * versions.
-   */
   async list(principal: Principal): Promise<DeviceListResponse> {
-    const [devices, settings] = await Promise.all([
-      this.prisma.device.findMany({
-        where: { restaurantId: principal.restaurantId },
-        orderBy: { createdAt: 'asc' },
-      }),
-      this.restaurantSettings.snapshot(principal.restaurantId),
-    ]);
-    const levels = {
-      pager: settings.get('pager.lowBatteryPercent'),
-      other: settings.get('devices.lowBatteryAlertPercent'),
-    };
-    return { devices: devices.map((device) => this.view(device, levels)) };
+    const devices = await this.prisma.device.findMany({
+      where: { restaurantId: principal.restaurantId },
+      orderBy: { createdAt: 'asc' },
+    });
+    const connected = this.realtime.connectedDeviceIds(principal.restaurantId);
+    const now = new Date();
+    return { devices: devices.map((device) => view(device, connected, now)) };
   }
 
-  /** Renames a device (MGR-006); audited, and device lists and the device itself hear of it. */
+  /**
+   * Lets a device take PINs and passwords again before its lock ends (PC-S5, MOBILE-S3): its count
+   * starts again and the lockout alert clears. Audited; every screen hears of it.
+   */
+  async unlockPins(principal: Principal, deviceId: string): Promise<DeviceView> {
+    const unlocked = await this.prisma.transaction(async (tx) => {
+      const device = await tx.device.findFirst({
+        where: { id: deviceId, restaurantId: principal.restaurantId },
+      });
+      if (device === null) throw AppError.notFound('The device');
+      const updated = await tx.device.update({
+        where: { id: device.id },
+        data: { pinFailures: 0, pinFailureWindowStartedAt: null, pinsLockedUntil: null },
+      });
+      await this.lockouts.unlocked(tx, {
+        kind: 'DEVICE',
+        restaurantId: principal.restaurantId,
+        deviceId: device.id,
+      });
+      await this.audit.record(tx, {
+        action: 'DEVICE_PINS_UNLOCKED',
+        entityType: 'device',
+        entityId: device.id,
+        actorId: principal.staffId,
+        deviceId: principal.deviceId,
+        restaurantId: principal.restaurantId,
+        before: { pinFailures: device.pinFailures, pinsLockedUntil: device.pinsLockedUntil },
+      });
+      await announceSetupChange(tx, principal.restaurantId, 'DEVICES', deviceAggregate(device.id));
+      return updated;
+    });
+    return view(unlocked, this.realtime.connectedDeviceIds(principal.restaurantId), new Date());
+  }
+
+  /** Renames a device (MGR-006): audited, and every screen hears of it. */
   async rename(principal: Principal, deviceId: string, name: string): Promise<DeviceSummary> {
     return this.prisma.transaction(async (tx) => {
-      const device = await this.find(tx, principal.restaurantId, deviceId);
-      if (device.status !== 'ACTIVE') throw errors.deviceRevoked();
+      const device = await tx.device.findFirst({
+        where: { id: deviceId, restaurantId: principal.restaurantId },
+      });
+      if (device === null) throw errors.notFound();
+      if (device.status === 'REVOKED') throw errors.deviceRevoked();
       if (device.name === name) return summary(device);
       const renamed = await tx.device.update({ where: { id: device.id }, data: { name } });
       await this.audit.record(tx, {
@@ -335,47 +443,63 @@ export class DevicesService {
         before: { name: device.name },
         after: { name },
       });
-      await this.announce(tx, principal.restaurantId, device.id);
+      await announceSetupChange(tx, principal.restaurantId, 'DEVICES', deviceAggregate(device.id));
       return summary(renamed);
     });
   }
 
   /**
-   * "Locate" (MGR-006): asks a connected device to show itself. Apps and screens hear
-   * `DeviceLocateRequested` on their live connection (never replayed); pagers on their MQTT locate
-   * topic. A few a minute per device, so nobody can keep a tablet beeping at a table.
+   * The stations a kitchen screen shows (KDS-002): one or more, or none for every station (the
+   * Expo/Pass view). Audited; the screen reconnects at once to its new stations.
    */
-  async locate(principal: Principal, deviceId: string): Promise<void> {
-    const device = await this.find(this.prisma, principal.restaurantId, deviceId);
-    if (device.status !== 'ACTIVE') throw errors.deviceRevoked();
-    const connected =
-      device.type === 'PAGER'
-        ? this.pagers.isDeviceConnected(device.id)
-        : this.gateway.isDeviceConnected(device.restaurantId, device.id);
-    if (!connected) throw errors.notConnected(device.name);
-    this.throttle(`locate:${device.id}`, 6);
-    const now = new Date();
-    await this.prisma.transaction(async (tx) => {
-      await appendEvent(
-        tx,
-        {
-          eventId: newId(),
-          type: 'DeviceLocateRequested',
-          version: 1,
-          occurredAt: now.toISOString(),
-          restaurantId: device.restaurantId,
-          businessDate: await currentBusinessDate(tx, device.restaurantId, now),
-          payload: { deviceId: device.id, deviceType: device.type, name: device.name },
-        },
-        { aggregate: { type: 'device', id: device.id } },
-      );
+  async setStations(
+    principal: Principal,
+    deviceId: string,
+    stationIds: readonly string[],
+  ): Promise<DeviceSummary> {
+    const wanted = [...new Set(stationIds)];
+    const changed = await this.prisma.transaction(async (tx) => {
+      const device = await tx.device.findFirst({
+        where: { id: deviceId, restaurantId: principal.restaurantId },
+      });
+      if (device === null) throw errors.notFound();
+      if (device.status === 'REVOKED') throw errors.deviceRevoked();
+      if (device.type !== 'KDS') {
+        throw new AppError(409, 'NOT_A_KITCHEN_SCREEN', 'Only a kitchen screen shows stations.');
+      }
+      if (wanted.length > 0) {
+        const found = await tx.station.count({
+          where: { id: { in: wanted }, restaurantId: principal.restaurantId, archivedAt: null },
+        });
+        if (found !== wanted.length) throw errors.bindingNotFound('station');
+      }
+      const before = stationIdsOf(device);
+      if (before.join() === wanted.join()) return { device, changed: false };
+      const updated = await tx.device.update({
+        where: { id: device.id },
+        data: { stationId: wanted[0] ?? null, extraStationIds: wanted.slice(1) },
+      });
+      await this.audit.record(tx, {
+        action: 'DEVICE_STATIONS_CHANGED',
+        entityType: 'device',
+        entityId: device.id,
+        actorId: principal.staffId,
+        deviceId: principal.deviceId,
+        restaurantId: principal.restaurantId,
+        before: { stationIds: before },
+        after: { stationIds: wanted },
+      });
+      await announceSetupChange(tx, principal.restaurantId, 'DEVICES', deviceAggregate(device.id));
+      return { device: updated, changed: true };
     });
+    if (changed.changed) this.realtime.reconnectDevice(principal.restaurantId, deviceId);
+    return summary(changed.device);
   }
 
   /**
    * Unpairs a device (AUTH-008): its device token and every staff session on it stop working at
    * the next request, and a `DeviceRevoked` event tells the real-time gateway (P0-12) to close
-   * its connections.
+   * its connections, and the pager broker a pager's.
    */
   async revoke(principal: Principal, deviceId: string, reason: string): Promise<DeviceSummary> {
     if (deviceId === principal.deviceId) throw errors.ownDevice();
@@ -386,9 +510,19 @@ export class DevicesService {
       if (device === null) throw errors.notFound();
       if (device.status === 'REVOKED') return summary(device);
       const now = new Date();
+      // An unpaired pager is nobody's any more, so its wearer's alerts escalate at once when they
+      // have no other way to hear them (NTF-007); the broker drops its connection on the event,
+      // so it is offline from now on, and the offline check never alerts about it.
+      const pager = device.type === 'PAGER';
+      const releasesWearer = pager && device.staffId !== null;
       const revoked = await tx.device.update({
         where: { id: device.id },
-        data: { status: 'REVOKED', revokedAt: now, online: false },
+        data: {
+          status: 'REVOKED',
+          revokedAt: now,
+          ...(pager && { online: false }),
+          ...(releasesWearer && { staffId: null }),
+        },
       });
       const sessions = await tx.session.updateMany({
         where: { deviceId: device.id, revokedAt: null },
@@ -420,29 +554,81 @@ export class DevicesService {
         actorId: principal.staffId,
         deviceId: principal.deviceId,
         restaurantId: principal.restaurantId,
-        before: { status: device.status },
-        after: { status: 'REVOKED', sessionsRevoked: sessions.count },
+        before: { status: device.status, ...(releasesWearer && { staffId: device.staffId }) },
+        after: {
+          status: 'REVOKED',
+          sessionsRevoked: sessions.count,
+          ...(releasesWearer && { staffId: null }),
+        },
         reason,
       });
-      await this.announce(tx, principal.restaurantId, device.id);
+      await announceSetupChange(tx, principal.restaurantId, 'DEVICES', deviceAggregate(device.id));
       return summary(revoked);
     });
   }
 
   /**
-   * Moves a table tablet to another table (AUTH-009); needs a manager. The gateway's sweep then
-   * restarts the tablet's live connection in the new table's rooms.
+   * "Locate" (MGR-006, P3-01c): a connected table tablet flashes and sounds for a few seconds, so
+   * a manager finds it among the tables. Nothing changes, so nothing is audited.
    */
+  async locate(principal: Principal, deviceId: string): Promise<LocateDeviceResponse> {
+    const device = await this.prisma.device.findFirst({
+      where: { id: deviceId, restaurantId: principal.restaurantId },
+      select: { id: true, type: true, status: true },
+    });
+    if (device === null) throw AppError.notFound('The device');
+    if (device.type !== 'TABLE_TABLET' || device.status !== 'ACTIVE') {
+      throw new AppError(
+        409,
+        'LOCATE_NOT_SUPPORTED',
+        'Only a paired table tablet can show itself (pagers follow with their firmware).',
+      );
+    }
+    if (!this.realtime.connectedDeviceIds(principal.restaurantId).has(device.id)) {
+      throw new AppError(
+        409,
+        'DEVICE_NOT_CONNECTED',
+        'This tablet is not connected. Check that it is switched on and on the Wi-Fi.',
+      );
+    }
+    const now = new Date();
+    await this.prisma.transaction(async (tx) => {
+      const restaurant = await tx.restaurant.findUniqueOrThrow({
+        where: { id: principal.restaurantId },
+      });
+      await appendEvent(
+        tx,
+        {
+          eventId: newId(),
+          type: 'DeviceLocateRequested',
+          version: 1,
+          occurredAt: now.toISOString(),
+          restaurantId: principal.restaurantId,
+          businessDate: businessDateOf(now, {
+            cutoff: restaurant.businessDayCutoff,
+            timeZone: restaurant.timeZone,
+          }),
+          payload: { deviceId: device.id, seconds: LOCATE_SECONDS },
+        },
+        { aggregate: { type: 'device', id: device.id } },
+      );
+    });
+    return { seconds: LOCATE_SECONDS };
+  }
+
+  /** Moves a table tablet to another table (AUTH-009); needs a manager. */
   async bindTable(principal: Principal, deviceId: string, tableId: string): Promise<DeviceSummary> {
     return this.prisma.transaction(async (tx) => {
-      const device = await this.find(tx, principal.restaurantId, deviceId);
+      const device = await tx.device.findFirst({
+        where: { id: deviceId, restaurantId: principal.restaurantId },
+      });
+      if (device === null) throw errors.notFound();
       if (device.type !== 'TABLE_TABLET') throw errors.notATablet();
       if (device.status !== 'ACTIVE') throw errors.deviceRevoked();
       const table = await tx.diningTable.findFirst({
         where: { id: tableId, restaurantId: principal.restaurantId, archivedAt: null },
       });
       if (table === null) throw errors.tableNotFound();
-      if (device.tableId === tableId) return summary(device);
       const updated = await tx.device.update({ where: { id: device.id }, data: { tableId } });
       await this.audit.record(tx, {
         action: 'DEVICE_TABLE_CHANGED',
@@ -454,7 +640,7 @@ export class DevicesService {
         before: { tableId: device.tableId },
         after: { tableId },
       });
-      await this.announce(tx, principal.restaurantId, device.id);
+      await announceSetupChange(tx, principal.restaurantId, 'DEVICES', deviceAggregate(device.id));
       return summary(updated);
     });
   }
@@ -470,11 +656,12 @@ export class DevicesService {
       });
       if (table === null) throw errors.tableNotFound();
     }
-    if (request.stationId !== undefined) {
-      const station = await tx.station.findFirst({
-        where: { id: request.stationId, restaurantId, archivedAt: null },
+    const stations = requestedStations(request);
+    if (stations.length > 0) {
+      const found = await tx.station.count({
+        where: { id: { in: stations }, restaurantId, archivedAt: null },
       });
-      if (station === null) throw errors.bindingNotFound('station');
+      if (found !== stations.length) throw errors.bindingNotFound('station');
     }
     if (request.staffId !== undefined) {
       const staff = await tx.staff.findFirst({
@@ -487,11 +674,15 @@ export class DevicesService {
   private async issueCode(
     tx: TransactionClient,
     restaurantId: string,
-    request: Pick<CreatePairingCodeRequest, 'type' | 'name' | 'tableId' | 'stationId' | 'staffId'>,
+    request: Pick<
+      CreatePairingCodeRequest,
+      'type' | 'name' | 'tableId' | 'stationId' | 'stationIds' | 'staffId'
+    >,
     createdById: string | null,
     actorDeviceId: string | null,
   ): Promise<PairingCodeResponse> {
     const settings = await this.settings.get(restaurantId);
+    const stations = requestedStations(request);
     const code = pairingCode();
     const expiresAt = new Date(Date.now() + settings.pairingCodeMinutes * 60_000);
     const created = await tx.pairingCode.create({
@@ -501,7 +692,8 @@ export class DevicesService {
         type: request.type,
         name: request.name,
         tableId: request.tableId ?? null,
-        stationId: request.stationId ?? null,
+        stationId: stations[0] ?? null,
+        extraStationIds: stations.slice(1),
         staffId: request.staffId ?? null,
         createdById,
         expiresAt,
@@ -539,37 +731,6 @@ export class DevicesService {
       serverUrls,
       qrPayload: JSON.stringify(qr),
     };
-  }
-
-  private async find(
-    client: Pick<TransactionClient, 'device'>,
-    restaurantId: string,
-    deviceId: string,
-  ): Promise<DeviceRow> {
-    const device = await client.device.findFirst({ where: { id: deviceId, restaurantId } });
-    if (device === null) throw errors.notFound();
-    return device;
-  }
-
-  /** MGR-006: the device and its state now; an unpaired device is never connected. */
-  private view(device: DeviceRow, levels: { pager: number; other: number }): DeviceView {
-    const connected =
-      device.type === 'PAGER'
-        ? device.online
-        : this.gateway.isDeviceConnected(device.restaurantId, device.id);
-    return {
-      ...summary(device),
-      online: device.status === 'ACTIVE' && connected,
-      batteryPercent: device.batteryPercent,
-      batteryLow: isLowBattery(device.batteryPercent, lowBatteryLevelFor(device.type, levels)),
-      firmwareVersion: device.firmwareVersion,
-      serial: device.serial,
-    };
-  }
-
-  /** Device lists, the pager's wearer and the device itself read the devices again (P4-02c). */
-  private announce(tx: TransactionClient, restaurantId: string, deviceId: string): Promise<void> {
-    return announceSetupChange(tx, restaurantId, 'DEVICES', { type: 'device', id: deviceId });
   }
 
   private throttle(key: string, limit: number): void {

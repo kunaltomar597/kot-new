@@ -1,10 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   OrderLineRequest,
-  RecommendationPreferenceRequest,
   RecommendationRuleRequest,
   RecommendationsQuery,
-  RecommendationsResponse,
   RecordRecommendationEventsRequest,
   TableRecommendationsQuery,
 } from '../src/index.js';
@@ -134,65 +132,5 @@ describe('[REC-002] recommendation rules', () => {
     ]) {
       expect(RecommendationRuleRequest.safeParse(wrong).success, JSON.stringify(wrong)).toBe(false);
     }
-  });
-});
-
-describe('[REC-009] pinned, boosted and blocked dishes', () => {
-  it('pins, boosts or blocks a dish, or puts it back, with words only for a pinned or boosted one', () => {
-    for (const request of [
-      { preference: 'PIN', label: 'Chef’s special' },
-      { preference: 'BOOST', label: null, reason: 'Too much stock' },
-      { preference: 'BLOCK', label: null },
-      { preference: 'NORMAL', label: null },
-    ]) {
-      expect(RecommendationPreferenceRequest.safeParse(request).success, request.preference).toBe(
-        true,
-      );
-    }
-    expect(
-      RecommendationPreferenceRequest.parse({ preference: 'PIN', label: '  Fresh  ' }),
-    ).toEqual({ preference: 'PIN', label: 'Fresh' });
-    for (const wrong of [
-      { preference: 'BLOCK', label: 'Never' },
-      { preference: 'NORMAL', label: 'Back' },
-      { preference: 'PIN', label: ' ' },
-      { preference: 'PIN', label: 'x'.repeat(61) },
-      { preference: 'FAVOURITE', label: null },
-      { preference: 'PIN' },
-      { preference: 'PIN', label: null, reason: '' },
-      { preference: 'PIN', label: null, itemId: A },
-    ]) {
-      expect(RecommendationPreferenceRequest.safeParse(wrong).success, JSON.stringify(wrong)).toBe(
-        false,
-      );
-    }
-  });
-
-  it('[REC-006] says a pinned or boosted dish is the restaurant’s pick, and counts it per layer', () => {
-    const response = {
-      recommendations: [
-        { itemId: A, layer: 'PINNED', reason: { kind: 'PINNED', label: 'Chef’s special' } },
-        { itemId: B, layer: 'BOOSTED', reason: { kind: 'BOOSTED', label: null } },
-      ],
-      daypart: 'LUNCH',
-      menuVersion: 3,
-    };
-    expect(RecommendationsResponse.safeParse(response).success).toBe(true);
-    expect(
-      RecordRecommendationEventsRequest.safeParse({
-        channel: 'TABLE_TABLET',
-        events: [
-          { kind: 'IMPRESSION', itemId: A, layer: 'PINNED', ruleId: null },
-          { kind: 'TAP', itemId: B, layer: 'BOOSTED', ruleId: null },
-        ],
-      }).success,
-    ).toBe(true);
-    // Only a rule suggestion names a rule.
-    expect(
-      RecordRecommendationEventsRequest.safeParse({
-        channel: 'TABLE_TABLET',
-        events: [{ kind: 'TAP', itemId: A, layer: 'PINNED', ruleId: RULE }],
-      }).success,
-    ).toBe(false);
   });
 });

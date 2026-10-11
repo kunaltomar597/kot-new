@@ -10,6 +10,7 @@ import { messageOf } from '../app/messages.js';
 import { useNow } from '../app/use-now.js';
 import { type FloorData, useFloor } from '../pos/use-floor.js';
 import { FILTER_PARAMS } from './order-feed-view.js';
+import { SetupBanner } from './setup/SetupScreen.js';
 import { type OrderFeedData, serverNow, useOrderFeed } from './use-order-feed.js';
 
 /** Move "25 min" and the late marks on this often between reads. */
@@ -27,6 +28,7 @@ export function Overview() {
   const now = useNow(CLOCK_MS);
   return (
     <>
+      <SetupBanner />
       <section className="dashboard-section" aria-labelledby="dashboard-glance">
         <h2 id="dashboard-glance" className="dashboard-section__heading">
           {t('dashboard.overview.glance')}

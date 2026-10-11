@@ -1,0 +1,20 @@
+{
+  "input": {
+    "type": "object",
+    "properties": {
+      "reason": { "type": "string", "minLength": 3, "maxLength": 500 },
+      "ownerVerification": { "type": "string", "minLength": 3, "maxLength": 500 }
+    },
+    "required": ["reason", "ownerVerification"],
+    "additionalProperties": false
+  },
+  "output": {
+    "type": "object",
+    "properties": {
+      "reason": { "type": "string", "minLength": 3, "maxLength": 500 },
+      "ownerVerification": { "type": "string", "minLength": 3, "maxLength": 500 }
+    },
+    "required": ["reason", "ownerVerification"],
+    "additionalProperties": false
+  }
+}

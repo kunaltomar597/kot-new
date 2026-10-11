@@ -1,12 +1,5 @@
-import { MenuSnapshot, RECOMMENDATION_PREFERENCES } from '@rp/contracts';
-import {
-  CAPABILITIES,
-  ORDER_ITEM_STATES,
-  ORDER_SOURCES,
-  RECOMMENDATION_LAYERS,
-  ROLES,
-  TABLE_STATES,
-} from '@rp/domain';
+import { MenuSnapshot } from '@rp/contracts';
+import { CAPABILITIES, ORDER_ITEM_STATES, ORDER_SOURCES, ROLES, TABLE_STATES } from '@rp/domain';
 import pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { AuditService } from '../../src/audit/audit.service.js';
@@ -17,8 +10,6 @@ import { PrismaService } from '../../src/database/prisma.service.js';
 import {
   OrderItemState,
   OrderSource,
-  RecommendationLayer,
-  RecommendationPreferenceKind,
   StaffRole,
   TableState,
 } from '../../src/generated/prisma/enums.js';
@@ -118,9 +109,11 @@ describe('[SEC-005] [INT-005] schema conventions', () => {
       SELECT table_name, array_agg(column_name::text) AS columns
       FROM information_schema.columns
       WHERE table_schema = 'public'
-        -- Installation-level: they exist before the restaurant is set up (event cursors, P0-12).
+        -- Installation-level: they exist before the restaurant is set up (event cursors, P0-12),
+        -- or cover the whole database (backups, P7-05a; archive-then-purge, P7-06b).
         AND table_name NOT IN (
-          '_prisma_migrations', 'system_meta', 'restaurants', 'event_consumer_cursors'
+          '_prisma_migrations', 'system_meta', 'restaurants', 'event_consumer_cursors',
+          'backup_runs', 'archive_runs'
         )
       GROUP BY table_name`);
     expect(rows.length).toBeGreaterThanOrEqual(50);
@@ -178,32 +171,36 @@ describe('[SEC-005] [INT-005] schema conventions', () => {
     expect(Object.values(OrderSource)).toEqual([...ORDER_SOURCES]);
     expect(Object.values(TableState)).toEqual([...TABLE_STATES]);
     expect(Object.values(StaffRole)).toEqual([...ROLES]);
-    expect(Object.values(RecommendationLayer)).toEqual([...RECOMMENDATION_LAYERS]);
-    expect(Object.values(RecommendationPreferenceKind)).toEqual([...RECOMMENDATION_PREFERENCES]);
     expect(CAPABILITIES.length).toBeGreaterThan(0);
-  });
-
-  it('[REC-009] keeps the suggestion layers in their order in the database too', async () => {
-    const labels = async (type: string) =>
-      (
-        await query<{ enumlabel: string }>(
-          `SELECT e.enumlabel FROM pg_enum e JOIN pg_type t ON t.oid = e.enumtypid
-           WHERE t.typname = $1 ORDER BY e.enumsortorder`,
-          [type],
-        )
-      ).map((row) => row.enumlabel);
-    expect(await labels('RecommendationLayer')).toEqual([...RECOMMENDATION_LAYERS]);
-    expect(await labels('RecommendationPreferenceKind')).toEqual([...RECOMMENDATION_PREFERENCES]);
   });
 });
 
 describe('[AUD-004] [SEC-007] least-privilege database roles', () => {
-  it('gives rp_app SELECT, INSERT and UPDATE on every table', async () => {
+  it('gives rp_app SELECT and INSERT on every table', async () => {
     const rows = await query<{ tablename: string; ok: boolean }>(`
       SELECT tablename,
         has_table_privilege('rp_app', format('%I.%I', schemaname, tablename), 'SELECT, INSERT') AS ok
       FROM pg_tables WHERE schemaname = 'public' AND tablename <> '_prisma_migrations'`);
     expect(rows.filter((row) => !row.ok)).toEqual([]);
+  });
+
+  it('never lets rp_app change a payment, a cash movement or a closed day', async () => {
+    const rows = await query<{ tablename: string }>(`
+      SELECT tablename FROM pg_tables
+      WHERE schemaname = 'public' AND tablename <> '_prisma_migrations'
+        AND NOT has_table_privilege('rp_app', format('%I.%I', schemaname, tablename), 'UPDATE')`);
+    expect(rows.map((row) => row.tablename).sort()).toEqual(
+      ['audit_log', 'cash_movements', 'day_ends', 'payments'].sort(),
+    );
+    await asRole('rp_app', async (client) => {
+      for (const statement of [
+        'UPDATE payments SET mode = mode',
+        'UPDATE cash_movements SET amount = amount',
+        'UPDATE day_ends SET restaurant_id = restaurant_id',
+      ]) {
+        await expect(client.query(statement)).rejects.toThrow(/permission denied/);
+      }
+    });
   });
 
   it('never lets rp_app DELETE financial or audit records', async () => {
@@ -214,7 +211,15 @@ describe('[AUD-004] [SEC-007] least-privilege database roles', () => {
     for (const table of PROTECTED) expect(deletable, table).not.toContain(table);
     // Operational tables stay deletable (e.g. expired sessions, published outbox rows).
     expect(deletable).toEqual(
-      expect.arrayContaining(['sessions', 'idempotency_records', 'outbox']),
+      expect.arrayContaining([
+        'sessions',
+        'idempotency_records',
+        'outbox',
+        // The automatic retention (DATA-007, P7-06a).
+        'alerts',
+        'service_requests',
+        'print_notices',
+      ]),
     );
   });
 

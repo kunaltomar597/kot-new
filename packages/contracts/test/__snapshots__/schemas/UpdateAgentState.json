@@ -1,0 +1,28 @@
+{
+  "input": {
+    "type": "string",
+    "enum": [
+      "IDLE",
+      "DOWNLOADING",
+      "DOWNLOAD_FAILED",
+      "WAITING",
+      "PREPARING",
+      "PREPARE_FAILED",
+      "INSTALLING",
+      "UNAVAILABLE"
+    ]
+  },
+  "output": {
+    "type": "string",
+    "enum": [
+      "IDLE",
+      "DOWNLOADING",
+      "DOWNLOAD_FAILED",
+      "WAITING",
+      "PREPARING",
+      "PREPARE_FAILED",
+      "INSTALLING",
+      "UNAVAILABLE"
+    ]
+  }
+}

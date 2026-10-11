@@ -62,6 +62,11 @@ export class NotificationsController {
 export class BreakController {
   constructor(private readonly notifications: NotificationsService) {}
 
+  @Get('break')
+  getBreak(@Req() request: AuthenticatedRequest): Promise<BreakView> {
+    return this.notifications.breakOf(principalOf(request));
+  }
+
   @Post('break')
   @HttpCode(200)
   setBreak(
@@ -77,7 +82,7 @@ export class BreakController {
  * the phone goes on alerting like a pager after an inactivity sign-out.
  */
 @Controller('devices/current/alerts')
-@RequireDevice()
+@RequireDevice(['WAITER_PHONE'])
 export class DeviceAlertsController {
   constructor(private readonly notifications: NotificationsService) {}
 

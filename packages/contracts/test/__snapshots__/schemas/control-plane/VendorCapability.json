@@ -1,0 +1,36 @@
+{
+  "input": {
+    "type": "string",
+    "enum": [
+      "FLEET_VIEW",
+      "TENANTS_MANAGE",
+      "LICENCE_REBIND",
+      "LICENCES_MANAGE",
+      "REACTIVATION_CODES",
+      "BILLING_MANAGE",
+      "SUPPORT_NOTES",
+      "RELEASES_MANAGE",
+      "USERS_MANAGE",
+      "AUDIT_VIEW",
+      "REMOTE_CONFIG",
+      "BACKUP_RESTORE"
+    ]
+  },
+  "output": {
+    "type": "string",
+    "enum": [
+      "FLEET_VIEW",
+      "TENANTS_MANAGE",
+      "LICENCE_REBIND",
+      "LICENCES_MANAGE",
+      "REACTIVATION_CODES",
+      "BILLING_MANAGE",
+      "SUPPORT_NOTES",
+      "RELEASES_MANAGE",
+      "USERS_MANAGE",
+      "AUDIT_VIEW",
+      "REMOTE_CONFIG",
+      "BACKUP_RESTORE"
+    ]
+  }
+}

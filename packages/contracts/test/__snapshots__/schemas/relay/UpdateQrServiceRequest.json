@@ -1,0 +1,26 @@
+{
+  "input": {
+    "type": "object",
+    "properties": {
+      "status": {
+        "type": "string",
+        "enum": ["RECEIVED", "ACKNOWLEDGED", "DONE", "REJECTED", "EXPIRED"]
+      },
+      "rejectionReason": { "type": "string", "minLength": 1, "maxLength": 200 }
+    },
+    "required": ["status"],
+    "additionalProperties": false
+  },
+  "output": {
+    "type": "object",
+    "properties": {
+      "status": {
+        "type": "string",
+        "enum": ["RECEIVED", "ACKNOWLEDGED", "DONE", "REJECTED", "EXPIRED"]
+      },
+      "rejectionReason": { "type": "string", "minLength": 1, "maxLength": 200 }
+    },
+    "required": ["status"],
+    "additionalProperties": false
+  }
+}

@@ -31,16 +31,234 @@ enum ReleaseChannel {
 /// @rp/contracts/control-plane RELEASE_COMPONENTS.
 enum ReleaseComponent {
   RESTAURANT_PC
+  PAGER_FIRMWARE
+}
+
+/// The licence states of LIC-005 (`@rp/domain` `licenseMachine`).
+enum LicenceState {
+  ACTIVE
+  PAYMENT_DUE
+  GRACE
+  RESTRICTED
+  TERMINATED
+}
+
+/// Vendor staff roles (VCP-001): `@rp/contracts/control-plane` VENDOR_ROLES.
+enum VendorRole {
+  SUPER_ADMIN
+  ONBOARDING
+  SUPPORT
+  FINANCE
+  READ_ONLY
+}
+
+/// A vendor staff account (VCP-001, SEC-018): password and authenticator, both mandatory.
+model VendorUser {
+  id               String     @id @db.Uuid
+  /// Lower case.
+  email            String     @unique
+  name             String
+  role             VendorRole
+  /// Argon2id, peppered with the Control Plane's secret key; null until set up.
+  passwordHash     String?    @map("password_hash")
+  /// The authenticator's secret, sealed with the Control Plane's secret key.
+  totpSecret       String?    @map("totp_secret")
+  /// The last authenticator step used: a code is never accepted twice.
+  totpLastStep     Int?       @map("totp_last_step")
+  /// Set when the authenticator was confirmed: only then can the account sign in.
+  activatedAt      DateTime?  @map("activated_at") @db.Timestamptz(3)
+  /// SHA-256 of the one-time setup token (a new account, or a reset).
+  setupTokenHash   String?    @unique @map("setup_token_hash")
+  setupExpiresAt   DateTime?  @map("setup_expires_at") @db.Timestamptz(3)
+  failedSignIns    Int        @default(0) @map("failed_sign_ins")
+  lockedUntil      DateTime?  @map("locked_until") @db.Timestamptz(3)
+  disabledAt       DateTime?  @map("disabled_at") @db.Timestamptz(3)
+  lastSignInAt     DateTime?  @map("last_sign_in_at") @db.Timestamptz(3)
+  /// The last quarterly access review that kept the account (SEC-018).
+  reviewedAt       DateTime?  @map("reviewed_at") @db.Timestamptz(3)
+  /// A Super Admin's reset asked for by another Super Admin, done only when a third approves.
+  resetRequestedBy String?    @map("reset_requested_by") @db.Uuid
+  resetRequestedAt DateTime?  @map("reset_requested_at") @db.Timestamptz(3)
+  createdAt        DateTime   @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt        DateTime   @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  sessions VendorSession[]
+
+  @@map("vendor_users")
+}
+
+/// A signed-in vendor staff member: the bearer token is kept only as its SHA-256.
+model VendorSession {
+  id         String    @id @db.Uuid
+  userId     String    @map("user_id") @db.Uuid
+  tokenHash  String    @unique @map("token_hash")
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  lastSeenAt DateTime  @map("last_seen_at") @db.Timestamptz(3)
+  expiresAt  DateTime  @map("expires_at") @db.Timestamptz(3)
+  endedAt    DateTime? @map("ended_at") @db.Timestamptz(3)
+  address    String?
+
+  user VendorUser @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@map("vendor_sessions")
+}
+
+enum BillingCycle {
+  MONTHLY
+  QUARTERLY
+  YEARLY
+}
+
+enum VendorInvoiceStatus {
+  ISSUED
+  PAID
+  VOID
+}
+
+enum PaymentMode {
+  UPI
+  BANK_TRANSFER
+  CHEQUE
+  CASH
+  CARD
+  OTHER
+}
+
+/// A plan in the catalogue (VCP-003): prices per billing cycle in paise, device limits, modules.
+model Plan {
+  id             String    @id @db.Uuid
+  code           String    @unique
+  name           String
+  monthlyPrice   Int?      @map("monthly_price")
+  quarterlyPrice Int?      @map("quarterly_price")
+  yearlyPrice    Int?      @map("yearly_price")
+  /// DeviceLimits.
+  deviceLimits   Json      @map("device_limits")
+  modules        String[]
+  archivedAt     DateTime? @map("archived_at") @db.Timestamptz(3)
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  subscriptions Subscription[]
+
+  @@map("plans")
+}
+
+/// A restaurant's plan and billing cycle (VCP-003); one at a time, changed in place.
+model Subscription {
+  tenantId      String       @id @map("tenant_id") @db.Uuid
+  planId        String       @map("plan_id") @db.Uuid
+  cycle         BillingCycle
+  /// Price per cycle in paise, as on the plan when chosen.
+  price         Int
+  startedOn     DateTime     @map("started_on") @db.Date
+  nextInvoiceOn DateTime     @map("next_invoice_on") @db.Date
+  cancelledAt   DateTime?    @map("cancelled_at") @db.Timestamptz(3)
+  createdAt     DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt     DateTime     @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+  plan   Plan   @relation(fields: [planId], references: [id])
+
+  @@map("subscriptions")
+}
+
+/// The vendor's invoice to a restaurant for a period (VCP-003); never deleted, voided with a reason.
+model VendorInvoice {
+  id          String              @id @db.Uuid
+  tenantId    String              @map("tenant_id") @db.Uuid
+  /// `SUB/2026-27/00001`.
+  number      String              @unique
+  periodStart DateTime            @map("period_start") @db.Date
+  periodEnd   DateTime            @map("period_end") @db.Date
+  amount      Int
+  dueOn       DateTime            @map("due_on") @db.Date
+  status      VendorInvoiceStatus @default(ISSUED)
+  issuedAt    DateTime            @default(now()) @map("issued_at") @db.Timestamptz(3)
+  paidAt      DateTime?           @map("paid_at") @db.Timestamptz(3)
+  voidedAt    DateTime?           @map("voided_at") @db.Timestamptz(3)
+  voidReason  String?             @map("void_reason")
+
+  tenant   Tenant          @relation(fields: [tenantId], references: [id])
+  payments VendorPayment[]
+
+  @@unique([tenantId, periodStart])
+  @@index([status, dueOn])
+  @@map("vendor_invoices")
+}
+
+/// A payment received for an invoice, recorded by hand (v1, VCP-003).
+model VendorPayment {
+  id         String      @id @db.Uuid
+  invoiceId  String      @map("invoice_id") @db.Uuid
+  amount     Int
+  mode       PaymentMode
+  reference  String?
+  receivedOn DateTime    @map("received_on") @db.Date
+  recordedBy String      @map("recorded_by")
+  createdAt  DateTime    @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  invoice VendorInvoice @relation(fields: [invoiceId], references: [id])
+
+  @@index([invoiceId])
+  @@map("vendor_payments")
+}
+
+/// A support note about a restaurant (VCP-007): append-only.
+model SupportNote {
+  id        String   @id @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  /// `vendor:<user id>` or `cli:<name>`.
+  author    String
+  body      String
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId, createdAt])
+  @@map("support_notes")
+}
+
+/// The restaurant in the QR relay (VCP-002): its credential, sealed, until its PC holds it.
+model RelayProvisioning {
+  tenantId           String    @id @map("tenant_id") @db.Uuid
+  /// The relay's id of the current credential (to revoke it on rotation).
+  credentialId       String    @map("credential_id") @db.Uuid
+  /// The credential sealed with the Control Plane's secret key, to deliver (and deliver again).
+  credentialSealed   String    @map("credential_sealed")
+  /// First 16 hex digits of its SHA-256: what the PC reports holding.
+  credentialDigest   String    @map("credential_digest")
+  provisionedAt      DateTime  @map("provisioned_at") @db.Timestamptz(3)
+  credentialIssuedAt DateTime  @map("credential_issued_at") @db.Timestamptz(3)
+  deliveredAt        DateTime? @map("delivered_at") @db.Timestamptz(3)
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@map("relay_provisioning")
 }
 
 /// A restaurant business, the vendor's customer (VCP-002 grows it in P7-02).
 model Tenant {
-  id        String   @id @db.Uuid
-  name      String
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+  id           String   @id @db.Uuid
+  name         String
+  legalName    String?  @map("legal_name")
+  /// Upper case (BILL-002).
+  gstin        String?
+  /// GST state code, two digits.
+  stateCode    String?  @map("state_code")
+  contactName  String?  @map("contact_name")
+  contactEmail String?  @map("contact_email")
+  contactPhone String?  @map("contact_phone")
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
 
-  installations Installation[]
+  installations   Installation[]
+  menuExtractions MenuExtraction[]
+  subscription    Subscription?
+  invoices        VendorInvoice[]
+  notes           SupportNote[]
+  relay           RelayProvisioning?
 
   @@map("tenants")
 }
@@ -62,15 +280,99 @@ model Installation {
   lastSeenAt             DateTime?          @map("last_seen_at") @db.Timestamptz(3)
   /// The latest heartbeat's payload, for fleet views (VCP-005, P7-03).
   lastHeartbeat          Json?              @map("last_heartbeat")
+  /// The digest of the vendor settings the PC reported holding (UPD-010, P7-08c).
+  settingsDigest         String?            @map("settings_digest")
+  /// Held at this version by the vendor (UPD-002, P7-04a); null follows the channel.
+  pinnedVersion          String?            @map("pinned_version")
   createdAt              DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt              DateTime           @updatedAt @map("updated_at") @db.Timestamptz(3)
 
-  tenant     Tenant         @relation(fields: [tenantId], references: [id])
-  heartbeats Heartbeat[]
-  nonces     RequestNonce[]
+  tenant              Tenant                    @relation(fields: [tenantId], references: [id])
+  heartbeats          Heartbeat[]
+  nonces              RequestNonce[]
+  menuExtractions     MenuExtraction[]
+  licence             InstallationLicence?
+  licenceFiles        LicenceFile[]
+  reactivationCodes   LicenceReactivationCode[]
+  auditChainHeads     AuditChainHead[]
+  fleetAlerts         FleetAlert[]
+  diagnostics         DiagnosticsBundle[]
+  diagnosticsRequests DiagnosticsRequest[]
+  cloudBackups        CloudBackup[]
+  backupKeyEscrows    BackupKeyEscrow[]
+  hotfixes            Release[]                 @relation("Hotfixes")
+  releaseInstalls     ReleaseInstall[]
+  digitalBills        DigitalBill[]
+  restoreCodes        RestoreCode[]
 
   @@index([tenantId])
   @@map("installations")
+}
+
+/// An installation's licence terms (LIC-001, VCP-003); every file issued from them is a LicenceFile.
+model InstallationLicence {
+  installationId      String       @id @map("installation_id") @db.Uuid
+  plan                String
+  /// LicenceModule codes.
+  modules             String[]
+  /// DeviceLimits: { TABLE_TABLET, PAGER, WAITER_PHONE, KDS }.
+  deviceLimits        Json         @map("device_limits")
+  validityDays        Int          @map("validity_days")
+  graceDays           Int          @map("grace_days")
+  state               LicenceState @default(ACTIVE)
+  graceStartedAt      DateTime?    @map("grace_started_at") @db.Timestamptz(3)
+  reason              String?
+  /// The PC fingerprint bound at the first licence (LIC-004): five SHA-256 hex strings or nulls.
+  fingerprint         Json?
+  boundAt             DateTime?    @map("bound_at") @db.Timestamptz(3)
+  /// Bumped on every change of terms, so the next heartbeat carries a new file at once.
+  revision            Int          @default(1)
+  /// The last offline reactivation code's counter (LIC-006).
+  reactivationCounter Int          @default(0) @map("reactivation_counter")
+  /// The current state was set by the billing run (P7-02c), so a payment lifts it.
+  setByBilling        Boolean      @default(false) @map("set_by_billing")
+  createdAt           DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt           DateTime     @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  installation Installation @relation(fields: [installationId], references: [id])
+
+  @@map("installation_licences")
+}
+
+/// Every licence file issued (LIC-001): the exact text signed, kept for support and audit.
+model LicenceFile {
+  id             String       @id @db.Uuid
+  installationId String       @map("installation_id") @db.Uuid
+  /// The terms' revision it was issued from.
+  revision       Int
+  state          LicenceState
+  issuedAt       DateTime     @map("issued_at") @db.Timestamptz(3)
+  validUntil     DateTime     @map("valid_until") @db.Timestamptz(3)
+  payload        String
+  signature      String
+  keyId          String       @map("key_id")
+
+  installation Installation @relation(fields: [installationId], references: [id])
+
+  @@index([installationId, issuedAt])
+  @@map("licence_files")
+}
+
+/// An offline reactivation code issued (LIC-006): its day and counter, never the code. A PC
+/// reports the code it took; one that matches none issued alerts (LIC-007, SEC-015).
+model LicenceReactivationCode {
+  installationId String    @map("installation_id") @db.Uuid
+  counter        Int
+  validUntil     DateTime  @map("valid_until") @db.Date
+  issuedAt       DateTime  @default(now()) @map("issued_at") @db.Timestamptz(3)
+  issuedBy       String    @map("issued_by")
+  /// When a PC first reported taking it.
+  usedAt         DateTime? @map("used_at") @db.Timestamptz(3)
+
+  installation Installation @relation(fields: [installationId], references: [id])
+
+  @@id([installationId, counter])
+  @@map("licence_reactivation_codes")
 }
 
 /// Every heartbeat an installation sent (VCP-005). Retention and fleet views come in P7-03.
@@ -104,19 +406,58 @@ model RequestNonce {
 
 /// A published build on a channel (UPD-002). Rollouts, pinning and halts come in P7-04.
 model Release {
-  id          String           @id @db.Uuid
-  component   ReleaseComponent
-  channel     ReleaseChannel
-  version     String
-  url         String
-  sha256      String
-  sizeBytes   BigInt           @map("size_bytes")
-  notes       String?
-  publishedAt DateTime         @default(now()) @map("published_at") @db.Timestamptz(3)
-  publishedBy String           @map("published_by")
+  id                   String           @id @db.Uuid
+  component            ReleaseComponent
+  channel              ReleaseChannel
+  version              String
+  url                  String
+  sha256               String
+  sizeBytes            BigInt           @map("size_bytes")
+  notes                String?
+  publishedAt          DateTime         @default(now()) @map("published_at") @db.Timestamptz(3)
+  publishedBy          String           @map("published_by")
+  /// UPD-004: may install while tables are open, with a manager's approval.
+  securityCritical     Boolean          @default(false) @map("security_critical")
+  /// UPD-003: the share of the channel's PCs offered it, ACTIVE, PAUSED or HALTED, and the PCs
+  /// offered it whatever their bucket.
+  rolloutPercent       Int              @default(100) @map("rollout_percent")
+  rolloutState         String           @default("ACTIVE") @map("rollout_state")
+  rolloutCohort        String[]         @default([]) @map("rollout_cohort") @db.Uuid
+  haltReason           String?          @map("halt_reason")
+  rolloutChangedAt     DateTime         @default(now()) @map("rollout_changed_at") @db.Timestamptz(3)
+  /// A hotfix for one PC (UPD-002).
+  targetInstallationId String?          @map("target_installation_id") @db.Uuid
+  /// The component version matrix published with it (UPD-006, P7-04d); null when none was given.
+  matrix               Json?
+
+  targetInstallation Installation?    @relation("Hotfixes", fields: [targetInstallationId], references: [id], onDelete: Restrict)
+  installs           ReleaseInstall[]
 
   @@unique([component, channel, version])
   @@map("releases")
+}
+
+/// How installing a release went on one PC (UPD-003, P7-04a), for the rollout's health.
+model ReleaseInstall {
+  releaseId      String    @map("release_id") @db.Uuid
+  installationId String    @map("installation_id") @db.Uuid
+  /// INSTALLING, INSTALLED, ROLLED_BACK, FAILED or SILENT (no heartbeat after INSTALLING).
+  outcome        String
+  startedAt      DateTime? @map("started_at") @db.Timestamptz(3)
+  installedAt    DateTime? @map("installed_at") @db.Timestamptz(3)
+  failedAt       DateTime? @map("failed_at") @db.Timestamptz(3)
+  error          String?
+  /// Server errors the PC reported in the day after it installed it.
+  errorsAfter    Int       @default(0) @map("errors_after")
+  errorSpike     Boolean   @default(false) @map("error_spike")
+  updatedAt      DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  release      Release      @relation(fields: [releaseId], references: [id])
+  installation Installation @relation(fields: [installationId], references: [id])
+
+  @@id([releaseId, installationId])
+  @@index([outcome, startedAt])
+  @@map("release_installs")
 }
 
 /// Every vendor or installation action (VCP-001: every action is audited). Append-only: a
@@ -124,7 +465,7 @@ model Release {
 model AuditEntry {
   id         BigInt   @id @default(autoincrement())
   occurredAt DateTime @default(now()) @map("occurred_at") @db.Timestamptz(3)
-  /// `cli:<user>`, `ci:<pipeline>` or `installation:<id>`.
+  /// `cli:<user>`, `ci:<pipeline>`, `vendor:<user id>` or `installation:<id>`.
   actor      String
   action     String
   targetType String   @map("target_type")
@@ -133,4 +474,278 @@ model AuditEntry {
 
   @@index([targetType, targetId])
   @@map("audit_log")
+}
+
+/// Where reading a printed menu stands (ONB-006, P6-04a).
+enum MenuExtractionStatus {
+  QUEUED
+  RUNNING
+  DONE
+  FAILED
+}
+
+/// One AI-assisted menu import (ONB-006, VCP-008): the job, what it cost and the draft it read.
+/// The files are kept only until they are read; the draft is purged after 30 days.
+model MenuExtraction {
+  id             String               @id @db.Uuid
+  tenantId       String               @map("tenant_id") @db.Uuid
+  installationId String               @map("installation_id") @db.Uuid
+  status         MenuExtractionStatus @default(QUEUED)
+  files          Int
+  bytes          Int
+  draft          Json?
+  errorCode      String?              @map("error_code")
+  errorMessage   String?              @map("error_message")
+  model          String?
+  inputTokens    Int?                 @map("input_tokens")
+  outputTokens   Int?                 @map("output_tokens")
+  attempts       Int                  @default(0)
+  /// A busy provider is tried again no sooner than this.
+  notBefore      DateTime?            @map("not_before") @db.Timestamptz(3)
+  startedAt      DateTime?            @map("started_at") @db.Timestamptz(3)
+  finishedAt     DateTime?            @map("finished_at") @db.Timestamptz(3)
+  createdAt      DateTime             @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime             @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  tenant       Tenant               @relation(fields: [tenantId], references: [id])
+  installation Installation         @relation(fields: [installationId], references: [id])
+  uploads      MenuExtractionFile[]
+
+  @@index([tenantId, createdAt])
+  @@index([status])
+  @@map("menu_extractions")
+}
+
+/// A photo or PDF waiting to be read; deleted once its extraction is done or failed.
+model MenuExtractionFile {
+  id           String   @id @db.Uuid
+  extractionId String   @map("extraction_id") @db.Uuid
+  position     Int
+  name         String
+  contentType  String   @map("content_type")
+  content      Bytes
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  extraction MenuExtraction @relation(fields: [extractionId], references: [id], onDelete: Cascade)
+
+  @@unique([extractionId, position])
+  @@map("menu_extraction_files")
+}
+
+/// An audit chain head a PC reported (AUD-003, P7-03): heads only move forward.
+model AuditChainHead {
+  id             String    @id @db.Uuid
+  installationId String    @map("installation_id") @db.Uuid
+  sequence       BigInt
+  hash           String
+  firstSeenAt    DateTime  @default(now()) @map("first_seen_at") @db.Timestamptz(3)
+  /// The last time an answered audit check found the PC still holding this hash.
+  verifiedAt     DateTime? @map("verified_at") @db.Timestamptz(3)
+  /// Set aside when a person closed a chain alert.
+  supersededAt   DateTime? @map("superseded_at") @db.Timestamptz(3)
+
+  installation Installation @relation(fields: [installationId], references: [id])
+
+  @@index([installationId, firstSeenAt])
+  @@map("audit_chain_heads")
+}
+
+enum FleetAlertKind {
+  OFFLINE
+  DISK_FULL
+  BACKUP_FAILED
+  AUDIT_CHAIN_MISMATCH
+  UPDATE_FAILED
+  LICENCE_TAMPERING
+  UNSIGNED_UPDATES
+}
+
+/// A fleet alert (VCP-005): at most one open per PC and kind (a partial unique index).
+model FleetAlert {
+  id                   String         @id @db.Uuid
+  installationId       String         @map("installation_id") @db.Uuid
+  kind                 FleetAlertKind
+  openedAt             DateTime       @map("opened_at") @db.Timestamptz(3)
+  resolvedAt           DateTime?      @map("resolved_at") @db.Timestamptz(3)
+  details              Json?
+  resolvedBy           String?        @map("resolved_by")
+  resolution           String?
+  notifiedAt           DateTime?      @map("notified_at") @db.Timestamptz(3)
+  resolutionNotifiedAt DateTime?      @map("resolution_notified_at") @db.Timestamptz(3)
+
+  installation Installation @relation(fields: [installationId], references: [id])
+
+  @@index([openedAt])
+  @@map("fleet_alerts")
+}
+
+/// A diagnostics bundle a manager sent to support (UPD-008, P7-08a), scrubbed on the PC.
+model DiagnosticsBundle {
+  id             String   @id @db.Uuid
+  installationId String   @map("installation_id") @db.Uuid
+  receivedAt     DateTime @default(now()) @map("received_at") @db.Timestamptz(3)
+  note           String?
+  sentBy         Json?    @map("sent_by")
+  requestId      String?  @map("request_id") @db.Uuid
+  sizeBytes      Int      @map("size_bytes")
+  bundle         Json
+
+  installation Installation @relation(fields: [installationId], references: [id])
+
+  @@index([installationId, receivedAt])
+  @@map("diagnostics_bundles")
+}
+
+enum DiagnosticsRequestState {
+  PENDING
+  FULFILLED
+  DECLINED
+}
+
+/// Support asks a restaurant for diagnostics (UPD-008, P7-08b).
+model DiagnosticsRequest {
+  id             String                  @id @db.Uuid
+  installationId String                  @map("installation_id") @db.Uuid
+  requestedBy    String                  @map("requested_by")
+  requesterName  String                  @map("requester_name")
+  reason         String
+  requestedAt    DateTime                @map("requested_at") @db.Timestamptz(3)
+  expiresAt      DateTime                @map("expires_at") @db.Timestamptz(3)
+  state          DiagnosticsRequestState @default(PENDING)
+  answeredAt     DateTime?               @map("answered_at") @db.Timestamptz(3)
+  answeredBy     Json?                   @map("answered_by")
+  bundleId       String?                 @map("bundle_id") @db.Uuid
+
+  installation Installation @relation(fields: [installationId], references: [id])
+
+  @@index([installationId, requestedAt])
+  @@map("diagnostics_requests")
+}
+
+/// Vendor settings and feature flags pushed to PCs (UPD-010, P7-08c): 'fleet' or an installation.
+model RemoteSettings {
+  scope     String   @id
+  values    Json
+  updatedAt DateTime @map("updated_at") @db.Timestamptz(3)
+  updatedBy String   @map("updated_by")
+
+  @@map("remote_settings")
+}
+
+enum CloudBackupStatus {
+  UPLOADING
+  COMPLETE
+  ABORTED
+  DELETED
+}
+
+/// A restaurant PC's encrypted backup in object storage (DATA-003, P7-05d). The Control Plane
+/// cannot read it: it is encrypted on the PC with the PC's own backup key.
+model CloudBackup {
+  id              String            @id @db.Uuid
+  installationId  String            @map("installation_id") @db.Uuid
+  objectKey       String            @unique @map("object_key")
+  fileName        String            @map("file_name")
+  backupCreatedAt DateTime          @map("backup_created_at") @db.Timestamptz(3)
+  sizeBytes       BigInt            @map("size_bytes")
+  sha256          String
+  keyId           String            @map("key_id")
+  /// BACKUP (a nightly backup, pruned by the retention) or ARCHIVE (a year, kept for good).
+  kind            String            @default("BACKUP")
+  status          CloudBackupStatus @default(UPLOADING)
+  /// The object store's multipart upload, while UPLOADING.
+  uploadId        String?           @map("upload_id")
+  partSize        Int               @map("part_size")
+  startedAt       DateTime          @map("started_at") @db.Timestamptz(3)
+  completedAt     DateTime?         @map("completed_at") @db.Timestamptz(3)
+  /// When the retention removed the object, or the upload was given up.
+  endedAt         DateTime?         @map("ended_at") @db.Timestamptz(3)
+
+  installation Installation @relation(fields: [installationId], references: [id])
+
+  @@index([installationId, status, backupCreatedAt])
+  @@index([installationId, startedAt])
+  @@map("cloud_backups")
+}
+
+/// A PC's backup key, wrapped with the vendor's escrow key (DATA-003, OI-10, P7-05e). Only the
+/// vendor's KMS can unwrap it, and only for a restore code. One per key a PC ever used.
+model BackupKeyEscrow {
+  id             String   @id @db.Uuid
+  installationId String   @map("installation_id") @db.Uuid
+  /// Which backup key (not the key).
+  keyId          String   @map("key_id")
+  /// Which vendor escrow key wrapped it.
+  escrowKeyId    String   @map("escrow_key_id")
+  /// RSA-OAEP (SHA-256), base64.
+  wrappedKey     String   @map("wrapped_key")
+  createdAt      DateTime @map("created_at") @db.Timestamptz(3)
+
+  installation Installation @relation(fields: [installationId], references: [id])
+
+  @@unique([installationId, keyId])
+  @@map("backup_key_escrows")
+}
+
+/// A one-time code that releases a restaurant's escrowed backup key to the restore tool on a new
+/// PC (DATA-004, P7-05e), issued by vendor staff after verifying the Owner.
+model RestoreCode {
+  id                String    @id @db.Uuid
+  installationId    String    @map("installation_id") @db.Uuid
+  /// SHA-256 (hex) of the code; the code itself is shown once.
+  codeHash          String    @unique @map("code_hash")
+  reason            String
+  /// How the Owner was verified (OI-10).
+  ownerVerification String    @map("owner_verification")
+  /// `vendor:<id>`, and the person's name as the restaurant sees it.
+  issuedBy          String    @map("issued_by")
+  issuerName        String    @map("issuer_name")
+  issuedAt          DateTime  @map("issued_at") @db.Timestamptz(3)
+  expiresAt         DateTime  @map("expires_at") @db.Timestamptz(3)
+  usedAt            DateTime? @map("used_at") @db.Timestamptz(3)
+  usedFrom          String?   @map("used_from")
+  /// When the restaurant's PC said its Owner was told.
+  notifiedAt        DateTime? @map("notified_at") @db.Timestamptz(3)
+
+  installation Installation @relation(fields: [installationId], references: [id])
+
+  @@index([installationId, issuedAt])
+  @@map("restore_codes")
+}
+
+/// A digital bill sent for a restaurant (BILL-012, P7-09a): the bill as printed behind a link until
+/// it expires, then deleted. Only the number's last four digits are kept.
+model DigitalBill {
+  id                String    @id @db.Uuid
+  installationId    String    @map("installation_id") @db.Uuid
+  /// The PC's id for the send: the same one again never sends twice.
+  requestId         String    @map("request_id") @db.Uuid
+  channel           String
+  /// `+91 ******3210`.
+  phoneMasked       String    @map("phone_masked")
+  /// SHA-256 of the link's token; the token itself is derived and never stored.
+  tokenHash         String    @unique @map("token_hash")
+  restaurantName    String    @map("restaurant_name")
+  invoiceNumber     String    @map("invoice_number")
+  invoiceDate       DateTime  @map("invoice_date") @db.Date
+  grandTotal        Int       @map("grand_total")
+  /// The bill as printed, line by line; null once expired.
+  lines             Json?
+  expiresAt         DateTime  @map("expires_at") @db.Timestamptz(3)
+  /// SENT or FAILED.
+  status            String
+  providerMessageId String?   @map("provider_message_id")
+  error             String?
+  retryable         Boolean   @default(false)
+  attempts          Int       @default(1)
+  createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  sentAt            DateTime? @map("sent_at") @db.Timestamptz(3)
+  purgedAt          DateTime? @map("purged_at") @db.Timestamptz(3)
+
+  installation Installation @relation(fields: [installationId], references: [id])
+
+  @@unique([installationId, requestId])
+  @@index([installationId, createdAt])
+  @@index([expiresAt])
+  @@map("digital_bills")
 }

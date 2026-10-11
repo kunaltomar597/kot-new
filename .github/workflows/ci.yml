@@ -33,22 +33,29 @@ jobs:
           --health-retries 20
     env:
       TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/postgres
+      # pg_dump and pg_restore for the backup tests (P7-05a), from the runner's PostgreSQL 16.
+      RP_PG_BIN: /usr/lib/postgresql/16/bin
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - uses: pnpm/action-setup@v6
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
 
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: .nvmrc
           cache: pnpm
+
+      # pnpm/action-setup installs its own pnpm first, then the version package.json names: the
+      # build must run with that one.
+      - name: pnpm is the version package.json names
+        run: test "pnpm@$(pnpm --version)" = "$(node -p "require('./package.json').packageManager")"
 
       - run: pnpm install --frozen-lockfile
 
       # React Native's sources are transformed by Babel for Jest; a warm cache keeps the first
       # render of each test file fast (see the Jest configs).
       - name: Jest transform cache
-        uses: actions/cache@v6
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: node_modules/.cache/jest
           key: jest-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml', '**/babel.config.cjs') }}
@@ -57,11 +64,27 @@ jobs:
       - name: Format
         run: pnpm format:check
 
+      - name: PostgreSQL programs
+        # The backup tests (P7-05a) run pg_dump and pg_restore 16. The continuous backup test
+        # (P7-05c) starts its own cluster with WAL archiving: initdb, pg_ctl and pg_basebackup.
+        # The runner image usually has them all.
+        run: |
+          test -x "$RP_PG_BIN/initdb" && test -x "$RP_PG_BIN/pg_basebackup" && test -x "$RP_PG_BIN/pg_dump" \
+            || (sudo apt-get update && sudo apt-get install -y postgresql-16 postgresql-client-16)
+
       - name: Build packages
         run: pnpm build
 
       - name: Contract docs are up to date
         run: pnpm contracts:docs:check
+
+      - name: Contracts still serve older apps (N-1)
+        run: pnpm contracts:compat
+
+      # SEC-000: every threat model's files, functions and test titles still exist, and every open
+      # threat has a dated plan (docs/security/threat-models/README.md).
+      - name: Threat models are current
+        run: pnpm security:threats
 
       - name: Lint
         run: pnpm lint
@@ -102,18 +125,18 @@ jobs:
     env:
       TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/postgres
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - uses: pnpm/action-setup@v6
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
 
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: .nvmrc
           cache: pnpm
 
       - run: pnpm install --frozen-lockfile
 
-      - name: Build server and console
+      - name: Build the server, the console, the QR site and the Control Plane with its web app
         run: pnpm build
 
       - name: Install Chromium for Playwright
@@ -122,12 +145,276 @@ jobs:
       - name: Console end-to-end tests
         run: pnpm --filter @rp/console e2e
 
+      - name: QR menu end-to-end tests (a phone against a real relay)
+        run: pnpm --filter @rp/qr-menu e2e
+
+      - name: Vendor web app end-to-end tests (against the real Control Plane)
+        run: pnpm --filter @rp/control-plane-web e2e
+
       - name: Keep the Playwright report
         if: failure()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: playwright-report
           path: |
             apps/console/playwright-report
             apps/console/test-results
+            apps/qr-menu/playwright-report
+            apps/qr-menu/test-results
+            apps/control-plane-web/playwright-report
+            apps/control-plane-web/test-results
           retention-days: 7
+
+  windows-setup-scripts:
+    # The PowerShell the installer runs on the restaurant PC (P0-16c): Pester and PSScriptAnalyzer
+    # on Windows PowerShell 5.1, which every Windows 10 and 11 PC has, and on PowerShell 7. The
+    # tests tagged Windows run icacls, the firewall and sc.exe for real, on a temporary folder and
+    # a firewall group of their own.
+    name: Windows set-up scripts
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Tests on Windows PowerShell 5.1
+        shell: powershell
+        run: |
+          [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+          Install-PackageProvider -Name NuGet -MinimumVersion 2.8.5.201 -Force -Scope CurrentUser | Out-Null
+          Install-Module Pester -RequiredVersion 5.7.1 -Force -SkipPublisherCheck -Scope CurrentUser
+          Install-Module PSScriptAnalyzer -RequiredVersion 1.25.0 -Force -Scope CurrentUser
+          ./infra/installer/windows/Invoke-Tests.ps1 -ResultFile pester-windows-powershell.xml
+
+      - name: Tests on PowerShell 7
+        shell: pwsh
+        run: |
+          Install-Module Pester -RequiredVersion 5.7.1 -Force -SkipPublisherCheck -Scope CurrentUser
+          Install-Module PSScriptAnalyzer -RequiredVersion 1.25.0 -Force -Scope CurrentUser
+          ./infra/installer/windows/Invoke-Tests.ps1 -ResultFile pester-powershell-7.xml
+
+      - name: Keep the test results
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: pester-results
+          path: pester-*.xml
+          retention-days: 7
+
+  windows-installer:
+    # The restaurant PC's installer (P0-16d). Staged and built on Windows, so the server's native
+    # modules are Windows' own; then installed silently here: the three services run, a killed
+    # server answers again within 10 s (NFR-A04), running the installer again repairs, and
+    # uninstalling keeps the data unless the Owner allowed deleting it (NFR-I02). Then scenario S9
+    # (P7-04c, UPD-005): an update that fails its health check is rolled back, application and
+    # database, and a good one installs through the watchdog and the updater's task. Signed only
+    # on main when the code-signing certificate's secrets exist; the vendor's addresses come from
+    # repository variables (unset ones stay off on the PC).
+    name: Windows installer
+    runs-on: windows-latest
+    timeout-minutes: 90
+    # SEC-013, SEC-006 (threat model "The update pipeline", UPDATE-E2): only a push to main is
+    # signed, in the environment `release-signing`, which holds the certificate's secrets and
+    # gives them to jobs on main only. Pull requests and other branches build unsigned test
+    # installers, so code nobody has reviewed is never signed as the vendor's.
+    environment: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && 'release-signing' || '' }}
+    env:
+      RP_CONTROL_PLANE_URL: ${{ vars.RP_CONTROL_PLANE_URL }}
+      RP_RELAY_URL: ${{ vars.RP_RELAY_URL }}
+      RP_QR_SITE_URL: ${{ vars.RP_QR_SITE_URL }}
+      RP_ERROR_DSN: ${{ secrets.RP_ERROR_DSN }}
+      # UPD-007: the signer updates must carry, set with the certificate, on main only. Without it
+      # the builds are unsigned test builds that take unsigned updates (for S9 here); a signed
+      # build never does (the build step refuses it). Never install an unsigned build at a
+      # restaurant.
+      RP_UPDATE_PUBLISHER: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.RP_UPDATE_PUBLISHER || '' }}
+      # UPDATE-S2: the authority that issued that certificate (the signer is pinned by both).
+      RP_UPDATE_ISSUER: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.RP_UPDATE_ISSUER || '' }}
+      RP_ALLOW_UNSIGNED_UPDATES: ${{ (github.event_name != 'push' || github.ref != 'refs/heads/main' || vars.RP_UPDATE_PUBLISHER == '') && '1' || '' }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Build the server, the console and the POS window
+        run: pnpm turbo run build --filter=@rp/server --filter=@rp/console --filter=@rp/desktop
+
+      # Node.js, PostgreSQL and WinSW, checked against their pinned SHA-256 at every use.
+      - name: Downloads cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: node_modules/.cache/rp-installer
+          key: rp-installer-${{ hashFiles('apps/desktop/src/packaging/components.ts') }}
+
+      - name: Stage the installer's contents
+        run: pnpm --filter @rp/desktop package:stage
+
+      - name: Build the installer
+        env:
+          WIN_CSC_LINK: ${{ env.RP_UPDATE_PUBLISHER != '' && secrets.WINDOWS_CERTIFICATE_P12 || '' }}
+          WIN_CSC_KEY_PASSWORD: ${{ env.RP_UPDATE_PUBLISHER != '' && secrets.WINDOWS_CERTIFICATE_PASSWORD || '' }}
+        run: pnpm --filter @rp/desktop package:win
+
+      - name: Install, check, repair and uninstall on this runner
+        shell: pwsh
+        run: |
+          $installer = (Get-Item apps/desktop/release/RestaurantPlatform-Setup-*.exe).FullName
+          ./infra/installer/windows/ci/Test-Installer.ps1 -Installer $installer -ResultDir installer-results
+
+      - name: Build the next version's installer from the same payload (scenario S9)
+        env:
+          WIN_CSC_LINK: ${{ env.RP_UPDATE_PUBLISHER != '' && secrets.WINDOWS_CERTIFICATE_P12 || '' }}
+          WIN_CSC_KEY_PASSWORD: ${{ env.RP_UPDATE_PUBLISHER != '' && secrets.WINDOWS_CERTIFICATE_PASSWORD || '' }}
+        shell: pwsh
+        run: |
+          $version = (Get-Content apps/desktop/package.json -Raw | ConvertFrom-Json).version
+          $core = $version.Split('-')[0].Split('.')
+          $next = '{0}.{1}.{2}' -f $core[0], $core[1], ([int]$core[2] + 1)
+          pnpm --filter @rp/desktop run package:win --product-version $next
+          New-Item -ItemType Directory -Force update-test | Out-Null
+          Move-Item "apps/desktop/release/RestaurantPlatform-Setup-$next.exe" update-test/
+
+      - name: Update, roll back (S9) and update again on this runner
+        shell: pwsh
+        run: |
+          $version = (Get-Content apps/desktop/package.json -Raw | ConvertFrom-Json).version
+          $next = (Get-Item update-test/RestaurantPlatform-Setup-*.exe).FullName
+          ./infra/installer/windows/ci/Test-Update.ps1 -Installer (Resolve-Path "apps/desktop/release/RestaurantPlatform-Setup-$version.exe").Path `
+            -NextInstaller $next -ResultDir installer-results
+
+      - name: Keep the logs
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: installer-logs
+          path: installer-results
+          retention-days: 7
+
+      - name: Keep the installer
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: windows-installer
+          # The installer and its component version matrix (UPD-006), published together.
+          path: |
+            apps/desktop/release/RestaurantPlatform-Setup-*.exe
+            apps/desktop/staging/version-matrix.json
+          retention-days: 14
+
+  release-evidence:
+    # UPDATE-R3: which commit and which build made a signed installer. A signed attestation
+    # (GitHub's build provenance) binds the installer, its release manifest and its SBOM to this
+    # commit and this run; `gh attestation verify <file> --repo <owner/repo>` checks it. Main only,
+    # and no certificate: the job only reads what the signing job published.
+    name: Release evidence
+    needs: [windows-installer]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    env:
+      # The same pin as security.yml's SBOM job (a test keeps them equal).
+      CDXGEN_VERSION: 12.8.4
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: windows-installer
+          path: release
+
+      # The artifact keeps the folders below the two paths' common ancestor; the rest wants them flat.
+      - name: Flatten the downloaded files
+        run: find release -mindepth 2 -type f -exec mv -t release {} +
+
+      - name: SBOM of this commit
+        run: >-
+          pnpm dlx @cyclonedx/cdxgen@${CDXGEN_VERSION}
+          --type js --no-install-deps --spec-version 1.7
+          --output release/sbom.cdx.json .
+
+      - name: Release manifest (commit, run and the files' hashes)
+        run: |
+          version=$(node -p "require('./apps/desktop/package.json').version")
+          node infra/ci/release-manifest.mjs --version "$version" --commit "$GITHUB_SHA" \
+            --run "$GITHUB_RUN_ID" --repository "$GITHUB_REPOSITORY" --out release/release-manifest.json \
+            release/RestaurantPlatform-Setup-*.exe release/version-matrix.json release/sbom.cdx.json
+
+      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: |
+            release/RestaurantPlatform-Setup-*.exe
+            release/version-matrix.json
+            release/sbom.cdx.json
+            release/release-manifest.json
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release-evidence
+          path: |
+            release/release-manifest.json
+            release/sbom.cdx.json
+          if-no-files-found: error
+          retention-days: 90
+
+  relay-supabase:
+    # The relay's isolation and rule tests (P5-01) also run in the check job on plain PostgreSQL
+    # with a Supabase prelude; here they run against a real local Supabase stack (ADR-0015).
+    name: QR relay on local Supabase
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - uses: supabase/setup-cli@1dedf2c611547ede7232d26866dd3c56ab903bbb # v1.7.3
+        with:
+          version: latest
+
+      # The Deno of Supabase's edge runtime (v1.77.4: deno_core 0.324, deno_http 0.180), where the
+      # functions run. Deno 2.9's own HTTP/1 server reads a refused body to its end whatever the
+      # function does, so a newer Deno does not show how production answers (RELAY-D3).
+      - uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed # v2.0.5
+        with:
+          deno-version: v2.1.4
+
+      - name: Build the relay functions and what they use
+        run: pnpm turbo run build --filter=@rp/relay...
+
+      - name: Start Supabase (database and Realtime) and apply the relay migrations
+        run: supabase start --workdir infra -x studio,imgproxy,logflare,vector,supavisor,postgres-meta,edge-runtime
+
+      - name: Relay tests against Supabase (the bundled functions run under Deno too)
+        run: pnpm --filter @rp/relay test
+        env:
+          # A superuser on the local stack: the tests switch session authorization and roles.
+          RELAY_DATABASE_URL: postgresql://supabase_admin:postgres@127.0.0.1:54322/postgres
+
+      - name: Stop Supabase
+        if: always()
+        run: supabase stop --workdir infra --no-backup

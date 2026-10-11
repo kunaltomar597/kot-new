@@ -1,0 +1,4 @@
+{
+  "input": { "type": "string", "enum": ["WINDOW", "OPEN_TABLES", "RETRY_APPROVAL"] },
+  "output": { "type": "string", "enum": ["WINDOW", "OPEN_TABLES", "RETRY_APPROVAL"] }
+}

@@ -76,6 +76,18 @@ CA <installation>`, valid 10 years, path length 0, key usage certificate and CRL
   to trust a new certificate; a CA separates long-lived trust from short-lived certificates.
 - Plain HTTP on the LAN: violates SEC-001 and blocks WebCrypto in browsers.
 
+## Amendment 2026-10-11 (P8-03d2b2c2, PC-S4): the CA is name-constrained
+
+A CA created from now on carries a critical name constraints extension: permitted IPv4 are loopback,
+10/8, 172.16/12, 192.168/16 and 169.254/16; permitted DNS are `localhost`, `local`, `lan`,
+`home.arpa` and the names the PC has when the CA is made (its computer name, `RP_TLS_HOSTNAMES`). A
+stolen CA key then cannot sign for a public site: browsers, Android and OpenSSL refuse the chain.
+The server leaves off the certificate any name or address outside the constraints (a PC with a
+public address stays up). A CA from before is not replaced, because that would re-pair every device;
+it keeps signing without constraints. A host name added to `RP_TLS_HOSTNAMES` after the CA exists,
+outside the suffixes above, is not covered: set it before the first start, or replace the CA in
+planned maintenance.
+
 ## Consequences
 
 - Browsers need a one-time CA installation, documented with fingerprint verification. Android

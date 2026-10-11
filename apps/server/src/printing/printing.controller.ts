@@ -2,6 +2,7 @@ import { Body, Controller, Get, HttpCode, Param, Post, Put, Req } from '@nestjs/
 import {
   KotParams,
   KotReprintRequest,
+  type PrinterDiscoveryResponse,
   type PrinterListResponse,
   PrinterRedirectRequest,
   PrinterRequest,
@@ -19,6 +20,7 @@ import { RequireCapability, RequireSession } from '../auth/decorators.js';
 import type { AuthenticatedRequest, Principal } from '../auth/principal.js';
 import { ZodValidationPipe } from '../validation/zod-validation.pipe.js';
 import { PrintQueueService } from './print-queue.service.js';
+import { PrinterDiscoveryService } from './printer-discovery.js';
 import { PrintersService } from './printers.service.js';
 import { StationsService } from './stations.service.js';
 
@@ -72,7 +74,17 @@ export class StationsController {
 /** Printers and the setup test page (P1-07a, KDS-008, ONB-004 step 6). */
 @Controller('printers')
 export class PrintersController {
-  constructor(private readonly printers: PrintersService) {}
+  constructor(
+    private readonly printers: PrintersService,
+    private readonly discovery: PrinterDiscoveryService,
+  ) {}
+
+  @Post('discover')
+  @HttpCode(200)
+  @RequireCapability('OPERATIONS_CONFIGURE')
+  discover(@Req() request: AuthenticatedRequest): Promise<PrinterDiscoveryResponse> {
+    return this.discovery.discover(principalOf(request));
+  }
 
   @Get()
   @RequireCapability('OPERATIONS_CONFIGURE')

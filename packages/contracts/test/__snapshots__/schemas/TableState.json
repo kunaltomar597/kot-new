@@ -1,4 +1,10 @@
 {
-  "input": { "type": "string", "enum": ["FREE", "OCCUPIED", "BILL_REQUESTED", "BILL_PRINTED"] },
-  "output": { "type": "string", "enum": ["FREE", "OCCUPIED", "BILL_REQUESTED", "BILL_PRINTED"] }
+  "input": {
+    "type": "string",
+    "enum": ["FREE", "OCCUPIED", "BILL_REQUESTED", "BILL_PRINTED", "NEEDS_CLEANING"]
+  },
+  "output": {
+    "type": "string",
+    "enum": ["FREE", "OCCUPIED", "BILL_REQUESTED", "BILL_PRINTED", "NEEDS_CLEANING"]
+  }
 }

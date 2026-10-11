@@ -1,0 +1,378 @@
+{
+  "input": {
+    "type": "object",
+    "properties": {
+      "id": {
+        "type": "string",
+        "format": "uuid",
+        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+      },
+      "installationId": {
+        "type": "string",
+        "format": "uuid",
+        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+      },
+      "receivedAt": {
+        "type": "string",
+        "format": "date-time",
+        "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+      },
+      "note": { "type": ["string", "null"] },
+      "sentBy": {
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "name": { "type": "string", "maxLength": 120 },
+              "role": { "type": "string", "maxLength": 40 }
+            },
+            "required": ["name", "role"]
+          },
+          { "type": "null" }
+        ]
+      },
+      "sizeBytes": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+      "requestId": {
+        "anyOf": [
+          {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          { "type": "null" }
+        ]
+      },
+      "bundle": {
+        "type": "object",
+        "properties": {
+          "format": { "type": "number", "const": 1 },
+          "generatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+          },
+          "installationId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              },
+              { "type": "null" }
+            ]
+          },
+          "versions": {
+            "maxItems": 30,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": { "type": "string", "maxLength": 60 },
+                "version": { "type": "string", "maxLength": 64 }
+              },
+              "required": ["name", "version"]
+            }
+          },
+          "platform": {
+            "type": "object",
+            "properties": {
+              "os": { "type": "string", "maxLength": 60 },
+              "release": { "type": "string", "maxLength": 120 },
+              "arch": { "type": "string", "maxLength": 30 },
+              "cpus": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+              "memoryMb": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+              "uptimeSeconds": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+              "serverUptimeSeconds": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              }
+            },
+            "required": [
+              "os",
+              "release",
+              "arch",
+              "cpus",
+              "memoryMb",
+              "uptimeSeconds",
+              "serverUptimeSeconds"
+            ]
+          },
+          "configuration": {
+            "type": "object",
+            "propertyNames": { "type": "string" },
+            "additionalProperties": { "type": ["string", "number", "boolean", "null"] }
+          },
+          "settings": {
+            "type": "object",
+            "propertyNames": { "type": "string" },
+            "additionalProperties": {}
+          },
+          "status": {
+            "type": "object",
+            "propertyNames": { "type": "string" },
+            "additionalProperties": {}
+          },
+          "devices": {
+            "maxItems": 500,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "type": { "type": "string" },
+                "name": { "type": "string" },
+                "status": { "type": "string" },
+                "online": { "type": "boolean" },
+                "lastSeenAt": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                    },
+                    { "type": "null" }
+                  ]
+                },
+                "appVersion": { "type": ["string", "null"] }
+              },
+              "required": ["type", "name", "status", "online", "lastSeenAt", "appVersion"]
+            }
+          },
+          "logs": {
+            "type": "object",
+            "properties": {
+              "files": {
+                "maxItems": 20,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "name": { "type": "string", "maxLength": 200 },
+                    "lines": { "type": "array", "items": { "type": "string" } }
+                  },
+                  "required": ["name", "lines"]
+                }
+              },
+              "truncated": { "type": "boolean" }
+            },
+            "required": ["files", "truncated"]
+          }
+        },
+        "required": [
+          "format",
+          "generatedAt",
+          "installationId",
+          "versions",
+          "platform",
+          "configuration",
+          "settings",
+          "status",
+          "devices",
+          "logs"
+        ]
+      }
+    },
+    "required": [
+      "id",
+      "installationId",
+      "receivedAt",
+      "note",
+      "sentBy",
+      "sizeBytes",
+      "requestId",
+      "bundle"
+    ]
+  },
+  "output": {
+    "type": "object",
+    "properties": {
+      "id": {
+        "type": "string",
+        "format": "uuid",
+        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+      },
+      "installationId": {
+        "type": "string",
+        "format": "uuid",
+        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+      },
+      "receivedAt": {
+        "type": "string",
+        "format": "date-time",
+        "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+      },
+      "note": { "type": ["string", "null"] },
+      "sentBy": {
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "name": { "type": "string", "maxLength": 120 },
+              "role": { "type": "string", "maxLength": 40 }
+            },
+            "required": ["name", "role"],
+            "additionalProperties": false
+          },
+          { "type": "null" }
+        ]
+      },
+      "sizeBytes": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+      "requestId": {
+        "anyOf": [
+          {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          { "type": "null" }
+        ]
+      },
+      "bundle": {
+        "type": "object",
+        "properties": {
+          "format": { "type": "number", "const": 1 },
+          "generatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+          },
+          "installationId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              },
+              { "type": "null" }
+            ]
+          },
+          "versions": {
+            "maxItems": 30,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": { "type": "string", "maxLength": 60 },
+                "version": { "type": "string", "maxLength": 64 }
+              },
+              "required": ["name", "version"],
+              "additionalProperties": false
+            }
+          },
+          "platform": {
+            "type": "object",
+            "properties": {
+              "os": { "type": "string", "maxLength": 60 },
+              "release": { "type": "string", "maxLength": 120 },
+              "arch": { "type": "string", "maxLength": 30 },
+              "cpus": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+              "memoryMb": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+              "uptimeSeconds": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+              "serverUptimeSeconds": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              }
+            },
+            "required": [
+              "os",
+              "release",
+              "arch",
+              "cpus",
+              "memoryMb",
+              "uptimeSeconds",
+              "serverUptimeSeconds"
+            ],
+            "additionalProperties": false
+          },
+          "configuration": {
+            "type": "object",
+            "propertyNames": { "type": "string" },
+            "additionalProperties": { "type": ["string", "number", "boolean", "null"] }
+          },
+          "settings": {
+            "type": "object",
+            "propertyNames": { "type": "string" },
+            "additionalProperties": {}
+          },
+          "status": {
+            "type": "object",
+            "propertyNames": { "type": "string" },
+            "additionalProperties": {}
+          },
+          "devices": {
+            "maxItems": 500,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "type": { "type": "string" },
+                "name": { "type": "string" },
+                "status": { "type": "string" },
+                "online": { "type": "boolean" },
+                "lastSeenAt": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                    },
+                    { "type": "null" }
+                  ]
+                },
+                "appVersion": { "type": ["string", "null"] }
+              },
+              "required": ["type", "name", "status", "online", "lastSeenAt", "appVersion"],
+              "additionalProperties": false
+            }
+          },
+          "logs": {
+            "type": "object",
+            "properties": {
+              "files": {
+                "maxItems": 20,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "name": { "type": "string", "maxLength": 200 },
+                    "lines": { "type": "array", "items": { "type": "string" } }
+                  },
+                  "required": ["name", "lines"],
+                  "additionalProperties": false
+                }
+              },
+              "truncated": { "type": "boolean" }
+            },
+            "required": ["files", "truncated"],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "format",
+          "generatedAt",
+          "installationId",
+          "versions",
+          "platform",
+          "configuration",
+          "settings",
+          "status",
+          "devices",
+          "logs"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "required": [
+      "id",
+      "installationId",
+      "receivedAt",
+      "note",
+      "sentBy",
+      "sizeBytes",
+      "requestId",
+      "bundle"
+    ],
+    "additionalProperties": false
+  }
+}

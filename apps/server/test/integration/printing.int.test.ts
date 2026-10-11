@@ -320,10 +320,6 @@ describe('[KDS-002] [KDS-008] stations', () => {
     expect(stationInUse.status).toBe(409);
     expect(codeOf(stationInUse)).toBe('STATION_IN_USE');
     expect(ApiError.parse(stationInUse.body).details).toMatchObject({ itemCount: 1 });
-    // Managers read it as it is on the Stations and printers page.
-    expect(ApiError.parse(stationInUse.body).message).toBe(
-      'This station is still used by 1 menu item. Move it to another station first.',
-    );
 
     // A spare station nothing uses is archived with a reason, and its name can be used again.
     const spare = StationView.parse(

@@ -1,10 +1,10 @@
 import { Body, Controller, Get, HttpCode, Param, Post, Put, Req } from '@nestjs/common';
 import {
   ArchiveRoleRequest,
-  CustomRoleRequest,
-  type CustomRoleView,
   type RoleListResponse,
   RoleParams,
+  RoleRequest,
+  type RoleView,
 } from '@rp/contracts';
 import { authErrors } from '../auth/auth-errors.js';
 import { RequireCapability } from '../auth/decorators.js';
@@ -17,10 +17,7 @@ function principalOf(request: AuthenticatedRequest): Principal {
   return request.principal;
 }
 
-/**
- * Custom roles (P4-02e, AUTH-012). Everyone who manages staff reads them, to give them to people;
- * only the Owner, with a fresh second factor, changes them (checked by `RolesService`).
- */
+/** Built-in and custom roles (P4-02e, AUTH-012); changes are the Owner's (see the service). */
 @Controller('roles')
 export class RolesController {
   constructor(private readonly roles: RolesService) {}
@@ -35,8 +32,8 @@ export class RolesController {
   @RequireCapability('STAFF_MANAGE')
   create(
     @Req() request: AuthenticatedRequest,
-    @Body(new ZodValidationPipe(CustomRoleRequest)) body: CustomRoleRequest,
-  ): Promise<CustomRoleView> {
+    @Body(new ZodValidationPipe(RoleRequest)) body: RoleRequest,
+  ): Promise<RoleView> {
     return this.roles.create(principalOf(request), body);
   }
 
@@ -45,8 +42,8 @@ export class RolesController {
   update(
     @Req() request: AuthenticatedRequest,
     @Param(new ZodValidationPipe(RoleParams)) params: RoleParams,
-    @Body(new ZodValidationPipe(CustomRoleRequest)) body: CustomRoleRequest,
-  ): Promise<CustomRoleView> {
+    @Body(new ZodValidationPipe(RoleRequest)) body: RoleRequest,
+  ): Promise<RoleView> {
     return this.roles.update(principalOf(request), params.roleId, body);
   }
 
@@ -57,17 +54,7 @@ export class RolesController {
     @Req() request: AuthenticatedRequest,
     @Param(new ZodValidationPipe(RoleParams)) params: RoleParams,
     @Body(new ZodValidationPipe(ArchiveRoleRequest)) body: ArchiveRoleRequest,
-  ): Promise<CustomRoleView> {
+  ): Promise<RoleView> {
     return this.roles.archive(principalOf(request), params.roleId, body.reason);
-  }
-
-  @Post(':roleId/restore')
-  @HttpCode(200)
-  @RequireCapability('STAFF_MANAGE')
-  restore(
-    @Req() request: AuthenticatedRequest,
-    @Param(new ZodValidationPipe(RoleParams)) params: RoleParams,
-  ): Promise<CustomRoleView> {
-    return this.roles.restore(principalOf(request), params.roleId);
   }
 }

@@ -1,0 +1,54 @@
+{
+  "input": {
+    "type": "object",
+    "properties": {
+      "state": {
+        "type": "string",
+        "enum": ["ACTIVE", "PAYMENT_DUE", "GRACE", "RESTRICTED", "TERMINATED"]
+      },
+      "plan": { "type": "string", "minLength": 1, "maxLength": 40 },
+      "deviceLimits": {
+        "type": "object",
+        "properties": {
+          "TABLE_TABLET": { "type": "integer", "minimum": 0, "maximum": 500 },
+          "PAGER": { "type": "integer", "minimum": 0, "maximum": 500 },
+          "WAITER_PHONE": { "type": "integer", "minimum": 0, "maximum": 500 },
+          "KDS": { "type": "integer", "minimum": 0, "maximum": 100 }
+        },
+        "required": ["TABLE_TABLET", "PAGER", "WAITER_PHONE", "KDS"],
+        "additionalProperties": false
+      },
+      "validityDays": { "type": "integer", "minimum": 1, "maximum": 365 },
+      "graceDays": { "type": "integer", "minimum": 0, "maximum": 90 },
+      "reason": { "type": "string", "minLength": 3, "maxLength": 200 }
+    },
+    "required": ["reason"],
+    "additionalProperties": false
+  },
+  "output": {
+    "type": "object",
+    "properties": {
+      "state": {
+        "type": "string",
+        "enum": ["ACTIVE", "PAYMENT_DUE", "GRACE", "RESTRICTED", "TERMINATED"]
+      },
+      "plan": { "type": "string", "minLength": 1, "maxLength": 40 },
+      "deviceLimits": {
+        "type": "object",
+        "properties": {
+          "TABLE_TABLET": { "type": "integer", "minimum": 0, "maximum": 500 },
+          "PAGER": { "type": "integer", "minimum": 0, "maximum": 500 },
+          "WAITER_PHONE": { "type": "integer", "minimum": 0, "maximum": 500 },
+          "KDS": { "type": "integer", "minimum": 0, "maximum": 100 }
+        },
+        "required": ["TABLE_TABLET", "PAGER", "WAITER_PHONE", "KDS"],
+        "additionalProperties": false
+      },
+      "validityDays": { "type": "integer", "minimum": 1, "maximum": 365 },
+      "graceDays": { "type": "integer", "minimum": 0, "maximum": 90 },
+      "reason": { "type": "string", "minLength": 3, "maxLength": 200 }
+    },
+    "required": ["reason"],
+    "additionalProperties": false
+  }
+}

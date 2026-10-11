@@ -30,7 +30,6 @@ import {
   uncoveredOf,
   withPlanFor,
 } from './sections-view.js';
-import { roleLabel } from './staff-view.js';
 
 interface SectionsData {
   readonly assignments: WaiterAssignmentsResponse;
@@ -198,7 +197,7 @@ export function SectionsScreen() {
               <li key={person.id} className="staff-row">
                 <div className="staff-row__who">
                   <h3 className="staff-row__name">{person.displayName}</h3>
-                  <p className="staff-row__role">{roleLabel(t, person.role, person.customRole)}</p>
+                  <p className="staff-row__role">{t(`roles.${person.role}`)}</p>
                   {day.sections.length + day.tables.length === 0 ? (
                     <p className="sections-row__none">{t('sections.none')}</p>
                   ) : (

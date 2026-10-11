@@ -2,18 +2,23 @@ import { Body, Controller, Get, HttpCode, Param, Post, Put, Req } from '@nestjs/
 import {
   AssignSessionWaiterRequest,
   CloseWithoutBillRequest,
+  MergeTablesRequest,
   MoveTableRequest,
   OpenTableRequest,
   type TableOverviewResponse,
   TableParams,
   TableSessionParams,
   type TableSessionView,
+  type TableStateView,
+  TransferItemsRequest,
+  type TransferItemsResponse,
 } from '@rp/contracts';
 import { authErrors } from '../auth/auth-errors.js';
 import { RequireCapability, RequireSession } from '../auth/decorators.js';
 import type { AuthenticatedRequest, Principal } from '../auth/principal.js';
 import { ZodValidationPipe } from '../validation/zod-validation.pipe.js';
 import { TableSessionsService } from './table-sessions.service.js';
+import { TableTransfersService } from './table-transfers.service.js';
 
 function principalOf(request: AuthenticatedRequest): Principal {
   if (request.principal === undefined) throw authErrors.unauthenticated();
@@ -23,12 +28,20 @@ function principalOf(request: AuthenticatedRequest): Principal {
 /** Table sessions and the live overview (P1-02b, TBL-003 to TBL-005, TBL-007). */
 @Controller()
 export class TableSessionsController {
-  constructor(private readonly sessions: TableSessionsService) {}
+  constructor(
+    private readonly sessions: TableSessionsService,
+    private readonly transfers: TableTransfersService,
+  ) {}
 
   @Get('tables/overview')
   @RequireSession()
   async overview(@Req() request: AuthenticatedRequest): Promise<TableOverviewResponse> {
-    return { tables: await this.sessions.overview(principalOf(request).restaurantId) };
+    const principal = principalOf(request);
+    const [tables, mayPrintBill] = await Promise.all([
+      this.sessions.overview(principal.restaurantId),
+      this.sessions.mayPrintBill(principal),
+    ]);
+    return { tables, mayPrintBill };
   }
 
   @Post('tables/:tableId/open')
@@ -78,6 +91,48 @@ export class TableSessionsController {
       body.toTableId,
       request.ownershipRequired === true,
     );
+  }
+
+  @Post('table-sessions/:sessionId/merge')
+  @HttpCode(200)
+  @RequireCapability('TABLE_MOVE_MERGE')
+  merge(
+    @Req() request: AuthenticatedRequest,
+    @Param(new ZodValidationPipe(TableSessionParams)) params: TableSessionParams,
+    @Body(new ZodValidationPipe(MergeTablesRequest)) body: MergeTablesRequest,
+  ): Promise<TableSessionView> {
+    return this.transfers.merge(
+      principalOf(request),
+      params.sessionId,
+      body.intoTableSessionId,
+      request.ownershipRequired === true,
+    );
+  }
+
+  @Post('table-sessions/:sessionId/transfer')
+  @HttpCode(200)
+  @RequireCapability('TABLE_MOVE_MERGE')
+  transfer(
+    @Req() request: AuthenticatedRequest,
+    @Param(new ZodValidationPipe(TableSessionParams)) params: TableSessionParams,
+    @Body(new ZodValidationPipe(TransferItemsRequest)) body: TransferItemsRequest,
+  ): Promise<TransferItemsResponse> {
+    return this.transfers.transfer(
+      principalOf(request),
+      params.sessionId,
+      body,
+      request.ownershipRequired === true,
+    );
+  }
+
+  @Post('tables/:tableId/clean')
+  @HttpCode(200)
+  @RequireCapability('ORDER_CREATE')
+  clean(
+    @Req() request: AuthenticatedRequest,
+    @Param(new ZodValidationPipe(TableParams)) params: TableParams,
+  ): Promise<TableStateView> {
+    return this.sessions.markClean(principalOf(request), params.tableId);
   }
 
   @Put('table-sessions/:sessionId/waiter')

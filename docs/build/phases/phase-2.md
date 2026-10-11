@@ -290,7 +290,7 @@ As built:
 
 ### P2-03b Nudges, breaks, device, printer and system alerts (done)
 
-As built: `POST /api/v1/alerts/nudge` (`STAFF_MANAGE`; one alert per person, presets in `notifications.nudgePresets`), `POST /api/v1/staff/me/break` (`staff.on_break_since`, migration `20260928020000_staff_break`; `recipientContext` fills `onBreak`), triggers for `DeviceStatusChanged` (pager, tablet, KDS: offline, and low battery at `pager.lowBatteryPercent` for pagers or `devices.lowBatteryAlertPercent` for tablets and kitchen screens, one alert per state; one shared level until P2-02a) and `PrinterStatusChanged` (until back online), and `SystemAlerts.checkDisk` hourly (`storage.warnPercent` since P4-03a, which removed the duplicate `notifications.diskAlertPercent`). Backup and licence alerts use the same engine when P7 adds them; the UI parts are P2-06 and P4.
+As built: `POST /api/v1/alerts/nudge` (`STAFF_MANAGE`; one alert per person, presets in `notifications.nudgePresets`), `POST /api/v1/staff/me/break` (`staff.on_break_since`, migration `20260928020000_staff_break`; `recipientContext` fills `onBreak`), triggers for `DeviceStatusChanged` (pager, tablet, KDS: offline, and low battery at `pager.lowBatteryPercent` for pagers or `devices.lowBatteryAlertPercent` for tablets and kitchen screens, one alert per state; one shared level until P2-02a) and `PrinterStatusChanged` (until back online), and `SystemAlerts.checkDisk` hourly (`notifications.diskAlertPercent`). Backup and licence alerts use the same engine when P7 adds them; the UI parts are P2-06 and P4.
 
 Original scope:
 
@@ -347,7 +347,7 @@ As built:
   counts as reachable (NTF-007).
 - Routes, all `DEVICE_PAIR`: `GET/POST /api/v1/pagers`, `POST /api/v1/pagers/:id/credential` and
   `PUT /api/v1/pagers/:id/wearer`. A person wears one pager, and every change is audited.
-- `@rp/domain` `pager.ts`: 2×12 line wrapping, vibration per type (each notification rule's `vibration`, P4-03b),
+- `@rp/domain` `pager.ts`: 2×12 line wrapping, vibration per type (setting `pagers.vibration`),
   topics, ACL checks and offline detection.
 - Contracts `pagers.ts`. The pager topics are documented in `docs/api/asyncapi.yaml`.
 
@@ -357,6 +357,38 @@ As built:
   (PGR-011).
 - Pair a pager by scanning its QR code in the manager UI (P4). The API from P2-04a takes the
   serial.
+
+Split (2026-10-05):
+
+- **P2-04b1 Firmware distribution through the PC (done, ADR-0018,
+  `docs/runbooks/pager-firmware.md`).** As built:
+  - Control Plane: `PAGER_FIRMWARE` releases (channel, staged rollout, pause, halt, hotfix; a
+    held PC holds its installer only); heartbeats carry the firmware a PC serves and its report
+    (INSTALLED, FAILED, ROLLED_BACK, counted in the rollout's health); answers carry a newer
+    release and whether the served one was halted; `release:publish --component`; the vendor web
+    app's "What it updates".
+  - The PC: downloads over HTTPS, checks size, SHA-256, the ESP-IDF image (ESP32-S3, `rp-pager`,
+    the version) and the secure boot v2 signature against the key digests built in
+    (`firmware-keys.ts`, empty until manual task 30); refuses for good or retries a download.
+  - Offers on the pager's own `ota` topic (ACL), when the pager is free (`pagerFirmwareVerdict`:
+    connected, battery ≥ 30 % or charging, no open alert, unworn or in the maintenance window or
+    "Update now"), two at a time; the image from `GET /api/v1/pager-firmware/<token>` (public,
+    15-minute token); progress and rollbacks from the heartbeat's `ota`.
+  - The Pagers page: the firmware served, a release on its way or refused, each pager's update
+    and "Update now" (`UPDATE_INSTALL_NOW`, audited).
+- **P2-04b2 Scan a pager's QR code with a camera on the Pagers page (PGR-012) (done,
+  ADR-0019).** As built:
+  - `@rp/contracts`: a pager's QR code holds `RP-PAGER:<serial>` (`PAGER_QR_PREFIX`,
+    `pagerQrText`, `pagerSerialFromQr`, `PagerSerial`); a bare serial is read too. P2-05 shows it
+    on the pairing screen and the label (`firmware/pager/README.md`).
+  - `@rp/ui-web` `QrScanner`: the device's camera (video only, the back camera on a phone), frames
+    decoded with `jsqr` (Windows Chromium has no `BarcodeDetector`), light-on-dark codes too, the
+    camera off when it unmounts, and a `CameraProblem` the screen explains; `hasCameraApi`.
+  - console: "Scan the QR code" in the register dialog where the browser has a camera; another
+    code is "not a pager's" and scanning goes on; the serial read lands in its field. A barcode
+    scanner typing the whole code leaves the serial.
+  - The Electron shell grants the camera without the microphone. Manual task 14 checks the PC's
+    webcam and a phone.
 
 ## P2-05 Pager firmware
 
@@ -368,15 +400,14 @@ esp-mqtt over TLS with pinned CA; pairing mode showing a QR/serial; alert queue 
 vibration pattern per type, LED, 2×12 text; short press ack, long press scroll; heartbeat every 30 s;
 "no connection" icon + single vibration on loss; low-battery warning; OTA with A/B partitions,
 signature check and automatic rollback; secure boot v2 and flash encryption config for production;
-debug console locked; no default passwords. Unit tests for queue/formatting logic (Unity on host),
+debug console locked; no default passwords. From the threat model (`docs/security/threat-models/pager-channel.md`,
+the threats planned for P2-05): flash encryption with encrypted NVS for the MQTT secret, JTAG off
+by eFuse and secure download mode, the anti-rollback eFuse (`secure_version`), and the CA pinned
+with the host name checked before the secret is sent. Unit tests for queue/formatting logic (Unity on host),
 hardware-in-the-loop test procedure. A CI job that builds the firmware with the ESP-IDF Docker image.
 People needed: flashing and on-device tests.
 Acceptance: CI build green; person confirms on devices: alert → vibrate ≤ 2 s, ack round trip, OTA
 update and rollback, 14 h battery with production firmware.
-
-The firmware also subscribes to `rp/<restaurant>/pagers/<device>/locate` (QoS 0, a
-`PagerLocateMessage` with `sentAt`, P4-02c): a manager pressing "Locate" on the Devices page makes
-the pager vibrate three times and show its name, without adding anything to the alert queue.
 
 ## P2-06 Waiter alerts, service-request inbox, manager nudge, "Notify manager"
 

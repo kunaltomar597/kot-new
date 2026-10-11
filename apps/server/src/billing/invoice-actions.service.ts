@@ -1,7 +1,13 @@
 import { Injectable } from '@nestjs/common';
-import type { BillView, InvoiceView, PrintInvoiceResponse } from '@rp/contracts';
+import type {
+  BillView,
+  InvoiceView,
+  PrintInvoiceResponse,
+  PrintTableBillResponse,
+} from '@rp/contracts';
 import { tableMachine, transition } from '@rp/domain';
 import { AuditService } from '../audit/audit.service.js';
+import { authErrors } from '../auth/auth-errors.js';
 import type { ConsumedOverride, Principal } from '../auth/principal.js';
 import { currentBusinessDate } from '../common/business-dates.js';
 import { newId } from '../common/ids.js';
@@ -14,6 +20,7 @@ import { PrintFailure, PrinterTransport } from '../printing/printer-transport.js
 import { SettingsService } from '../settings/settings.service.js';
 import { BillsService } from './bills.service.js';
 import { InvoicesService } from './invoices.service.js';
+import { mayPrintBill, printsBills } from './who-prints-bills.js';
 
 function invoiceNotFound(): AppError {
   return new AppError(404, 'INVOICE_NOT_FOUND', 'There is no such invoice.');
@@ -35,6 +42,57 @@ export class InvoiceActionsService {
     private readonly transport: PrinterTransport,
     private readonly printerStatus: PrinterStatusService,
   ) {}
+
+  /**
+   * WTR-008 (S): a table's bill printed from the waiter app. The invoice is issued as the POS
+   * issues it, then printed on the bill printer; when it cannot print, it stays issued and the
+   * answer says why, so the cashier can print it. Waiters print only their own tables' bills, and
+   * only when the restaurant allows it (the BRD matrix lets them only ask for the bill). A printed
+   * bill is never printed again from here: a copy is a reprint, the cashier's.
+   */
+  async printTableBill(principal: Principal, sessionId: string): Promise<PrintTableBillResponse> {
+    const cashier = printsBills(principal);
+    const settings = await this.settings.snapshot(principal.restaurantId);
+    if (!mayPrintBill(principal, settings)) {
+      throw new AppError(
+        403,
+        'BILL_PRINT_NOT_ALLOWED',
+        'Only the cashier prints bills here. Ask for the bill instead.',
+      );
+    }
+    const session = await this.prisma.tableSession.findFirst({
+      where: { id: sessionId, restaurantId: principal.restaurantId, status: 'OPEN' },
+      select: { waiterId: true, table: { select: { state: true } } },
+    });
+    if (session === null) {
+      throw new AppError(404, 'TABLE_SESSION_NOT_FOUND', 'There is no such open table.');
+    }
+    if (!cashier && session.waiterId !== principal.staffId) throw authErrors.forbidden();
+    if (session.table.state === 'BILL_PRINTED') {
+      throw new AppError(
+        409,
+        'BILL_ALREADY_PRINTED',
+        'The bill is already printed. Ask the cashier for a copy.',
+      );
+    }
+    const bill = await this.bills.open(principal, { tableSessionId: sessionId });
+    const invoice = await this.invoices.issue(principal, bill.id, null);
+    let outcome: { printed: boolean; error: string | null };
+    try {
+      outcome = await this.print(principal, invoice.id, null);
+    } catch (error) {
+      // No bill printer set, or it was archived: the bill is issued, the cashier prints it.
+      if (!(error instanceof AppError) || error.status !== 422) throw error;
+      outcome = { printed: false, error: error.message };
+    }
+    return {
+      invoiceId: invoice.id,
+      invoiceNumber: invoice.invoiceNumber,
+      grandTotal: invoice.grandTotal,
+      printed: outcome.printed,
+      error: outcome.error,
+    };
+  }
 
   /**
    * Prints the invoice. The row is locked while it prints, so two tills pressing Print at once

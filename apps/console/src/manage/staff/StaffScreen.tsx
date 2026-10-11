@@ -19,13 +19,7 @@ import { useNow } from '../../app/use-now.js';
 import { ReasonDialog } from '../../billing/ReasonDialog.js';
 import { SecondFactorCancelled, useSecondFactor } from '../../owner/second-factor.js';
 import { PersonDialog, PinDialog } from './StaffDialogs.js';
-import {
-  isLocked,
-  roleLabel,
-  type StaffAction,
-  type StaffActorView,
-  staffActions,
-} from './staff-view.js';
+import { isLocked, type StaffAction, type StaffActorView, staffActions } from './staff-view.js';
 
 /** Check locks again this often, so an expired lock stops showing without a reload. */
 const CLOCK_MS = 30_000;
@@ -36,10 +30,10 @@ type Open =
 
 /**
  * The Staff page (P4-02a, MGR-004): everyone who signs in here, active people first, with their
- * role (a custom role with the role it is built on, P4-02e), contact, PIN and lock state; adding
- * people, editing them, setting PINs, unlocking, deactivating and reactivating. Each person shows
- * only the actions the signed-in person may take (`@rp/domain` staff rules, checked again by the
- * server), and the list follows every change made on any screen (`RestaurantChanged`).
+ * role, contact, PIN and lock state; adding people, editing them, setting PINs, unlocking,
+ * deactivating and reactivating. Each person shows only the actions the signed-in person may take
+ * (`@rp/domain` staff rules, checked again by the server), and the list follows every change made
+ * on any screen (`RestaurantChanged`).
  */
 export function StaffScreen() {
   const t = useT();
@@ -49,12 +43,13 @@ export function StaffScreen() {
   const now = useNow(CLOCK_MS);
   const { withSecondFactor, dialog: secondFactorDialog } = useSecondFactor();
   const { data, reload } = useLive(
-    () => controller.api.listStaff(),
-    (type) => type === 'RestaurantChanged',
-  );
-  // The custom roles the dialog offers; without them it offers the built-in roles.
-  const { data: roles } = useLive(
-    () => controller.api.listRoles(),
+    async () => {
+      const [list, roles] = await Promise.all([
+        controller.api.listStaff(),
+        controller.api.listRoles(),
+      ]);
+      return { ...list, roles: roles.roles };
+    },
     (type) => type === 'RestaurantChanged',
   );
   const [open, setOpen] = useState<Open | undefined>();
@@ -98,7 +93,7 @@ export function StaffScreen() {
   };
 
   if (me === undefined) return null;
-  const actor: StaffActorView = { staffId: me.id, role: me.role, customRole: me.customRole };
+  const actor: StaffActorView = { staffId: me.id, role: me.role };
 
   let content: ReactNode;
   if (data.status === 'loading') {
@@ -162,7 +157,7 @@ export function StaffScreen() {
         <PersonDialog
           actor={actor}
           person={open.kind === 'EDIT' ? open.person : undefined}
-          customRoles={roles.status === 'ready' ? roles.value.roles : []}
+          customRoles={data.status === 'ready' ? data.value.roles : []}
           pinLength={pinLength}
           withSecondFactor={withSecondFactor}
           onSaved={(saved) => {
@@ -267,7 +262,14 @@ function StaffRow({
           {person.displayName}
           {self ? <Badge tone="info">{t('staff.you')}</Badge> : null}
         </h3>
-        <p className="staff-row__role">{roleLabel(t, person.role, person.customRole)}</p>
+        <p className="staff-row__role">
+          {person.customRoleName === null
+            ? t(`roles.${person.role}`)
+            : t('staff.customRole', {
+                name: person.customRoleName,
+                role: t(`roles.${person.role}`),
+              })}
+        </p>
         <p className="staff-row__states">
           {person.active ? (
             <Badge tone="success">{t('staff.active')}</Badge>

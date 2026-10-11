@@ -1,6 +1,7 @@
 import { Body, Controller, Get, HttpCode, Param, Post, Put, Req } from '@nestjs/common';
 import {
   ArchiveRequest,
+  HTTP_DEVICE_TYPES,
   type InvoiceSeriesListResponse,
   InvoiceSeriesParams,
   InvoiceSeriesRequest,
@@ -33,7 +34,7 @@ export class RestaurantController {
 
   // Any paired device: the login screen shows the name and logo, bills the particulars.
   @Get()
-  @RequireDevice()
+  @RequireDevice(HTTP_DEVICE_TYPES)
   get(@Req() request: AuthenticatedRequest): Promise<RestaurantProfile> {
     if (request.device === undefined) throw authErrors.deviceNotRecognised();
     return this.restaurant.get(request.device.restaurantId);

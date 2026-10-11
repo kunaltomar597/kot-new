@@ -1,9 +1,10 @@
+import { en } from '@rp/i18n';
 import { eventFrame } from '@rp/mobile-core/testing';
 import { act, fireEvent, screen, within } from '@testing-library/react-native';
 import { BackHandler } from 'react-native';
 import { PAGER_REFRESH_MS } from '../src/PagerCard';
 import { mayMove } from '../src/MoveSheet';
-import { KIRAN, PAGER_ID, RAVI, Restaurant, signedInApp } from './restaurant';
+import { IDS, KIRAN, PAGER_ID, RAVI, Restaurant, signedInApp } from './restaurant';
 
 jest.mock('expo-status-bar', () => ({ StatusBar: () => null }));
 
@@ -84,6 +85,75 @@ describe('[TBL-003] opening a table', () => {
   });
 });
 
+describe('[LIC-005] the licence on the waiter’s phone', () => {
+  it('shows the days left in grace, and nothing when active', async () => {
+    const restaurant = new Restaurant();
+    restaurant.licence = {
+      ...restaurant.licence,
+      enforced: true,
+      state: 'GRACE',
+      recorded: 'GRACE',
+      daysLeft: 2,
+    };
+    await signedInApp(restaurant);
+    expect(await screen.findByTestId('licence-banner')).toHaveTextContent(
+      /^2 days left to renew the subscription\./,
+    );
+  });
+
+  it('says new orders are paused when restricted', async () => {
+    const restaurant = new Restaurant();
+    restaurant.licence = {
+      ...restaurant.licence,
+      enforced: true,
+      state: 'RESTRICTED',
+      recorded: 'RESTRICTED',
+      daysLeft: 0,
+    };
+    await signedInApp(restaurant);
+    const banner = await screen.findByTestId('licence-banner');
+    expect(banner).toHaveTextContent(/^New tables and orders are paused/);
+    expect(banner).toHaveProp('accessibilityRole', 'alert');
+  });
+});
+
+describe('[TBL-004] a table that needs cleaning', () => {
+  it('is marked clean first, then opened like a free one', async () => {
+    const restaurant = new Restaurant();
+    restaurant.table('T1').state = 'NEEDS_CLEANING';
+    const { server } = await signedInApp(restaurant);
+    await fireEvent.press(await tile('T1, Needs cleaning'));
+    expect(screen.getByText(en.pos.table.needsCleaning)).toBeOnTheScreen();
+    expect(screen.queryByTestId('open-table')).toBeNull();
+    await fireEvent.press(screen.getByTestId('mark-clean'));
+    await fireEvent.press(await screen.findByTestId('open-table'));
+    expect(await screen.findByText('T1 is open')).toBeOnTheScreen();
+    expect(
+      server.callsTo('POST', `/api/v1/tables/${restaurant.table('T1').id}/clean`),
+    ).toHaveLength(1);
+  });
+});
+
+describe('[WTR-008] printing the bill from the app', () => {
+  it('is offered on the waiter’s own tables only when the restaurant allows it', async () => {
+    const restaurant = new Restaurant();
+    const { server } = await signedInApp(restaurant);
+    await fireEvent.press(await tile(/^T2, Occupied/));
+    expect(await screen.findByRole('header', { name: 'Table T2' })).toBeOnTheScreen();
+    expect(screen.queryByTestId('print-bill')).toBeNull();
+
+    restaurant.waiterMayPrint = true;
+    await fireEvent.press(screen.getByRole('button', { name: 'Back to tables' }));
+    await fireEvent.press(await tile(/^T2, Occupied/));
+    await fireEvent.press(await screen.findByTestId('print-bill'));
+    expect(await screen.findByText('Bill INV/26-27/000042 printed: ₹640.00')).toBeOnTheScreen();
+    const sessionId = restaurant.table('T2').session?.id ?? '';
+    expect(server.callsTo('POST', `/api/v1/table-sessions/${sessionId}/print-bill`)).toHaveLength(
+      1,
+    );
+  });
+});
+
 describe('[TBL-005] [WTR-008] moving a table and asking for the bill', () => {
   it('moves the waiter’s table to a free one and stays on it', async () => {
     const { server, restaurant } = await signedInApp();
@@ -148,9 +218,6 @@ describe('[TBL-005] [WTR-008] moving a table and asking for the bill', () => {
     expect(mayMove(entry('T5'), { id: RAVI, role: 'WAITER' })).toBe(false);
     expect(mayMove(entry('T5'), { id: RAVI, role: 'MANAGER' })).toBe(true);
     expect(mayMove(entry('T5'), { id: RAVI, role: 'KITCHEN' })).toBe(false);
-    // [AUTH-012] A custom role that moves any table.
-    const captain = { added: ['TABLE_MOVE_MERGE'] as const, removed: [] };
-    expect(mayMove(entry('T5'), { id: RAVI, role: 'WAITER', customRole: captain })).toBe(true);
 
     await signedInApp(restaurant);
     await fireEvent.press(await screen.findByRole('tab', { name: 'All tables' }));
@@ -263,5 +330,42 @@ describe('[WTR-014] the waiter’s pager', () => {
     }));
     await signedInApp(broken, server);
     expect(await screen.findByText('Your pager status could not be read.')).toBeOnTheScreen();
+  });
+});
+
+describe('[NTF-009] on break', () => {
+  it('goes on break, says where the alerts go, and comes back', async () => {
+    const restaurant = new Restaurant();
+    await signedInApp(restaurant);
+    const card = await screen.findByTestId('break-card');
+    await fireEvent.press(within(card).getByText(en.mobile.break.start));
+    expect(await within(card).findByText(/^On break since .*manager on duty\.$/)).toBeOnTheScreen();
+    expect(restaurant.breakSince).not.toBeNull();
+    await fireEvent.press(within(card).getByText(en.mobile.break.end));
+    expect(await within(card).findByText(en.mobile.break.hint)).toBeOnTheScreen();
+    expect(restaurant.breakSince).toBeNull();
+  });
+});
+
+describe('[WTR-013] a takeaway order from the phone', () => {
+  it('sends it to the kitchen with the customer’s name, and shows its token', async () => {
+    const restaurant = new Restaurant();
+    const { server } = await signedInApp(restaurant);
+    await fireEvent.press(await screen.findByTestId('new-takeaway'));
+    expect(await screen.findByText(en.mobile.takeaway.none)).toBeOnTheScreen();
+    await fireEvent.press(screen.getByRole('button', { name: 'Main Course' }));
+    await fireEvent.press(screen.getByRole('button', { name: /^Dal Makhani,/ }));
+    await fireEvent.changeText(screen.getByLabelText(en.mobile.takeaway.customer), 'Asha');
+    await fireEvent.press(screen.getByTestId('send-takeaway'));
+    expect(await screen.findByText('Token 61: order 21 sent to the kitchen')).toBeOnTheScreen();
+    const [body] = server.callsTo('POST', '/api/v1/orders').map((call) => call.body);
+    expect(body).toMatchObject({
+      source: 'WAITER_APP',
+      orderType: 'TAKEAWAY',
+      customerName: 'Asha',
+      lines: [{ itemId: IDS.dal, quantity: 1 }],
+    });
+    expect(await screen.findByTestId('takeaway-61')).toBeOnTheScreen();
+    expect(screen.getByText('Token 61 · Asha')).toBeOnTheScreen();
   });
 });

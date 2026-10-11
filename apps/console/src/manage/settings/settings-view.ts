@@ -1,497 +1,309 @@
-import {
-  type PrinterView,
-  SETTING_KEYS,
-  type SettingDefinition,
-  type SettingKey,
-  type SettingView,
-  settingDefinition,
-  TimeOfDay,
-  type UpdateSettingRequest,
-} from '@rp/contracts';
-import {
-  canonicalJson,
-  formatRupees,
-  OWNER_ONLY_CAPABILITIES,
-  OWNER_SECOND_FACTOR_CAPABILITIES,
-  parseRupees,
-} from '@rp/domain';
-import type { MessageKey, Translator } from '@rp/i18n';
+import { settingDefinition, type SettingView } from '@rp/contracts';
+import { formatRupees, OWNER_SECOND_FACTOR_CAPABILITIES, parseRupees } from '@rp/domain';
 import type { z } from 'zod';
 
-/** `auth` in `auth.pinLength`. */
-type AreaOf<Key> = Key extends `${infer Area}.${string}` ? Area : never;
-export type SettingArea = AreaOf<SettingKey>;
-export type SettingUnit = NonNullable<SettingDefinition['unit']>;
-
-/** The groups of the General settings page (P4-03a, MGR-007), in the order it shows them. */
-export const SETTING_GROUPS = [
-  'ordersAndBills',
-  'kitchen',
-  'notifications',
-  'devices',
-  'signIn',
-  'recommendations',
-  'qrMenu',
-  'data',
-  'updates',
-  'formats',
-] as const;
-export type SettingGroup = (typeof SETTING_GROUPS)[number];
-
-/** Each area of the catalogue in its group; a new area does not compile until it has one. */
-const GROUP_OF_AREA: Readonly<Record<SettingArea, SettingGroup>> = {
-  orders: 'ordersAndBills',
-  billing: 'ordersAndBills',
-  bills: 'ordersAndBills',
-  payments: 'ordersAndBills',
-  kds: 'kitchen',
-  stock: 'kitchen',
-  notifications: 'notifications',
-  devices: 'devices',
-  tablet: 'devices',
-  pager: 'devices',
-  pagers: 'devices',
-  auth: 'signIn',
-  reco: 'recommendations',
-  qr: 'qrMenu',
-  audit: 'data',
-  backups: 'data',
-  storage: 'data',
-  retention: 'data',
-  updates: 'updates',
-  licence: 'updates',
-  controlPlane: 'updates',
-  onboarding: 'updates',
-  ui: 'formats',
-};
-
-const KEYS: ReadonlySet<string> = new Set(SETTING_KEYS);
-
-/** Whether this console knows the setting (a newer server may list more). */
-export function isSettingKey(key: string): key is SettingKey {
-  return KEYS.has(key);
-}
-
-export function groupOf(key: SettingKey): SettingGroup {
-  return GROUP_OF_AREA[key.slice(0, key.indexOf('.')) as SettingArea];
-}
-
 /**
- * Settings with a page of their own, not on the General page: the notification rules, a rule for
- * each alert on the Notifications page (P4-03b). N, R and the nudge messages are on both pages.
+ * The Settings page (P4-03a, MGR-007, UPD-010): an editor for every catalogue setting, chosen from
+ * its schema, and the conversions between what is stored (integers, basis points, paise) and what
+ * a manager types (percent, rupees, one line per entry).
  */
-export const EDITED_ELSEWHERE: ReadonlySet<SettingKey> = new Set<SettingKey>([
-  'notifications.rules',
-]);
 
-export interface TimeWindowValue {
-  readonly start: string;
-  readonly end: string;
+export type NumberScale = 'PLAIN' | 'BP' | 'PAISE';
+
+export type Editor =
+  | { readonly kind: 'BOOLEAN' }
+  | {
+      readonly kind: 'NUMBER';
+      readonly min: number;
+      readonly max: number;
+      readonly scale: NumberScale;
+    }
+  | { readonly kind: 'CHOICE'; readonly options: readonly (string | number)[] }
+  | { readonly kind: 'LIST'; readonly numbers?: boolean }
+  | { readonly kind: 'TEXT'; readonly nullable: boolean }
+  | { readonly kind: 'PRINTER' }
+  | { readonly kind: 'WINDOW' }
+  | {
+      readonly kind: 'FIELDS';
+      readonly fields: readonly { readonly name: string; readonly editor: Editor }[];
+    }
+  | {
+      readonly kind: 'RECORD';
+      readonly keys: readonly string[];
+      readonly options: readonly string[];
+    }
+  /** Edited on a page of their own: the notification rules (P4-03b), the suggestions (P4-03c). */
+  | { readonly kind: 'RULES'; readonly page: RulesPage };
+
+export type RulesPage = 'notifications' | 'recommendations';
+
+interface Def {
+  readonly type: string;
+  readonly values?: readonly unknown[];
+  readonly options?: readonly z.ZodType[];
+  readonly innerType?: z.ZodType;
+  readonly element?: z.ZodType;
+  readonly keyType?: z.ZodType;
+  readonly valueType?: z.ZodType;
+  readonly format?: string;
 }
 
-/** How a setting is edited, read from its validation in the catalogue. */
-export type SettingField =
-  | { readonly kind: 'number'; readonly min: number; readonly max: number }
-  | { readonly kind: 'switch' }
-  | { readonly kind: 'choice'; readonly options: readonly (string | number)[] }
-  | {
-      readonly kind: 'lines';
-      readonly minLines: number;
-      readonly maxLines: number;
-      readonly maxLength: number;
-    }
-  /** Text that may be left empty for none (`null`). */
-  | { readonly kind: 'text'; readonly maxLength: number }
-  | { readonly kind: 'printer' }
-  /** A daily window, `HH:MM` to `HH:MM`. */
-  | { readonly kind: 'window' }
-  /** Named daily windows, such as the times of day. */
-  | { readonly kind: 'windows'; readonly parts: readonly string[] };
+function defOf(schema: z.ZodType): Def {
+  return (schema as unknown as { def: Def }).def;
+}
 
-/** Settings whose editor is not read from their validation. */
-const SPECIAL_FIELDS: Readonly<Partial<Record<SettingKey, SettingField>>> = {
-  'bills.printerId': { kind: 'printer' },
-};
-
-const UNLIMITED = Number.MAX_SAFE_INTEGER;
-
-function lengthLimits(schema: z.ZodArray): { readonly min: number; readonly max: number } {
-  let min = 0;
-  let max = UNLIMITED;
-  for (const check of schema.def.checks ?? []) {
-    const def = check._zod.def as {
-      readonly check: string;
-      readonly minimum?: number;
-      readonly maximum?: number;
-    };
-    if (def.check === 'min_length' && def.minimum !== undefined) min = def.minimum;
-    if (def.check === 'max_length' && def.maximum !== undefined) max = def.maximum;
+function choicesOf(schema: z.ZodType): readonly (string | number)[] | undefined {
+  const def = defOf(schema);
+  if (def.type === 'enum') return (schema as unknown as { options: string[] }).options;
+  if (def.type === 'union' && def.options?.every((option) => defOf(option).type === 'literal')) {
+    return def.options.flatMap((option) => (defOf(option).values ?? []) as (string | number)[]);
   }
-  return { min, max };
+  return undefined;
 }
 
 function isWindow(schema: z.ZodType): boolean {
-  if (schema.def.type !== 'object') return false;
-  return (
-    Object.keys((schema as z.ZodObject).shape)
-      .sort()
-      .join() === 'end,start'
-  );
+  const def = defOf(schema);
+  if (def.type !== 'object') return false;
+  const keys = Object.keys((schema as unknown as { shape: Record<string, z.ZodType> }).shape);
+  return keys.length === 2 && keys.includes('start') && keys.includes('end');
 }
 
-function fieldOfSchema(schema: z.ZodType): SettingField | undefined {
-  switch (schema.def.type) {
-    case 'number': {
-      const number = schema as z.ZodNumber;
-      return { kind: 'number', min: number.minValue ?? 0, max: number.maxValue ?? UNLIMITED };
-    }
+/** The editor for a schema; `undefined` when none fits (never for the catalogue, see tests). */
+export function editorOfSchema(schema: z.ZodType, unit?: string): Editor | undefined {
+  const def = defOf(schema);
+  const choices = choicesOf(schema);
+  if (choices !== undefined) return { kind: 'CHOICE', options: choices };
+  switch (def.type) {
     case 'boolean':
-      return { kind: 'switch' };
-    case 'enum':
-      return { kind: 'choice', options: (schema as z.ZodEnum).options };
-    case 'union': {
-      const values = (schema as z.ZodUnion).options.map((option) =>
-        option._zod.def.type === 'literal' ? (option as z.ZodLiteral).value : undefined,
-      );
-      return values.every((value) => typeof value === 'string' || typeof value === 'number')
-        ? { kind: 'choice', options: values }
-        : undefined;
+      return { kind: 'BOOLEAN' };
+    case 'number': {
+      const number = schema as unknown as { minValue: number | null; maxValue: number | null };
+      return {
+        kind: 'NUMBER',
+        min: number.minValue ?? 0,
+        max: number.maxValue ?? Number.MAX_SAFE_INTEGER,
+        scale: unit === 'basis points' ? 'BP' : unit === 'paise' ? 'PAISE' : 'PLAIN',
+      };
     }
     case 'array': {
-      const array = schema as z.ZodArray;
-      if (array.element._zod.def.type !== 'string') return undefined;
-      const { min, max } = lengthLimits(array);
-      const maxLength = (array.element as z.ZodString).maxLength ?? UNLIMITED;
-      return { kind: 'lines', minLines: min, maxLines: max, maxLength };
+      const element = def.element === undefined ? undefined : defOf(def.element).type;
+      if (element === 'string') return { kind: 'LIST' };
+      // Whole numbers one per line, such as printer ports.
+      return element === 'number' ? { kind: 'LIST', numbers: true } : undefined;
     }
+    case 'string':
+      return { kind: 'TEXT', nullable: false };
     case 'nullable': {
-      const inner = (schema as z.ZodNullable).unwrap();
-      if (inner._zod.def.type !== 'string') return undefined;
-      return { kind: 'text', maxLength: (inner as z.ZodString).maxLength ?? UNLIMITED };
+      const inner = def.innerType;
+      if (inner === undefined) return undefined;
+      if (defOf(inner).type === 'string') {
+        return defOf(inner).format === 'uuid'
+          ? { kind: 'PRINTER' }
+          : { kind: 'TEXT', nullable: true };
+      }
+      return undefined;
     }
     case 'object': {
-      if (isWindow(schema)) return { kind: 'window' };
-      const shape = (schema as z.ZodObject).shape;
-      const parts = Object.keys(shape);
-      return parts.length > 0 && parts.every((part) => isWindow(shape[part] as z.ZodType))
-        ? { kind: 'windows', parts }
-        : undefined;
+      if (isWindow(schema)) return { kind: 'WINDOW' };
+      const shape = (schema as unknown as { shape: Record<string, z.ZodType> }).shape;
+      const fields: { name: string; editor: Editor }[] = [];
+      for (const [name, field] of Object.entries(shape)) {
+        const editor = editorOfSchema(field);
+        if (editor?.kind !== 'CHOICE' && editor?.kind !== 'WINDOW') return undefined;
+        fields.push({ name, editor });
+      }
+      return { kind: 'FIELDS', fields };
+    }
+    case 'record': {
+      const keys = def.keyType === undefined ? undefined : choicesOf(def.keyType);
+      const options = def.valueType === undefined ? undefined : choicesOf(def.valueType);
+      if (keys === undefined || options === undefined) return undefined;
+      return { kind: 'RECORD', keys: keys.map(String), options: options.map(String) };
     }
     default:
       return undefined;
   }
 }
 
-function definitionOf(key: SettingKey): SettingDefinition {
+/** The editor for a catalogue setting. */
+export function editorOf(key: string): Editor | undefined {
+  if (key === 'notifications.rules') return { kind: 'RULES', page: 'notifications' };
+  if (key === 'reco.itemPreferences') return { kind: 'RULES', page: 'recommendations' };
   const definition = settingDefinition(key);
-  if (definition === undefined) throw new Error(`Unknown setting ${key}`);
-  return definition;
+  return definition === undefined ? undefined : editorOfSchema(definition.schema, definition.unit);
 }
 
-/**
- * The editor for a setting: a number in its range, a switch, a choice, lines, text, a printer or
- * daily windows. A setting whose validation fits none throws, so a new kind of setting fails the
- * tests until the page can edit it.
- */
-export function fieldOf(key: SettingKey): SettingField {
-  const field = SPECIAL_FIELDS[key] ?? fieldOfSchema(definitionOf(key).schema);
-  if (field === undefined) throw new Error(`No editor for the setting ${key}`);
-  return field;
+// ---------------------------------------------------------------- what is typed
+
+/** What the dialog holds while a value is edited. */
+export type Draft =
+  | boolean
+  | string
+  | { readonly start: string; readonly end: string }
+  | { readonly [name: string]: Draft };
+
+/** Basis points as a percent people type: 1000 → "10", 50 → "0.5". */
+export function bpText(bp: number): string {
+  const whole = Math.trunc(bp / 100);
+  const rest = Math.abs(bp % 100);
+  if (rest === 0) return String(whole);
+  return `${String(whole)}.${String(rest).padStart(2, '0').replace(/0$/, '')}`;
 }
 
-export function unitOf(key: SettingKey): SettingUnit | undefined {
-  return definitionOf(key).unit;
+/** A percent typed as text, to basis points without floating point; undefined if not a number. */
+export function parseBp(text: string): number | undefined {
+  const match = /^(\d{1,3})(?:\.(\d{1,2}))?$/.exec(text.trim().replace(/%$/, '').trim());
+  if (match === null) return undefined;
+  return Number(match[1]) * 100 + Number((match[2] ?? '').padEnd(2, '0'));
 }
 
-export function settingLabel(t: Translator, key: SettingKey): string {
-  return t(`settingItems.${key}.label`);
-}
-
-export function settingHint(t: Translator, key: SettingKey): string {
-  return t(`settingItems.${key}.hint`);
-}
-
-/** The words for one choice of a setting (`settingItems.<key>.options.<value>`). */
-export function optionLabel(t: Translator, key: SettingKey, option: string | number): string {
-  return t(`settingItems.${key}.options.${String(option)}` as MessageKey);
-}
-
-/** The name of one of a setting's windows (`settingItems.<key>.parts.<part>`). */
-export function partLabel(t: Translator, key: SettingKey, part: string): string {
-  return t(`settingItems.${key}.parts.${part}` as MessageKey);
-}
-
-/** A rate in basis points as the percentage people type: 1000 → "10", 1250 → "12.5". */
-export function percentOf(basisPoints: number): string {
-  return (basisPoints / 100).toFixed(2).replace(/\.?0+$/, '');
-}
-
-/** A number with its unit: "10 minutes", "12.5 %", "₹200.00" (NFR-L03). */
-export function formatNumber(t: Translator, unit: SettingUnit | undefined, value: number): string {
-  if (unit === 'basis points') return t('settings.units.percent', { value: percentOf(value) });
-  if (unit === 'paise') return formatRupees(value);
-  if (unit === undefined) return new Intl.NumberFormat(t.locale).format(value);
-  return t(`settings.units.${unit}`, { value });
-}
-
-function windowText(t: Translator, window: TimeWindowValue): string {
-  return t(
-    window.end < window.start ? 'settings.values.windowOvernight' : 'settings.values.window',
-    { start: window.start, end: window.end },
-  );
-}
-
-/** The printers a bill can print on, by id, for showing the chosen one. */
-export type PrinterNames = ReadonlyMap<string, string>;
-
-/** Printer names by id; an archived printer still chosen says so. */
-export function printerNamesOf(t: Translator, printers: readonly PrinterView[]): PrinterNames {
-  return new Map(
-    printers.map((printer) => [
-      printer.id,
-      printer.archivedAt === null
-        ? printer.name
-        : t('settings.values.printerArchived', { name: printer.name }),
-    ]),
-  );
-}
-
-/** A setting's value in words, with its unit. */
-export function formatValue(
-  t: Translator,
-  key: SettingKey,
-  value: unknown,
-  printers: PrinterNames,
-): string {
-  const field = fieldOf(key);
-  switch (field.kind) {
-    case 'number':
-      return formatNumber(t, unitOf(key), value as number);
-    case 'switch':
-      return t(value === true ? 'settings.values.on' : 'settings.values.off');
-    case 'choice':
-      return optionLabel(t, key, value as string | number);
-    case 'lines': {
-      const lines = value as readonly string[];
-      return lines.length === 0 ? t('settings.values.none') : lines.join(', ');
-    }
-    case 'text':
-      return (value as string | null) ?? t('settings.values.none');
-    case 'printer':
-      if (value === null) return t('settings.values.printerEachTime');
-      return printers.get(value as string) ?? t('settings.values.printerGone');
-    case 'window':
-      return windowText(t, value as TimeWindowValue);
-    case 'windows': {
-      const windows = value as Readonly<Record<string, TimeWindowValue>>;
-      return field.parts
-        .map((part) =>
-          t('settings.values.part', {
-            part: partLabel(t, key, part),
-            window: windows[part] === undefined ? '' : windowText(t, windows[part]),
-          }),
-        )
-        .join('; ');
-    }
-  }
-}
-
-/**
- * What is typed or chosen in the editor: text for numbers (in the unit people use: percent for
- * basis points, rupees for paise), choices, lines and printers; on or off; or daily windows.
- */
-export type SettingDraft =
-  string | boolean | TimeWindowValue | Readonly<Record<string, TimeWindowValue>>;
-
-function numberText(unit: SettingUnit | undefined, value: number): string {
-  if (unit === 'basis points') return percentOf(value);
-  if (unit === 'paise') return formatRupees(value, { symbol: false });
-  return String(value);
-}
-
-/** The editor's starting point for a value. */
-export function draftOf(key: SettingKey, value: unknown): SettingDraft {
-  const field = fieldOf(key);
-  switch (field.kind) {
-    case 'number':
-      return numberText(unitOf(key), value as number);
-    case 'switch':
+export function draftOf(editor: Editor, value: unknown): Draft {
+  switch (editor.kind) {
+    case 'BOOLEAN':
       return value === true;
-    case 'choice':
+    case 'NUMBER': {
+      const number = typeof value === 'number' ? value : 0;
+      if (editor.scale === 'BP') return bpText(number);
+      if (editor.scale === 'PAISE')
+        return formatRupees(number, { symbol: false }).replace(/,/g, '');
+      return String(number);
+    }
+    case 'CHOICE':
       return String(value);
-    case 'lines':
-      return (value as readonly string[]).join('\n');
-    case 'text':
-    case 'printer':
-      return (value as string | null) ?? '';
-    case 'window':
-      return { ...(value as TimeWindowValue) };
-    case 'windows':
-      return { ...(value as Readonly<Record<string, TimeWindowValue>>) };
+    case 'LIST':
+      return Array.isArray(value) ? value.map(String).join('\n') : '';
+    case 'TEXT':
+    case 'PRINTER':
+      return typeof value === 'string' ? value : '';
+    case 'WINDOW': {
+      const window = value as { start?: string; end?: string } | null;
+      return { start: window?.start ?? '', end: window?.end ?? '' };
+    }
+    case 'FIELDS': {
+      const object = (value ?? {}) as Record<string, unknown>;
+      return Object.fromEntries(
+        editor.fields.map((field) => [field.name, draftOf(field.editor, object[field.name])]),
+      );
+    }
+    case 'RECORD': {
+      const record = (value ?? {}) as Record<string, unknown>;
+      return Object.fromEntries(
+        editor.keys.map((key) => {
+          const entry = record[key];
+          return [key, typeof entry === 'string' ? entry : ''];
+        }),
+      );
+    }
+    case 'RULES':
+      return '';
   }
 }
 
-/** Why a draft cannot be saved; the page puts it in words. */
-export type SettingProblem =
-  | { readonly kind: 'number'; readonly min: number; readonly max: number }
-  | { readonly kind: 'required' }
-  | { readonly kind: 'tooManyLines'; readonly max: number }
-  | { readonly kind: 'tooFewLines' }
-  | { readonly kind: 'lineTooLong'; readonly length: number }
-  | { readonly kind: 'tooLong'; readonly length: number }
-  | { readonly kind: 'time' }
-  | { readonly kind: 'invalid' };
+export type Parsed = { readonly ok: true; readonly value: unknown } | { readonly ok: false };
 
-export type SettingCheck =
-  | { readonly ok: true; readonly value: unknown }
-  | { readonly ok: false; readonly problem: SettingProblem };
-
-const fail = (problem: SettingProblem): SettingCheck => ({ ok: false, problem });
-
-function numberOf(unit: SettingUnit | undefined, text: string): number | undefined {
-  const typed = text.trim().replace(/%$/, '').trim();
-  if (unit === 'basis points' || unit === 'paise') {
-    try {
-      return parseRupees(typed);
-    } catch {
-      return undefined;
-    }
-  }
-  return /^\d+$/.test(typed) ? Number(typed) : undefined;
-}
-
-function isTime(text: string): boolean {
-  return TimeOfDay.safeParse(text).success;
-}
-
-function candidateOf(
-  field: SettingField,
-  unit: SettingUnit | undefined,
-  draft: SettingDraft,
-): SettingCheck {
-  switch (field.kind) {
-    case 'number': {
-      const value = numberOf(unit, draft as string);
-      return value !== undefined &&
-        Number.isSafeInteger(value) &&
-        value >= field.min &&
-        value <= field.max
-        ? { ok: true, value }
-        : fail({ kind: 'number', min: field.min, max: field.max });
-    }
-    case 'switch':
+/** The value a draft stands for; the schema then checks it like the server will. */
+export function valueOf(editor: Editor, draft: Draft): Parsed {
+  switch (editor.kind) {
+    case 'BOOLEAN':
       return { ok: true, value: draft === true };
-    case 'choice': {
-      const option = field.options.find((each) => String(each) === draft);
-      return option === undefined ? fail({ kind: 'required' }) : { ok: true, value: option };
+    case 'NUMBER': {
+      const text = typeof draft === 'string' ? draft.trim() : '';
+      let number: number | undefined;
+      if (editor.scale === 'BP') number = parseBp(text);
+      else if (editor.scale === 'PAISE') {
+        try {
+          number = parseRupees(text);
+        } catch {
+          number = undefined;
+        }
+      } else number = /^-?\d{1,12}$/.test(text) ? Number(text) : undefined;
+      return number === undefined || number < editor.min || number > editor.max
+        ? { ok: false }
+        : { ok: true, value: number };
     }
-    case 'lines': {
-      const lines = (draft as string)
+    case 'CHOICE': {
+      const chosen = editor.options.find((option) => String(option) === draft);
+      return chosen === undefined ? { ok: false } : { ok: true, value: chosen };
+    }
+    case 'LIST': {
+      const lines = (typeof draft === 'string' ? draft : '')
         .split('\n')
         .map((line) => line.trim())
         .filter((line) => line !== '');
-      if (lines.length < field.minLines) return fail({ kind: 'tooFewLines' });
-      if (lines.length > field.maxLines) return fail({ kind: 'tooManyLines', max: field.maxLines });
-      if (lines.some((line) => line.length > field.maxLength)) {
-        return fail({ kind: 'lineTooLong', length: field.maxLength });
-      }
-      return { ok: true, value: lines };
+      if (editor.numbers !== true) return { ok: true, value: lines };
+      return lines.every((line) => /^\d{1,9}$/.test(line))
+        ? { ok: true, value: lines.map(Number) }
+        : { ok: false };
     }
-    case 'text': {
-      const text = (draft as string).trim();
-      if (text.length > field.maxLength) return fail({ kind: 'tooLong', length: field.maxLength });
-      return { ok: true, value: text === '' ? null : text };
+    case 'TEXT': {
+      const text = typeof draft === 'string' ? draft.trim() : '';
+      return { ok: true, value: editor.nullable && text === '' ? null : text };
     }
-    case 'printer':
+    case 'PRINTER':
       return { ok: true, value: draft === '' ? null : draft };
-    case 'window': {
-      const window = draft as TimeWindowValue;
-      return isTime(window.start) && isTime(window.end)
-        ? { ok: true, value: { start: window.start, end: window.end } }
-        : fail({ kind: 'time' });
-    }
-    case 'windows': {
-      const windows = draft as Readonly<Record<string, TimeWindowValue>>;
-      const value: Record<string, TimeWindowValue> = {};
-      for (const part of field.parts) {
-        const window = windows[part];
-        if (window === undefined || !isTime(window.start) || !isTime(window.end)) {
-          return fail({ kind: 'time' });
-        }
-        value[part] = { start: window.start, end: window.end };
+    case 'WINDOW':
+      return { ok: true, value: draft };
+    case 'FIELDS': {
+      const object = draft as Record<string, Draft>;
+      const value: Record<string, unknown> = {};
+      for (const field of editor.fields) {
+        const parsed = valueOf(field.editor, object[field.name] ?? '');
+        if (!parsed.ok) return parsed;
+        value[field.name] = parsed.value;
       }
       return { ok: true, value };
     }
+    case 'RECORD': {
+      const object = draft as Record<string, string>;
+      return {
+        ok: true,
+        value: Object.fromEntries(Object.entries(object).filter(([, chosen]) => chosen !== '')),
+      };
+    }
+    case 'RULES':
+      return { ok: false };
   }
 }
 
-/**
- * The value a draft stands for, checked with the setting's own validation from the catalogue, as
- * the server checks it (the rules between settings, such as red after amber, are the server's).
- */
-export function checkDraft(key: SettingKey, draft: SettingDraft): SettingCheck {
-  const candidate = candidateOf(fieldOf(key), unitOf(key), draft);
-  if (!candidate.ok) return candidate;
-  const parsed = definitionOf(key).schema.safeParse(candidate.value);
-  return parsed.success ? { ok: true, value: parsed.data } : fail({ kind: 'invalid' });
+/** Parses and checks a draft against the setting's schema, as the server will. */
+export function checkedValue(key: string, editor: Editor, draft: Draft): Parsed {
+  const parsed = valueOf(editor, draft);
+  const definition = settingDefinition(key);
+  if (!parsed.ok || definition === undefined) return { ok: false };
+  const result = definition.schema.safeParse(parsed.value);
+  return result.success ? { ok: true, value: result.data } : { ok: false };
 }
 
-export function sameValue(a: unknown, b: unknown): boolean {
-  return canonicalJson(a) === canonicalJson(b);
+// ---------------------------------------------------------------- the list
+
+export interface SettingGroup {
+  /** The key's first part, e.g. `kds`. */
+  readonly area: string;
+  readonly settings: readonly SettingView[];
 }
 
-export function updateRequestOf(value: unknown, reason: string): UpdateSettingRequest {
-  const why = reason.trim();
-  return { value, ...(why !== '' && { reason: why }) };
+/** Settings by area in catalogue order, filtered by a search over labels, hints and keys. */
+export function groupSettings(
+  settings: readonly SettingView[],
+  search: string,
+  textOf: (setting: SettingView) => string,
+): SettingGroup[] {
+  const words = search.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  const groups = new Map<string, SettingView[]>();
+  for (const setting of settings) {
+    const text = `${textOf(setting)} ${setting.key}`.toLowerCase();
+    if (!words.every((word) => text.includes(word))) continue;
+    const prefix = setting.key.split('.')[0] ?? setting.key;
+    // Older pager keys say `pager.`; they belong with the other pager settings.
+    const area = prefix === 'pager' ? 'pagers' : prefix;
+    const list = groups.get(area) ?? [];
+    list.push(setting);
+    groups.set(area, list);
+  }
+  return [...groups].map(([area, list]) => ({ area, settings: list }));
 }
 
-/**
- * What a person may do with a setting: change it, or see it because the vendor sets it (UPD-010),
- * only the Owner changes it (AUTH-006) or their role does not let them.
- */
-export type SettingAccess = 'EDIT' | 'VENDOR' | 'OWNER_ONLY' | 'NOT_YOURS';
-
-export function accessOf(view: SettingView): SettingAccess {
-  if (view.scope === 'VENDOR') return 'VENDOR';
-  if (view.editable) return 'EDIT';
-  return OWNER_ONLY_CAPABILITIES.has(view.capability) ? 'OWNER_ONLY' : 'NOT_YOURS';
-}
-
-/** Whether saving asks the Owner for the second factor (tax, invoice and data settings). */
-export function asksSecondFactor(view: SettingView): boolean {
-  return OWNER_SECOND_FACTOR_CAPABILITIES.has(view.capability);
-}
-
-export interface SettingSection {
-  readonly group: SettingGroup;
-  readonly settings: readonly (SettingView & { readonly key: SettingKey })[];
-}
-
-export interface SettingFilter {
-  readonly query: string;
-  readonly changedOnly: boolean;
-}
-
-/**
- * The General page's sections: its groups in order, each with its settings in the catalogue's
- * order, those with a page of their own and any this console does not know left out. `words`
- * gives what a search looks in (the setting's name and description).
- */
-export function settingSections(
-  views: readonly SettingView[],
-  filter: SettingFilter,
-  words: (key: SettingKey) => string,
-): SettingSection[] {
-  const query = filter.query.trim().toLowerCase();
-  const shown = views.filter(
-    (view): view is SettingView & { readonly key: SettingKey } =>
-      isSettingKey(view.key) &&
-      !EDITED_ELSEWHERE.has(view.key) &&
-      (!filter.changedOnly || !view.isDefault) &&
-      (query === '' || words(view.key).toLowerCase().includes(query)),
-  );
-  return SETTING_GROUPS.map((group) => ({
-    group,
-    settings: shown.filter((view) => groupOf(view.key) === group),
-  })).filter((section) => section.settings.length > 0);
+/** Whether changing it needs the Owner's fresh second factor (AUTH-006). */
+export function needsOwner(setting: SettingView): boolean {
+  return OWNER_SECOND_FACTOR_CAPABILITIES.has(setting.capability);
 }

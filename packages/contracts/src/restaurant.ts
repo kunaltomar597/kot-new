@@ -88,6 +88,11 @@ export const BusinessDayCutoff = TimeOfDay.refine((time) => time < '12:00', {
 });
 
 /** The restaurant as every screen and printed bill shows it. */
+/** A colour as "#RRGGBB" (the tablets pick black or white text on it for contrast). */
+export const AccentColor = z
+  .string()
+  .regex(/^#[0-9a-fA-F]{6}$/, { message: 'Give the colour as #RRGGBB, for example #B4232A' });
+
 export const RestaurantProfile = z.object({
   id: Id,
   displayName: z.string(),
@@ -103,6 +108,8 @@ export const RestaurantProfile = z.object({
   businessHours: BusinessHours,
   /** A photo from the photo store (P1-04). */
   logoPhotoId: Id.nullable(),
+  /** The brand colour the table tablets use for buttons and highlights (TAB-003, P3-01a). */
+  accentColor: AccentColor.nullable(),
   /** Asia/Kolkata in this version (NFR-L03). */
   timeZone: z.string(),
   businessDayCutoff: TimeOfDay,
@@ -116,6 +123,8 @@ export const UpdateRestaurantProfileRequest = z.strictObject({
   contact: RestaurantContact,
   businessHours: BusinessHours,
   logoPhotoId: Id.nullable(),
+  /** Left out: unchanged. Null: the tablets use the standard colour. */
+  accentColor: AccentColor.nullable().optional(),
   businessDayCutoff: BusinessDayCutoff,
   reason: Reason.optional(),
 });

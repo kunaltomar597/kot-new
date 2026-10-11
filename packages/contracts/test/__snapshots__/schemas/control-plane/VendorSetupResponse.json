@@ -1,0 +1,13 @@
+{
+  "input": {
+    "type": "object",
+    "properties": { "otpauthUri": { "type": "string" }, "secret": { "type": "string" } },
+    "required": ["otpauthUri", "secret"]
+  },
+  "output": {
+    "type": "object",
+    "properties": { "otpauthUri": { "type": "string" }, "secret": { "type": "string" } },
+    "required": ["otpauthUri", "secret"],
+    "additionalProperties": false
+  }
+}

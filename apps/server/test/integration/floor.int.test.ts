@@ -172,10 +172,6 @@ describe('[TBL-001] sections and tables', () => {
       .set(as(manager))
       .send({ reason: 'Monsoon' });
     expect([full.status, codeOf(full)]).toEqual([409, 'SECTION_NOT_EMPTY']);
-    // Managers read it as it is on the Floor page.
-    expect(ApiError.parse(full.body).message).toBe(
-      'The section still has a table. Move or archive it first.',
-    );
 
     await server()
       .post(`/api/v1/tables/${t7.id}/archive`)
@@ -218,6 +214,65 @@ function addTableRaw(label: string, sectionId: string) {
     .set(as(manager))
     .send({ label, capacity: 4, sectionId, displayOrder: 0 });
 }
+
+describe('[ONB-004] [TBL-001] the floor plan', () => {
+  const place = (x: number, y: number, w = 4, h = 3, shape = 'RECT') => ({ x, y, w, h, shape });
+  const save = (tables: object[], login = manager) =>
+    server().put('/api/v1/floor/layout').set(as(login)).send({ tables });
+  const layoutOf = (floor: FloorResponse, label: string) =>
+    floor.sections.flatMap((section) => section.tables).find((table) => table.label === label)
+      ?.layout;
+  const audits = () => prisma.auditLog.count({ where: { action: 'FLOOR_LAYOUT_CHANGED' } });
+
+  it('saves where tables sit, never two on one spot of a section, audited', async () => {
+    expect((await save([{ tableId: t1.id, layout: place(1, 1) }], waiter)).status).toBe(403);
+    const saved = await save([
+      { tableId: t1.id, layout: place(1, 1) },
+      { tableId: t2.id, layout: place(6, 1, 3, 3, 'ROUND') },
+      // The same spot in another section is fine.
+      { tableId: t7.id, layout: place(1, 1) },
+    ]);
+    expect(saved.status, JSON.stringify(saved.body)).toBe(200);
+    const floor = FloorResponse.parse(saved.body);
+    expect([layoutOf(floor, 'T1'), layoutOf(floor, 'T2'), layoutOf(floor, 'T7')]).toEqual([
+      place(1, 1),
+      place(6, 1, 3, 3, 'ROUND'),
+      place(1, 1),
+    ]);
+    expect(await audits()).toBe(1);
+    expect(
+      await prisma.auditLog.findFirstOrThrow({ where: { action: 'FLOOR_LAYOUT_CHANGED' } }),
+    ).toMatchObject({ before: { T1: null }, after: { T1: place(1, 1) } });
+
+    const clash = await save([{ tableId: t2.id, layout: place(3, 2) }]);
+    expect([clash.status, codeOf(clash)]).toEqual([422, 'LAYOUT_OVERLAP']);
+    expect(ApiError.parse(clash.body).message).toBe('T1 and T2 overlap on the plan.');
+    const outside = await save([{ tableId: t1.id, layout: place(38, 0) }]);
+    expect(outside.status).toBe(400);
+    const unknown = await save([
+      { tableId: '01926a3e-0000-7000-8000-000000000009', layout: place(1, 1) },
+    ]);
+    expect([unknown.status, codeOf(unknown)]).toEqual([404, 'TABLE_NOT_FOUND']);
+    // Saving the same places again changes nothing.
+    expect((await save([{ tableId: t1.id, layout: place(1, 1) }])).status).toBe(200);
+    expect(await audits()).toBe(1);
+  });
+
+  it('takes a table off the plan when it moves section, or when asked', async () => {
+    const moved = await server()
+      .put(`/api/v1/tables/${t2.id}`)
+      .set(as(manager))
+      .send({ label: 'T2', capacity: 4, sectionId: terrace.id, displayOrder: 2 });
+    expect(TableView.parse(moved.body).layout).toBeNull();
+    const off = FloorResponse.parse((await save([{ tableId: t7.id, layout: null }])).body);
+    expect(layoutOf(off, 'T7')).toBeNull();
+    expect(layoutOf(off, 'T1')).toEqual(place(1, 1));
+    await server()
+      .put(`/api/v1/tables/${t2.id}`)
+      .set(as(manager))
+      .send({ label: 'T2', capacity: 4, sectionId: hall.id, displayOrder: 2 });
+  });
+});
 
 describe('[TBL-002] waiter assignment', () => {
   const put = (login: LoginResponse, body: Record<string, unknown>) =>

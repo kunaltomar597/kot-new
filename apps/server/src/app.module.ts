@@ -1,8 +1,13 @@
 import { type DynamicModule, Module } from '@nestjs/common';
 import { APP_FILTER } from '@nestjs/core';
 import { AuditModule } from './audit/audit.module.js';
+import { BackupsModule } from './backups/backups.module.js';
+import { LifecycleModule } from './lifecycle/lifecycle.module.js';
+import { DigitalBillsModule } from './digital-bills/digital-bills.module.js';
 import { BillingModule } from './billing/billing.module.js';
 import { CloudModule } from './cloud/cloud.module.js';
+import { OnboardingModule } from './onboarding/onboarding.module.js';
+import { RelayModule } from './relay/relay.module.js';
 import { AuthModule } from './auth/auth.module.js';
 import type { AppConfig } from './config/app-config.js';
 import { ConfigModule } from './config/config.module.js';
@@ -17,11 +22,13 @@ import { ObservabilityModule } from './observability/error-reporter.js';
 import { RealtimeModule } from './realtime/realtime.module.js';
 import { KitchenModule } from './kitchen/kitchen.module.js';
 import { ReportsModule } from './reports/reports.module.js';
+import { FeedbackModule } from './feedback/feedback.module.js';
 import { FloorModule } from './floor/floor.module.js';
 import { MenuModule } from './menu/menu.module.js';
 import { NotificationsModule } from './notifications/notifications.module.js';
 import { OrdersModule } from './orders/orders.module.js';
 import { PagersModule } from './pagers/pagers.module.js';
+import { PagerFirmwareModule } from './pager-firmware/pager-firmware.module.js';
 import { PaymentsModule } from './payments/payments.module.js';
 import { PhotosModule } from './photos/photos.module.js';
 import { PrintingModule } from './printing/printing.module.js';
@@ -29,7 +36,10 @@ import { RecommendationsModule } from './recommendations/recommendations.module.
 import { RestaurantModule } from './restaurant/restaurant.module.js';
 import { ServiceRequestsModule } from './service-requests/service-requests.module.js';
 import { SettingsModule } from './settings/settings.module.js';
+import { LicensingModule } from './licensing/licensing.module.js';
 import { StaffModule } from './staff/staff.module.js';
+import { SystemModule } from './system/system.module.js';
+import { UpdatesModule } from './updates/updates.module.js';
 import { TlsModule } from './tls/tls.module.js';
 
 /**
@@ -49,6 +59,7 @@ export class AppModule {
         AuthModule,
         AuditModule,
         SettingsModule,
+        LicensingModule,
         RestaurantModule,
         FloorModule,
         MenuModule,
@@ -64,12 +75,21 @@ export class AppModule {
         PhotosModule,
         DayEndModule,
         ReportsModule,
+        FeedbackModule,
         KitchenModule,
         DevicesModule,
         EventsModule,
         RealtimeModule,
         TlsModule,
         CloudModule,
+        OnboardingModule,
+        RelayModule,
+        SystemModule,
+        BackupsModule,
+        UpdatesModule,
+        PagerFirmwareModule,
+        LifecycleModule,
+        DigitalBillsModule,
         HealthModule,
       ],
       providers: [{ provide: APP_FILTER, useClass: ApiExceptionFilter }],

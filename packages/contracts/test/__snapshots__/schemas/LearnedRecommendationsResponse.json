@@ -1,0 +1,169 @@
+{
+  "input": {
+    "type": "object",
+    "properties": {
+      "lastRun": {
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "at": {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+              },
+              "windowFrom": {
+                "type": "string",
+                "format": "date",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+              },
+              "windowTo": {
+                "type": "string",
+                "format": "date",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+              },
+              "orders": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+              "baskets": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+              "associations": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+              "active": { "type": "boolean" },
+              "durationMs": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+            },
+            "required": [
+              "at",
+              "windowFrom",
+              "windowTo",
+              "orders",
+              "baskets",
+              "associations",
+              "active",
+              "durationMs"
+            ]
+          },
+          { "type": "null" }
+        ]
+      },
+      "minOrders": { "type": "integer", "exclusiveMinimum": 0, "maximum": 9007199254740991 },
+      "associations": {
+        "maxItems": 50,
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "fromItemId": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "fromName": { "type": "string" },
+            "toItemId": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "toName": { "type": "string" },
+            "pairCount": { "type": "integer", "exclusiveMinimum": 0, "maximum": 9007199254740991 },
+            "supportBp": { "type": "integer", "minimum": 0, "maximum": 10000 },
+            "confidenceBp": { "type": "integer", "minimum": 0, "maximum": 10000 },
+            "liftPercent": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+          },
+          "required": [
+            "fromItemId",
+            "fromName",
+            "toItemId",
+            "toName",
+            "pairCount",
+            "supportBp",
+            "confidenceBp",
+            "liftPercent"
+          ]
+        }
+      }
+    },
+    "required": ["lastRun", "minOrders", "associations"]
+  },
+  "output": {
+    "type": "object",
+    "properties": {
+      "lastRun": {
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "at": {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+              },
+              "windowFrom": {
+                "type": "string",
+                "format": "date",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+              },
+              "windowTo": {
+                "type": "string",
+                "format": "date",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+              },
+              "orders": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+              "baskets": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+              "associations": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+              "active": { "type": "boolean" },
+              "durationMs": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+            },
+            "required": [
+              "at",
+              "windowFrom",
+              "windowTo",
+              "orders",
+              "baskets",
+              "associations",
+              "active",
+              "durationMs"
+            ],
+            "additionalProperties": false
+          },
+          { "type": "null" }
+        ]
+      },
+      "minOrders": { "type": "integer", "exclusiveMinimum": 0, "maximum": 9007199254740991 },
+      "associations": {
+        "maxItems": 50,
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "fromItemId": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "fromName": { "type": "string" },
+            "toItemId": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "toName": { "type": "string" },
+            "pairCount": { "type": "integer", "exclusiveMinimum": 0, "maximum": 9007199254740991 },
+            "supportBp": { "type": "integer", "minimum": 0, "maximum": 10000 },
+            "confidenceBp": { "type": "integer", "minimum": 0, "maximum": 10000 },
+            "liftPercent": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+          },
+          "required": [
+            "fromItemId",
+            "fromName",
+            "toItemId",
+            "toName",
+            "pairCount",
+            "supportBp",
+            "confidenceBp",
+            "liftPercent"
+          ],
+          "additionalProperties": false
+        }
+      }
+    },
+    "required": ["lastRun", "minOrders", "associations"],
+    "additionalProperties": false
+  }
+}

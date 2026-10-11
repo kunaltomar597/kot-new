@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import * as controlPlane from '../src/control-plane/index.js';
 import * as contracts from '../src/index.js';
+import * as relay from '../src/relay/index.js';
 import { buildAsyncApi } from '../scripts/lib/asyncapi.js';
 import { buildOpenApi } from '../scripts/lib/openapi.js';
 import { renderDocs } from '../scripts/lib/render.js';
@@ -15,6 +16,7 @@ const options = {
   routes: contracts.ROUTES,
   events: contracts.DomainEvent,
   controlPlane: { namespace: controlPlane, routes: controlPlane.CONTROL_PLANE_ROUTES },
+  relay: { namespace: relay, routes: relay.RELAY_ROUTES },
   version: '0.0.0-test',
   outDir,
 };
@@ -32,6 +34,7 @@ const route = (overrides: Partial<RouteDefinition>): RouteDefinition => ({
   method: 'GET',
   path: '/api/v1/things/:thingId',
   summary: 'Get a thing',
+  description: 'Public because things are no secret.',
   tags: ['things'],
   requirements: [],
   capability: 'PUBLIC',
@@ -51,8 +54,27 @@ describe('[INT-002] [NFR-M06] generated contract documents', () => {
     expect(first.map((file) => file.name)).toEqual([
       'openapi.json',
       'control-plane.openapi.json',
+      'relay.openapi.json',
       'asyncapi.yaml',
     ]);
+  });
+
+  it('[QR-006] documents the QR relay functions separately, without prices in the order', () => {
+    const document = buildOpenApi({
+      namespace: relay,
+      routes: relay.RELAY_ROUTES,
+      version: '0.0.0-test',
+    }) as unknown as Doc;
+    for (const registered of relay.RELAY_ROUTES) {
+      const path = registered.path.replace(/:([A-Za-z0-9_]+)/g, '{$1}');
+      expect(document.paths[path]?.[registered.method.toLowerCase()], path).toBeDefined();
+    }
+    for (const name of collectSchemas(relay).keys()) {
+      expect(document.components.schemas).toHaveProperty([name]);
+    }
+    const body = JSON.stringify(document.paths['/functions/v1/submit-order']?.post?.requestBody);
+    expect(body).not.toMatch(/price/i);
+    expect(openapi.components.schemas).not.toHaveProperty(['QrSubmitOrderRequest']);
   });
 
   it('[VCP-005] [UPD-002] documents the Control Plane API separately, route by route', () => {
@@ -62,7 +84,9 @@ describe('[INT-002] [NFR-M06] generated contract documents', () => {
       version: '0.0.0-test',
     }) as unknown as Doc;
     for (const registered of controlPlane.CONTROL_PLANE_ROUTES) {
-      expect(document.paths[registered.path]?.[registered.method.toLowerCase()]).toBeDefined();
+      // OpenAPI writes Express-style `:param` as `{param}`.
+      const path = registered.path.replace(/:([A-Za-z0-9_]+)/g, '{$1}');
+      expect(document.paths[path]?.[registered.method.toLowerCase()], path).toBeDefined();
     }
     for (const name of collectSchemas(controlPlane).keys()) {
       expect(document.components.schemas).toHaveProperty([name]);
@@ -148,6 +172,36 @@ describe('[INT-002] [NFR-M06] generated contract documents', () => {
     expect(() =>
       buildOpenApi({ ...options, routes: [route({}), route({ operationId: 'other' })] }),
     ).toThrow(/Duplicate route/);
+  });
+
+  it('[SEC-003] makes device endpoints name their devices and public ones say why', () => {
+    const device = (devices?: RouteDefinition['devices']) =>
+      route({ capability: 'DEVICE', ...(devices !== undefined && { devices }) });
+    expect(() => buildOpenApi({ ...options, routes: [device()] })).toThrow(/name their devices/);
+    expect(() => buildOpenApi({ ...options, routes: [device([])] })).toThrow(/no device/);
+    expect(() => buildOpenApi({ ...options, routes: [route({ devices: ['POS'] })] })).toThrow(
+      /name their devices/,
+    );
+    expect(() => buildOpenApi({ ...options, routes: [route({ description: ' ' })] })).toThrow(
+      /says why/,
+    );
+    const document = buildOpenApi({
+      ...options,
+      routes: [device(['TABLE_TABLET'])],
+    }) as unknown as { paths: Record<string, { get: Record<string, unknown> }> };
+    expect(document.paths['/api/v1/things/{thingId}']?.get['x-devices']).toEqual(['TABLE_TABLET']);
+  });
+
+  it('[SEC-003] documents the devices of every device endpoint of the local server', () => {
+    const devices = Object.values(openapi.paths)
+      .flatMap((item) => Object.values(item) as Record<string, unknown>[])
+      .filter((operation) => operation['x-capability'] === 'DEVICE')
+      .map((operation) => operation['x-devices'] as string[]);
+    expect(devices.length).toBeGreaterThan(20);
+    for (const list of devices) {
+      expect(list.length).toBeGreaterThan(0);
+      expect(list).not.toContain('PAGER');
+    }
   });
 
   it('names events that are only defined inside the catalogue after their type', () => {

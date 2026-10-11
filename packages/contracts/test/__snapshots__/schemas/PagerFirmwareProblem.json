@@ -1,0 +1,42 @@
+{
+  "input": {
+    "type": "string",
+    "enum": [
+      "NOT_HTTPS",
+      "HTTP_STATUS",
+      "NETWORK",
+      "SIZE",
+      "HASH",
+      "TOO_LARGE",
+      "NOT_AN_IMAGE",
+      "WRONG_CHIP",
+      "WRONG_PROJECT",
+      "VERSION_MISMATCH",
+      "NOT_SIGNED",
+      "UNTRUSTED_KEY",
+      "BAD_SIGNATURE",
+      "NO_TRUSTED_KEY",
+      "SECURE_VERSION_LOWER"
+    ]
+  },
+  "output": {
+    "type": "string",
+    "enum": [
+      "NOT_HTTPS",
+      "HTTP_STATUS",
+      "NETWORK",
+      "SIZE",
+      "HASH",
+      "TOO_LARGE",
+      "NOT_AN_IMAGE",
+      "WRONG_CHIP",
+      "WRONG_PROJECT",
+      "VERSION_MISMATCH",
+      "NOT_SIGNED",
+      "UNTRUSTED_KEY",
+      "BAD_SIGNATURE",
+      "NO_TRUSTED_KEY",
+      "SECURE_VERSION_LOWER"
+    ]
+  }
+}

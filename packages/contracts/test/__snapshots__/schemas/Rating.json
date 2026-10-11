@@ -1,0 +1,4 @@
+{
+  "input": { "type": "integer", "minimum": 1, "maximum": 5 },
+  "output": { "type": "integer", "minimum": 1, "maximum": 5 }
+}

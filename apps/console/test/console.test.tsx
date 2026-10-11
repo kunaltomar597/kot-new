@@ -103,6 +103,26 @@ describe('[AUTH-001] [AUTH-004] staff tiles and PIN login', () => {
   });
 });
 
+describe('[UPD-006] a console older than its server', () => {
+  it('says the screen is out of date and offers to load it again', async () => {
+    const reload = vi.fn();
+    // Only the button reads `location` here.
+    vi.stubGlobal('location', { reload });
+    const fake = server().on('GET', '/api/v1/auth/staff-tiles', () => ({
+      status: 426,
+      body: { code: 'CLIENT_TOO_OLD', message: 'Update the app.' },
+    }));
+    const { user, container } = await renderConsole({ fake });
+    expect(
+      await screen.findByRole('alert', { name: undefined, description: undefined }),
+    ).toHaveTextContent(t('console.outdated.title'));
+    expect(screen.getByText(t('console.outdated.description'))).toBeVisible();
+    await user.click(screen.getByRole('button', { name: t('console.outdated.reload') }));
+    expect(reload).toHaveBeenCalledOnce();
+    await expectNoAxeViolations(container);
+  });
+});
+
 describe('[MGR-001] [KDS-001] modes', () => {
   it('offers managers every mode and signs them out', async () => {
     const { user } = await renderConsole({ fake: signsInAs(server(), 'MANAGER') });
@@ -144,7 +164,8 @@ describe('[NFR-P11] connection banner', () => {
   it('appears while the server is unreachable and goes when it is back', async () => {
     const { sockets } = await renderConsole({ fake: server('KDS') });
     await screen.findByRole('heading', { level: 1, name: t('modes.kds') });
-    expect(screen.getByRole('status')).toHaveTextContent(t('connection.connecting'));
+    // By its words: on a slow machine the kitchen board's loading status can show beside it.
+    expect(screen.getByText(t('connection.connecting'))).toBeInTheDocument();
     sockets.sync(1);
     await waitFor(() => {
       expect(screen.queryByText(t('connection.connecting'))).toBeNull();

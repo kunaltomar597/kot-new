@@ -28,6 +28,23 @@ servers (every 30 s) and read-only switch when absent for 2 minutes; contract sc
 Acceptance: function tests for every validation and rate limit; replayed submissions return the
 original order.
 
+Split in two (2026-10-02):
+
+- **P5-02a Diners' functions.**
+  - `qr-menu` (the latest menu, read-only when the restaurant is absent), `submit-order` and
+    `order-status`;
+  - the expiry job and the rate limits in SQL;
+  - `@rp/contracts/relay` with its OpenAPI document;
+  - the local server's line check moved to `@rp/ordering`, so the relay runs the same one;
+  - the bundling for Deno, with a Deno smoke test.
+- **P5-02b Local servers' functions.**
+  - `server-session`: a credential exchanged for a short-lived Realtime JWT;
+  - presence, and the QR settings, every 30 s;
+  - publishing the menu document and photo metadata, and keeping the tables (token hashes) in
+    step;
+  - picking up new orders (polling fallback) and reporting their status;
+  - all checked against the contracts, acting as `relay_writer`.
+
 ## P5-03 Sync agent in the local server
 
 Requirements: QR-003, QR-009, QR-010, MENU-006 (≤ 30 s to QR), MENU-008 (photo mirror), NFR-P05,
@@ -41,6 +58,30 @@ approving opens the table; late expired orders rejected; presence heartbeat; sta
 relay (received, sent to kitchen, item statuses S).
 Acceptance: integration tests with local Supabase: internet cut mid-sync then recovery with no loss or
 duplicates; expired order rejection.
+
+Split in three (2026-10-02). The tests run the real relay (its schema in the test cluster, its
+functions over HTTP, `@rp/relay/testing`) in place of a local Supabase.
+
+- **P5-03a Publishing.**
+  - `RP_RELAY_URL`, and the credential sealed in the database (`relay:credential`);
+  - presence with the QR settings;
+  - the tables, and the QR menu with live availability, versioned and sent when their content
+    changes, with back-off while offline;
+  - the QR relay on the System page.
+- **P5-03b Orders.**
+  - pickup by Realtime with a polling fallback, and the inbox;
+  - prices recomputed into a normal QR order waiting for approval;
+  - tables not open go to their section's waiter, and approving opens the table;
+  - expired orders rejected;
+  - received, sent to the kitchen, rejected and item states reported back.
+- **P5-03c Photos.**
+  - menu photos mirrored to the relay's Storage in their sizes, listed in the QR menu;
+  - removed photos swept after 90 days.
+- **P5-03d Realtime doorbell.**
+  - a Realtime subscription to the restaurant's new QR orders and requests, which rings a pickup;
+  - polling slows to a safety net while it works, and speeds up at once when it drops;
+  - heartbeats, token renewal and rejoining with back-off; checked on a real Supabase by manual
+    task 20.
 
 ## P5-04 QR table tokens and table-tent PDFs
 
@@ -63,6 +104,24 @@ call waiter / request bill (S). Lighthouse CI budget for LCP ≤ 2.5 s on a mid-
 Acceptance: Playwright mobile tests for the order flow and offline read-only mode; Lighthouse budget
 passes.
 
+Split in two (2026-10-02):
+
+- **P5-05a The site.**
+  - `apps/qr-menu` on Next.js 16;
+  - the menu rendered on the server, with search, filters, dishes with options and combos;
+  - the cart with instructions and estimate, sending, and following orders;
+  - the call-a-waiter timeout and the read-only banner;
+  - privacy and terms, no tracking, CSP and no referrer;
+  - Playwright phone tests against a real relay.
+- **P5-05b Suggestions and speed.**
+  - recommendations from the snapshot (the local server publishes them in the QR menu document);
+  - the best-seller filter;
+  - the speed budget: LCP ≤ 2.5 s for a 300-dish menu on Lighthouse's mobile profile, measured by
+    Playwright.
+- **P5-05c Call waiter / request bill (S).** A relay function, pickup by the sync agent into the
+  restaurant's service requests, and the acknowledgement back to the page.
+- Photos on the page come with P5-03c, which mirrors them.
+
 ## P5-06 Phase 5 exit test: QR scenarios
 
 Requirements: S2 (QR part), S11, S13.
@@ -71,3 +130,6 @@ Deliverables: automated scenarios: internet outage 30 min (QR read-only, queues 
 recovery without duplicates), cross-tenant isolation, QR order with restaurant offline (please call
 a waiter after T; late arrival rejected as expired), duplicate replay.
 Acceptance: all pass in CI against local Supabase; summary in PROGRESS.md.
+
+Built as `apps/server/test/integration/qr-exit.int.test.ts` against the in-process relay; the
+relay's own suites run on a Supabase stack in the `relay-supabase` job (decision 385).

@@ -1,4 +1,5 @@
-import type { CustomRoleView, StaffView } from '@rp/contracts';
+import type { RoleView, StaffView } from '@rp/contracts';
+import { rolesOffered } from '@rp/domain';
 import { Button, Dialog, Select, TextField } from '@rp/ui-web';
 import { useId, useState } from 'react';
 import { useConsole } from '../../app/console-context.js';
@@ -10,13 +11,13 @@ import {
   checkPin,
   createRequestOf,
   emptyPersonForm,
+  fromRoleChoice,
   type PersonField,
   type PersonForm,
   type PersonProblem,
   personFormOf,
-  roleLabel,
-  roleOptions,
-  roleValueOf,
+  roleChoiceOf,
+  roleChoices,
   type StaffActorView,
   updateRequestOf,
 } from './staff-view.js';
@@ -61,8 +62,8 @@ function PinField({
 
 /**
  * Adds a person (name, role, contact, PIN) or edits one (name, role, contact), offering only the
- * roles the signed-in person may give (MGR-004), custom roles included (P4-02e, AUTH-012). Adding,
- * promoting or demoting a manager asks the Owner for the second factor first (AUTH-006).
+ * roles the signed-in person may give (MGR-004). Adding, promoting or demoting a manager asks the
+ * Owner for the second factor first (AUTH-006).
  */
 export function PersonDialog({
   actor,
@@ -76,8 +77,8 @@ export function PersonDialog({
   actor: StaffActorView;
   /** Undefined to add someone. */
   person: StaffView | undefined;
-  /** The custom roles, archived ones included; empty until read. */
-  customRoles: readonly CustomRoleView[];
+  /** The Owner's custom roles (AUTH-012), offered under their base role. */
+  customRoles: readonly RoleView[];
   pinLength: number;
   withSecondFactor: WithSecondFactor;
   onSaved: (saved: StaffView) => void;
@@ -86,19 +87,14 @@ export function PersonDialog({
   const t = useT();
   const controller = useConsole();
   const formId = useId();
-  const roles = roleOptions(actor, person, customRoles);
-  const [form, setForm] = useState<PersonForm>(() => {
-    if (person !== undefined) return personFormOf(person);
-    const first = roles.find((option) => option.value === 'WAITER') ?? roles[0];
-    return emptyPersonForm(first?.role ?? 'WAITER', first?.customRoleId ?? null);
-  });
-  const chosen = roles.find((option) => option.value === roleValueOf(form));
-  const chosenName = chosen?.customName ?? null;
-  const chosenLabel = roleLabel(
-    t,
-    form.role,
-    chosenName === null ? null : { name: chosenName },
-    chosen?.archived,
+  const target =
+    person === undefined ? null : { staffId: person.id, role: person.role, active: person.active };
+  const roles = rolesOffered(actor, target);
+  const choices = roleChoices(roles, customRoles, (role) => t(`roles.${role}`));
+  const [form, setForm] = useState<PersonForm>(() =>
+    person === undefined
+      ? emptyPersonForm(roles.includes('WAITER') ? 'WAITER' : (roles[0] ?? 'WAITER'))
+      : personFormOf(person),
   );
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState<string | undefined>();
@@ -183,33 +179,19 @@ export function PersonDialog({
             set('displayName')(event.target.value);
           }}
         />
-        {roles.length > 1 ? (
+        {choices.length > 1 ? (
           <Select
             label={t('staff.form.role')}
-            value={roleValueOf(form)}
-            options={roles.map((option) => ({
-              value: option.value,
-              label: roleLabel(
-                t,
-                option.role,
-                option.customName === null ? null : { name: option.customName },
-                option.archived,
-              ),
-            }))}
+            value={roleChoiceOf(form)}
+            options={choices}
             onChange={(event) => {
-              const option = roles.find((entry) => entry.value === event.target.value);
-              if (option !== undefined) {
-                setForm((current) => ({
-                  ...current,
-                  role: option.role,
-                  customRoleId: option.customRoleId,
-                }));
-              }
+              const chosen = fromRoleChoice(event.target.value, customRoles);
+              if (chosen !== undefined) setForm((current) => ({ ...current, ...chosen }));
             }}
           />
         ) : (
           <p className="staff-form__role">
-            {t('staff.form.role')}: {chosenLabel}
+            {t('staff.form.role')}: {t(`roles.${form.role}`)}
           </p>
         )}
         <TextField

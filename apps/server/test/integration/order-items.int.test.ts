@@ -287,6 +287,8 @@ describe('[ORD-011] [ORD-012] cancel, void and modify', () => {
           approverStaffId: kit.staff.MANAGER,
           pin: TEST_PINS.MANAGER,
           capability: 'ITEM_VOID_AFTER_PREP',
+          entityType: 'order_item',
+          entityId: roti,
         })
       ).body,
     );

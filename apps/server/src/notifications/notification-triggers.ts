@@ -1,6 +1,6 @@
 import { Injectable, type OnModuleInit } from '@nestjs/common';
 import type { DomainEvent } from '@rp/contracts';
-import { isLowBattery, lowBatteryLevelFor } from '@rp/domain';
+import { isLowBattery } from '@rp/domain';
 import type { TransactionClient } from '../database/prisma.service.js';
 import { EventBus } from '../events/event-bus.js';
 import { NotificationsService } from './notifications.service.js';
@@ -32,7 +32,6 @@ export class NotificationTriggers implements OnModuleInit {
         'TableClosed',
         'KotBumped',
         'DeviceStatusChanged',
-        'DeviceRevoked',
         'PrinterStatusChanged',
       ],
       handle: (event, context) => this.handle(event, context.tx),
@@ -43,16 +42,22 @@ export class NotificationTriggers implements OnModuleInit {
     const restaurantId = event.restaurantId;
     switch (event.type) {
       case 'OrderSubmitted': {
-        if (!event.payload.needsApproval || event.payload.tableSessionId === undefined) return;
-        const session = await tx.tableSession.findUnique({
-          where: { id: event.payload.tableSessionId },
-          select: { tableId: true },
-        });
+        const { tableSessionId } = event.payload;
+        if (!event.payload.needsApproval) return;
+        if (tableSessionId === undefined && event.payload.tableId === undefined) return;
+        const session =
+          tableSessionId === undefined
+            ? null
+            : await tx.tableSession.findUnique({
+                where: { id: tableSessionId },
+                select: { tableId: true },
+              });
+        // QR-010: for a table that is not open, the waiter who looks after it today is told.
         await this.notifications.raise(tx, {
           restaurantId,
           type: 'ORDER_PENDING_APPROVAL',
-          tableId: session?.tableId ?? null,
-          tableSessionId: event.payload.tableSessionId,
+          tableId: session?.tableId ?? event.payload.tableId ?? null,
+          tableSessionId: tableSessionId ?? null,
           orderId: event.payload.orderId,
           dedupeKey: `approval:${event.payload.orderId}`,
           payload: { orderNumber: event.payload.orderNumber, source: event.payload.source },
@@ -108,15 +113,6 @@ export class NotificationTriggers implements OnModuleInit {
       case 'DeviceStatusChanged':
         await this.deviceChanged(tx, restaurantId, event.payload);
         return;
-      case 'DeviceRevoked':
-        // An unpaired device is nobody's problem any more (MGR-006): its alerts end.
-        for (const state of ['offline', 'low']) {
-          await this.notifications.clear(tx, {
-            restaurantId,
-            dedupeKey: `device:${event.payload.deviceId}:${state}`,
-          });
-        }
-        return;
       case 'PrinterStatusChanged': {
         const key = `printer:${event.payload.printerId}`;
         if (event.payload.online) {
@@ -148,16 +144,23 @@ export class NotificationTriggers implements OnModuleInit {
   private async deviceChanged(
     tx: TransactionClient,
     restaurantId: string,
-    change: { deviceId: string; deviceType: string; online: boolean; batteryPercent?: number },
+    change: {
+      deviceId: string;
+      deviceType: string;
+      online: boolean;
+      batteryPercent?: number;
+      charging?: boolean;
+    },
   ): Promise<void> {
     if (!['PAGER', 'TABLE_TABLET', 'KDS'].includes(change.deviceType)) return;
     const settings = await this.notifications.settingsOf(restaurantId);
     // PGR-013 sets the pager's level; TAB-015 the tablets' (kitchen screens share it).
-    const threshold = lowBatteryLevelFor(change.deviceType, {
-      pager: settings.get('pager.lowBatteryPercent'),
-      other: settings.get('devices.lowBatteryAlertPercent'),
-    });
-    const low = isLowBattery(change.batteryPercent ?? null, threshold);
+    const threshold =
+      change.deviceType === 'PAGER'
+        ? settings.get('pager.lowBatteryPercent')
+        : settings.get('devices.lowBatteryAlertPercent');
+    // A device on charge is being looked after (TAB-015).
+    const low = isLowBattery(change.batteryPercent ?? null, threshold) && change.charging !== true;
     const offlineKey = `device:${change.deviceId}:offline`;
     const lowKey = `device:${change.deviceId}:low`;
     if (change.online) await this.notifications.clear(tx, { restaurantId, dedupeKey: offlineKey });
@@ -165,10 +168,8 @@ export class NotificationTriggers implements OnModuleInit {
     if (change.online && !low) return;
     const device = await tx.device.findUnique({
       where: { id: change.deviceId },
-      select: { name: true, staffId: true, tableId: true, status: true },
+      select: { name: true, staffId: true, tableId: true },
     });
-    // Reported just before it was unpaired: nothing to alert about.
-    if (device?.status === 'REVOKED') return;
     await this.notifications.raise(tx, {
       restaurantId,
       type: 'DEVICE_LOW_BATTERY_OR_OFFLINE',

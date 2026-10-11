@@ -1,0 +1,22 @@
+{
+  "input": {
+    "type": "object",
+    "properties": {
+      "width": { "type": "integer", "exclusiveMinimum": 0, "maximum": 4096 },
+      "height": { "type": "integer", "exclusiveMinimum": 0, "maximum": 4096 },
+      "path": { "type": "string", "minLength": 1, "maxLength": 300 }
+    },
+    "required": ["width", "height", "path"],
+    "additionalProperties": false
+  },
+  "output": {
+    "type": "object",
+    "properties": {
+      "width": { "type": "integer", "exclusiveMinimum": 0, "maximum": 4096 },
+      "height": { "type": "integer", "exclusiveMinimum": 0, "maximum": 4096 },
+      "path": { "type": "string", "minLength": 1, "maxLength": 300 }
+    },
+    "required": ["width", "height", "path"],
+    "additionalProperties": false
+  }
+}

@@ -1,5 +1,6 @@
 import { ORDER_ITEM_STATES, type OrderItemState } from '@rp/domain';
 import type { Meta, StoryObj } from '@storybook/react-vite';
+import { useState } from 'react';
 import {
   Badge,
   Button,
@@ -11,6 +12,7 @@ import {
   LoadingState,
   Money,
   QrCode,
+  QrScanner,
   StatusChip,
   TableTile,
   Table,
@@ -23,6 +25,7 @@ type Story = StoryObj;
 
 const STATE_LABELS: Record<OrderItemState, string> = {
   PENDING_APPROVAL: 'Awaiting approval',
+  HELD: 'Held',
   SENT: 'Sent',
   PREPARING: 'Preparing',
   READY: 'Ready',
@@ -224,4 +227,25 @@ export const QrCodes: Story = {
       />
     </div>
   ),
+};
+
+/** The real camera: hold a code (the pairing code above, on a phone) in front of it. */
+function ScannerDemo() {
+  const [read, setRead] = useState('Nothing read yet');
+  return (
+    <div style={{ display: 'grid', gap: 8, maxWidth: 448 }}>
+      <QrScanner
+        label="Camera for a QR code"
+        onRead={setRead}
+        onProblem={(problem) => {
+          setRead(`Camera problem: ${problem}`);
+        }}
+      />
+      <output>{read}</output>
+    </div>
+  );
+}
+
+export const QrScanning: Story = {
+  render: () => <ScannerDemo />,
 };

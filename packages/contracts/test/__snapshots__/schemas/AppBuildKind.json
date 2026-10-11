@@ -1,0 +1,4 @@
+{
+  "input": { "type": "string", "enum": ["waiter-app", "table-tablet"] },
+  "output": { "type": "string", "enum": ["waiter-app", "table-tablet"] }
+}

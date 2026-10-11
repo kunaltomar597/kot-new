@@ -1,0 +1,44 @@
+# The table's session on the tablet (P3-01b, TAB-001, TAB-003): idle while free, unlocked when the
+# table is opened, back to idle with the guests' data wiped when it closes; then staff leave the
+# kiosk with a manager's PIN and lock it again. A person opens and closes the table at the POS
+# while the flow waits (manual task 12). Run on the paired tablet, with the demo restaurant
+# (Vikram, Manager, PIN 2222):
+#   maestro test apps/table-tablet/.maestro/session-lifecycle.yaml
+appId: ${APP_ID}
+env:
+  APP_ID: in.rp.tablet.dev
+  MANAGER_NAME: Vikram
+  PIN_DIGIT: '2'
+---
+- launchApp
+- extendedWaitUntil:
+    visible:
+      id: idle-screen
+    timeout: 30000
+- assertVisible: Please wait to be seated
+# Now open this tablet's table at the POS (Tables → the table → Open, 2 guests).
+- extendedWaitUntil:
+    visible:
+      id: open-table
+    timeout: 180000
+- assertVisible: .*2 guests
+# Now close the table at the POS (Close without bill, any reason).
+- extendedWaitUntil:
+    visible:
+      id: idle-screen
+    timeout: 180000
+# Staff: five quick taps in the top-left corner, the manager and their PIN.
+- repeat:
+    times: 5
+    commands:
+      - tapOn:
+          point: 3%,3%
+- assertVisible: Which manager is letting you out?
+- tapOn: ${MANAGER_NAME}
+- repeat:
+    times: 4
+    commands:
+      - tapOn: ${PIN_DIGIT}
+- assertVisible: Kiosk paused
+- tapOn: Lock the tablet again
+- assertVisible: Please wait to be seated

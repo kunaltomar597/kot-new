@@ -1,5 +1,7 @@
 import { z } from 'zod';
-import { DeviceType, Id, Timestamp } from './common.js';
+import { Pin } from './auth.js';
+import { ClientCompatibility } from './client-api.js';
+import { DeviceType, Id, TableState, Timestamp } from './common.js';
 import { CaFingerprint } from './system.js';
 
 /** Header carrying the device token on every request of a paired device (AUTH-007). */
@@ -28,24 +30,37 @@ export function deviceTokenMessage(deviceId: string, challenge: string): string 
   return `rp-device-token:v1:${deviceId}:${challenge}`;
 }
 
+/** A device's name is what staff call it, like "Kitchen screen 2" (MGR-006). */
+export const DeviceName = z.string().trim().min(1).max(60);
+
+/**
+ * What a pairing code can pair (AUTH-007): every device but a pager, which is registered on the
+ * Pagers page with its own MQTT credential and never gets a device key (PGR-012, SEC-012).
+ */
+export const PairableDeviceType = DeviceType.exclude(['PAGER']);
+export type PairableDeviceType = z.infer<typeof PairableDeviceType>;
+
 /** A manager prepares the pairing of one device (AUTH-007). */
 export const CreatePairingCodeRequest = z
   .strictObject({
-    type: DeviceType,
-    name: z.string().trim().min(1).max(60),
+    type: PairableDeviceType,
+    name: DeviceName,
     /** Required for table tablets: the one table the tablet serves (AUTH-009). */
     tableId: Id.optional(),
     /** For kitchen screens: the station whose tickets it shows (KDS-002). */
     stationId: Id.optional(),
-    /**
-     * For pagers: the person wearing it. For waiter phones: the person it alerts until someone
-     * signs in on it (P2-06a).
-     */
+    /** For kitchen screens: the stations it shows, when more than one (KDS-002). */
+    stationIds: z.array(Id).min(1).max(10).optional(),
+    /** For waiter phones: the person it alerts until someone signs in on it (P2-06a). */
     staffId: Id.optional(),
   })
   .refine((request) => request.type !== 'TABLE_TABLET' || request.tableId !== undefined, {
     message: 'A table tablet needs its table',
     path: ['tableId'],
+  })
+  .refine((request) => request.stationId === undefined || request.stationIds === undefined, {
+    message: 'Give the station or the stations, not both',
+    path: ['stationIds'],
   });
 export type CreatePairingCodeRequest = z.infer<typeof CreatePairingCodeRequest>;
 
@@ -97,6 +112,11 @@ export const PairingCodeResponse = z.object({
 });
 export type PairingCodeResponse = z.infer<typeof PairingCodeResponse>;
 
+/** How an app is connected (TAB-015). */
+export const NETWORK_KINDS = ['WIFI', 'ETHERNET', 'CELLULAR', 'NONE', 'OTHER'] as const;
+export const NetworkKind = z.enum(NETWORK_KINDS);
+export type NetworkKind = z.infer<typeof NetworkKind>;
+
 /** The device presents the code with its new public key (SPKI, DER, base64). */
 export const PairDeviceRequest = z.strictObject({
   code: PairingCode,
@@ -115,6 +135,8 @@ export const PairedDevice = z.object({
   name: z.string(),
   tableId: Id.nullable(),
   stationId: Id.nullable(),
+  /** Every station a kitchen screen shows; empty for all stations (KDS-002). */
+  stationIds: z.array(Id).default([]),
   staffId: Id.nullable(),
 });
 export type PairedDevice = z.infer<typeof PairedDevice>;
@@ -152,6 +174,8 @@ export const DeviceSummary = z.object({
   status: DeviceStatus,
   tableId: Id.nullable(),
   stationId: Id.nullable(),
+  /** Every station a kitchen screen shows; empty for all stations (KDS-002). */
+  stationIds: z.array(Id).default([]),
   staffId: Id.nullable(),
   pairedAt: Timestamp.nullable(),
   lastSeenAt: Timestamp.nullable(),
@@ -159,39 +183,111 @@ export const DeviceSummary = z.object({
 });
 export type DeviceSummary = z.infer<typeof DeviceSummary>;
 
-/** What a manager sees of a device (MGR-006, P4-02c): its summary and its state now. */
+/**
+ * A device as the manager's device list shows it (MGR-006): its summary plus whether it is
+ * connected now, what it last reported and when it was unpaired.
+ */
 export const DeviceView = DeviceSummary.extend({
   /**
-   * Connected now: an app or screen with a live connection to the server, or a pager whose
-   * heartbeats arrive (PGR-007).
+   * Connected now: an app with a live connection to the server, a pager heard from within its
+   * last three heartbeats (PGR-007).
    */
-  online: z.boolean(),
-  /** The battery level the device last reported (pagers; table tablets from P3-01), if any. */
-  batteryPercent: z.int().min(0).max(100).nullable(),
-  /**
-   * Below the low level of its type: `pager.lowBatteryPercent` for pagers (PGR-013),
-   * `devices.lowBatteryAlertPercent` for the others (TAB-015). False while nothing is reported.
-   */
-  batteryLow: z.boolean(),
-  /** A pager's firmware, from its heartbeats. */
+  connected: z.boolean(),
+  /** Last reported battery: pagers by heartbeat, apps by their health reports (TAB-015). */
+  batteryPercent: z.number().int().min(0).max(100).nullable(),
+  /** On charge at the last health report; null when the device does not say (pagers). */
+  charging: z.boolean().nullable(),
+  /** How an app reached the network at its last health report (TAB-015). */
+  network: NetworkKind.nullable(),
+  /** Wi-Fi signal in dBm at the last heartbeat or health report. */
+  rssi: z.int().nullable(),
+  /** Pager firmware version (PGR-007). */
   firmwareVersion: z.string().nullable(),
-  /** The serial on a pager's label. */
+  /** Serial on a pager's label (PGR-012). */
   serial: z.string().nullable(),
+  revokedAt: Timestamp.nullable(),
+  /** The client API the app last said it speaks (`x-rp-client`), e.g. `1.0` (UPD-006). */
+  clientApi: z.string().nullable(),
+  /** How that stands against the server's: PREVIOUS and TOO_OLD apps need updating. */
+  compatibility: ClientCompatibility,
+  /**
+   * Until when the device takes no PINs or passwords after too many wrong ones (PC-S5); null when
+   * it takes them. A manager can let it take them again sooner (`unlockDevicePins`).
+   */
+  pinsLockedUntil: Timestamp.nullable(),
 });
 export type DeviceView = z.infer<typeof DeviceView>;
 
 export const DeviceListResponse = z.object({ devices: z.array(DeviceView) });
 export type DeviceListResponse = z.infer<typeof DeviceListResponse>;
 
-export const DeviceParams = z.strictObject({ deviceId: Id });
-export type DeviceParams = z.infer<typeof DeviceParams>;
+export const RenameDeviceRequest = z.strictObject({ name: DeviceName });
 
-/** MGR-006: a manager renames a device, e.g. after moving it. */
-export const UpdateDeviceRequest = z.strictObject({ name: z.string().trim().min(1).max(60) });
-export type UpdateDeviceRequest = z.infer<typeof UpdateDeviceRequest>;
+/** KDS-002: the stations a kitchen screen shows; none for all of them (an Expo/Pass screen). */
+export const SetDeviceStationsRequest = z.strictObject({
+  stationIds: z.array(Id).max(10),
+});
+export type SetDeviceStationsRequest = z.infer<typeof SetDeviceStationsRequest>;
+export type RenameDeviceRequest = z.infer<typeof RenameDeviceRequest>;
 
 export const RevokeDeviceRequest = z.strictObject({ reason: z.string().trim().min(3).max(200) });
 export type RevokeDeviceRequest = z.infer<typeof RevokeDeviceRequest>;
 
+/** "Locate" (MGR-006, P3-01c): how long the device shows itself. */
+export const LOCATE_SECONDS = 15;
+
+export const LocateDeviceResponse = z.object({ seconds: z.int().positive() });
+export type LocateDeviceResponse = z.infer<typeof LocateDeviceResponse>;
+
 export const BindTableRequest = z.strictObject({ tableId: Id });
 export type BindTableRequest = z.infer<typeof BindTableRequest>;
+
+// ---------------------------------------------------------------- device health (P3-01a)
+
+/**
+ * What an app reports about itself (TAB-015): battery, charging, connection and version. Tablets
+ * send it when they start, every few minutes and when something changes; the dashboard shows it
+ * and a low battery alerts the managers (`devices.lowBatteryAlertPercent`).
+ */
+export const DeviceHealthRequest = z.strictObject({
+  batteryPercent: z.int().min(0).max(100).nullable(),
+  charging: z.boolean().nullable(),
+  network: NetworkKind,
+  /** Wi-Fi signal in dBm, when on Wi-Fi and the device can tell. */
+  rssi: z.int().min(-127).max(0).nullable(),
+  appVersion: z.string().trim().min(1).max(40).optional(),
+});
+export type DeviceHealthRequest = z.infer<typeof DeviceHealthRequest>;
+
+// ---------------------------------------------------------------- the table tablet (P3-01a)
+
+/**
+ * A table tablet's own table (TAB-002, TAB-003, AUTH-009): whether a session is open (the tablet
+ * unlocks) and what the idle screen shows. A tablet can read only its own table.
+ */
+export const TabletTableView = z.object({
+  tableId: Id,
+  /** The table's label, e.g. "T4". */
+  label: z.string(),
+  state: TableState,
+  /** The open session, or null: the tablet shows its idle screen. */
+  session: z.object({ id: Id, openedAt: Timestamp, covers: z.int().min(1).nullable() }).nullable(),
+  /** The idle screen's promotions (`tablet.idleShowsPromotions`): the restaurant's pinned dishes. */
+  promotions: z.object({ show: z.boolean(), itemIds: z.array(Id) }),
+  /** Whether menu prices include GST (`billing.priceMode`), for the tax note and estimate (TAB-005). */
+  priceMode: z.enum(['TAX_EXCLUSIVE', 'TAX_INCLUSIVE']),
+});
+export type TabletTableView = z.infer<typeof TabletTableView>;
+
+/**
+ * Staff leave the tablet's kiosk mode with a manager's PIN (TAB-001): the hidden gesture shows the
+ * managers to choose from; the server checks the PIN (with the usual lock-out) and audits the exit.
+ */
+export const KioskExitRequest = z.strictObject({ staffId: Id, pin: Pin });
+export type KioskExitRequest = z.infer<typeof KioskExitRequest>;
+
+export const KioskExitResponse = z.object({
+  approver: z.object({ id: Id, displayName: z.string() }),
+  exitedAt: Timestamp,
+});
+export type KioskExitResponse = z.infer<typeof KioskExitResponse>;

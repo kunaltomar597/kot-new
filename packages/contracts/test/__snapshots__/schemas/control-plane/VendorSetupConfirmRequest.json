@@ -1,0 +1,20 @@
+{
+  "input": {
+    "type": "object",
+    "properties": {
+      "token": { "type": "string", "pattern": "^[A-Za-z0-9_-]{43}$" },
+      "code": { "type": "string", "pattern": "^\\d{6}$" }
+    },
+    "required": ["token", "code"],
+    "additionalProperties": false
+  },
+  "output": {
+    "type": "object",
+    "properties": {
+      "token": { "type": "string", "pattern": "^[A-Za-z0-9_-]{43}$" },
+      "code": { "type": "string", "pattern": "^\\d{6}$" }
+    },
+    "required": ["token", "code"],
+    "additionalProperties": false
+  }
+}

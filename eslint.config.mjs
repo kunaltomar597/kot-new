@@ -22,6 +22,11 @@ export default tseslint.config(
       // Hand-written declarations for the shared ESLint helpers (not part of a TS project).
       'packages/config/eslint/*.d.mts',
       'firmware/**',
+      // The Windows installer's staging folder and output (P0-16d).
+      'apps/desktop/staging/**',
+      'apps/desktop/release/**',
+      // ZAP's plans, scripts and reports from a DAST run (P8-03c1).
+      'infra/dast/reports/**',
     ],
   },
   js.configs.recommended,

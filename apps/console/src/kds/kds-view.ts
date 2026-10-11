@@ -112,3 +112,64 @@ export function arrivals(
     changes: fresh.filter((ticket) => ticket.kind !== 'NEW').length,
   };
 }
+
+/** What the board heading names: its one station, its stations, or every station (KDS-002). */
+export function boardStations(view: { readonly stations: readonly { name: string }[] }): string[] {
+  return view.stations.map((station) => station.name);
+}
+
+/** One order across its stations, for the Expo/Pass view (KDS-002 S). */
+export interface ExpoOrder {
+  readonly orderId: string;
+  readonly orderNumber: number;
+  readonly tableLabel: string | null;
+  readonly takeawayToken: number | null;
+  /** When its oldest ticket was raised. */
+  readonly since: string;
+  readonly tickets: readonly KdsTicket[];
+  /** Every line still to serve is ready, at every station: the pass can send it out. */
+  readonly allReady: boolean;
+  /** The lines that are ready and waiting at the pass. */
+  readonly ready: readonly { readonly ticket: KdsTicket; readonly line: KdsTicketLine }[];
+}
+
+const DONE_STATES: ReadonlySet<OrderItemState> = new Set([
+  'PICKED_UP',
+  'SERVED',
+  'CANCELLED',
+  'VOIDED',
+  'REJECTED',
+]);
+
+/** Open NEW tickets grouped by order, oldest order first. */
+export function expoOrders(tickets: readonly KdsTicket[]): ExpoOrder[] {
+  const byOrder = new Map<string, KdsTicket[]>();
+  for (const ticket of tickets) {
+    if (ticket.kind !== 'NEW') continue;
+    byOrder.set(ticket.orderId, [...(byOrder.get(ticket.orderId) ?? []), ticket]);
+  }
+  return [...byOrder.values()]
+    .flatMap((group): ExpoOrder[] => {
+      const sorted = [...group].sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+      const first = sorted[0];
+      if (first === undefined) return [];
+      const open = sorted.flatMap((ticket) =>
+        ticket.lines
+          .filter((line) => !DONE_STATES.has(line.state))
+          .map((line) => ({ ticket, line })),
+      );
+      return [
+        {
+          orderId: first.orderId,
+          orderNumber: first.orderNumber,
+          tableLabel: first.tableLabel,
+          takeawayToken: first.takeawayToken,
+          since: first.createdAt,
+          tickets: sorted,
+          allReady: open.length > 0 && open.every(({ line }) => line.state === 'READY'),
+          ready: open.filter(({ line }) => line.state === 'READY'),
+        },
+      ];
+    })
+    .sort((a, b) => a.since.localeCompare(b.since));
+}

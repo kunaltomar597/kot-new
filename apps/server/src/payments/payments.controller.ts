@@ -5,6 +5,8 @@ import {
   type CurrentShiftResponse,
   InvoiceParams,
   type InvoicePaymentsView,
+  OpenCashDrawerRequest,
+  type OpenCashDrawerResponse,
   OpenShiftRequest,
   RecordPaymentsRequest,
   ShiftParams,
@@ -14,12 +16,29 @@ import { authErrors } from '../auth/auth-errors.js';
 import { RequireCapability } from '../auth/decorators.js';
 import type { AuthenticatedRequest, Principal } from '../auth/principal.js';
 import { ZodValidationPipe } from '../validation/zod-validation.pipe.js';
+import { CashDrawerService } from './cash-drawer.service.js';
 import { type ParsedPayments, PaymentsService } from './payments.service.js';
 import { ShiftsService } from './shifts.service.js';
 
 function principalOf(request: AuthenticatedRequest): Principal {
   if (request.principal === undefined) throw authErrors.unauthenticated();
   return request.principal;
+}
+
+/** The cash drawer opened without a sale, with a reason (P4-07b, BILL-016, AUD-006). */
+@Controller('cash-drawer')
+export class CashDrawerController {
+  constructor(private readonly drawer: CashDrawerService) {}
+
+  @Post('open')
+  @HttpCode(200)
+  @RequireCapability('BILL_PRINT_AND_PAYMENT')
+  open(
+    @Req() request: AuthenticatedRequest,
+    @Body(new ZodValidationPipe(OpenCashDrawerRequest)) body: OpenCashDrawerRequest,
+  ): Promise<OpenCashDrawerResponse> {
+    return this.drawer.openWithoutSale(principalOf(request), body.reason, body.printerId);
+  }
 }
 
 /** Cash shifts (P1-11a, BILL-013). */

@@ -4,7 +4,7 @@
     "properties": {
       "type": {
         "type": "string",
-        "enum": ["POS", "KDS", "WAITER_PHONE", "TABLE_TABLET", "PAGER", "MANAGER_BROWSER"]
+        "enum": ["POS", "KDS", "WAITER_PHONE", "TABLE_TABLET", "MANAGER_BROWSER"]
       },
       "name": { "type": "string", "minLength": 1, "maxLength": 60 },
       "tableId": {
@@ -16,6 +16,16 @@
         "type": "string",
         "format": "uuid",
         "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+      },
+      "stationIds": {
+        "minItems": 1,
+        "maxItems": 10,
+        "type": "array",
+        "items": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
       },
       "staffId": {
         "type": "string",
@@ -31,7 +41,7 @@
     "properties": {
       "type": {
         "type": "string",
-        "enum": ["POS", "KDS", "WAITER_PHONE", "TABLE_TABLET", "PAGER", "MANAGER_BROWSER"]
+        "enum": ["POS", "KDS", "WAITER_PHONE", "TABLE_TABLET", "MANAGER_BROWSER"]
       },
       "name": { "type": "string", "minLength": 1, "maxLength": 60 },
       "tableId": {
@@ -43,6 +53,16 @@
         "type": "string",
         "format": "uuid",
         "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+      },
+      "stationIds": {
+        "minItems": 1,
+        "maxItems": 10,
+        "type": "array",
+        "items": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
       },
       "staffId": {
         "type": "string",

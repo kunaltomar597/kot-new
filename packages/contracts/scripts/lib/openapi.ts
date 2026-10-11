@@ -30,7 +30,9 @@ const LOCAL_SERVER_INFO: OpenApiInfo = {
     'integer paise, rates are basis points, dates are YYYY-MM-DD and instants are ISO-8601 ' +
     'UTC. `x-capability` names the permission the server enforces (AUTH-010): a capability, ' +
     '`SESSION` (any signed-in person), `DEVICE` (a paired device, nobody signed in) or ' +
-    '`PUBLIC`; ' +
+    '`PUBLIC`; `x-devices` lists the kinds of device a `DEVICE` endpoint serves (others get ' +
+    '403 `DEVICE_NOT_ALLOWED`), and people sign in only on POS terminals, kitchen screens, ' +
+    "waiter phones and managers' browsers; " +
     '`x-requirements` lists the BRD requirement IDs. Components cover every exported contract ' +
     'schema, including those not yet used by a route. A `<Name>Input` component describes ' +
     'what a client may send when it differs from the parsed form (for example omitted ' +
@@ -83,6 +85,20 @@ export function buildOpenApi({
     if (item[method] !== undefined)
       throw new Error(`Duplicate route ${route.method} ${route.path}`);
 
+    // Deny by default (SEC-003): a device endpoint names the devices it serves, and an endpoint
+    // open to anyone says why.
+    if ((route.capability === 'DEVICE') !== (route.devices !== undefined)) {
+      throw new Error(
+        `Route ${route.operationId}: only DEVICE routes name their devices, and all do`,
+      );
+    }
+    if (route.devices?.length === 0) {
+      throw new Error(`Route ${route.operationId}: no device may call it`);
+    }
+    if (route.capability === 'PUBLIC' && (route.description ?? '').trim() === '') {
+      throw new Error(`Route ${route.operationId}: a PUBLIC route says why in its description`);
+    }
+
     const inPath = [...route.path.matchAll(PATH_PARAMETER)].map((match) => match[1]).sort();
     const declared = Object.keys(route.request?.params?.shape ?? {}).sort();
     if (inPath.join() !== declared.join()) {
@@ -120,6 +136,7 @@ export function buildOpenApi({
       }),
       responses,
       'x-capability': route.capability,
+      ...(route.devices !== undefined && { 'x-devices': [...route.devices] }),
       'x-requirements': [...route.requirements],
     };
   }

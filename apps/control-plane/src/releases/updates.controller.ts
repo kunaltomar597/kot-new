@@ -14,10 +14,10 @@ export class UpdatesController {
     @Req() request: InstallationRequest,
     @Query(new ZodPipe(UpdatesQuery)) query: UpdatesQuery,
   ): Promise<UpdatesResponse> {
-    const { channel } = installationOf(request);
+    const { id, channel } = installationOf(request);
     return {
       channel,
-      update: await this.releases.updateFor(query.component, channel, query.version),
+      update: await this.releases.offerFor(id, query.component, query.version),
     };
   }
 }

@@ -12,6 +12,7 @@ import { currentBusinessDate, dbDate } from '../common/business-dates.js';
 import { newId } from '../common/ids.js';
 import { PrismaService, type TransactionClient } from '../database/prisma.service.js';
 import { AppError } from '../errors/app-error.js';
+import { ORDERS_MOVED_ACTIONS } from '../floor/table-transfers.service.js';
 import { appendEvent } from '../events/outbox.js';
 import type { Prisma } from '../generated/prisma/client.js';
 import { NotificationsService } from '../notifications/notifications.service.js';
@@ -55,6 +56,8 @@ const TICKET_INCLUDE = {
           readyAt: true,
           modifiers: { orderBy: { createdAt: 'asc' }, select: { name: true, quantity: true } },
           parent: { select: { name: true } },
+          // Where the dish goes now, when it moved to another table's bill (TBL-006).
+          order: { select: { table: { select: { label: true } } } },
         },
       },
     },
@@ -68,6 +71,12 @@ type TicketRow = Prisma.KotGetPayload<{ include: typeof TICKET_INCLUDE }>;
  * each item's live state, bump and recall, and "Notify manager". A kitchen screen in station mode
  * (AUTH-005) is held to its own station; its actions are attributed to the device.
  */
+/** The stations a station-mode screen is bound to; none for all (or for a person). */
+function boundStations(actor: Actor): readonly string[] {
+  if (actor.stationIds !== undefined) return actor.stationIds;
+  return actor.stationId === undefined || actor.stationId === null ? [] : [actor.stationId];
+}
+
 @Injectable()
 export class KdsService {
   constructor(
@@ -77,29 +86,28 @@ export class KdsService {
   ) {}
 
   async tickets(actor: Actor, query: KdsTicketsQuery): Promise<KdsTicketsResponse> {
-    const stationId = this.stationFor(actor, query.stationId);
-    const station =
-      stationId === null
-        ? null
-        : await this.prisma.station.findFirst({
-            where: { id: stationId, restaurantId: actor.restaurantId },
+    const stationIds = this.stationsFor(actor, query.stationId);
+    const found =
+      stationIds === null
+        ? []
+        : await this.prisma.station.findMany({
+            where: { id: { in: [...stationIds] }, restaurantId: actor.restaurantId },
             select: { id: true, name: true },
           });
-    if (stationId !== null && station === null) {
+    if (stationIds !== null && found.length !== stationIds.length) {
       throw new AppError(404, 'STATION_NOT_FOUND', 'There is no such station.');
     }
+    const stations = (stationIds ?? []).flatMap(
+      (id) => found.find((station) => station.id === id) ?? [],
+    );
     const now = new Date();
     const businessDate = await currentBusinessDate(this.prisma, actor.restaurantId, now);
     const scope = {
       restaurantId: actor.restaurantId,
-      ...(stationId !== null && { stationId }),
+      ...(stationIds !== null && { stationId: { in: [...stationIds] } }),
     };
     const [open, bumped, snapshot] = await Promise.all([
-      this.prisma.kot.findMany({
-        where: { ...scope, bumpedAt: null },
-        include: TICKET_INCLUDE,
-        orderBy: [{ createdAt: 'asc' }, { kotNumber: 'asc' }],
-      }),
+      this.openTickets(actor.restaurantId, stationIds, businessDate),
       this.prisma.kot.findMany({
         where: { ...scope, bumpedAt: { gte: new Date(now.getTime() - RECALL_WINDOW_MS) } },
         include: TICKET_INCLUDE,
@@ -108,16 +116,11 @@ export class KdsService {
       }),
       this.settings.snapshot(actor.restaurantId),
     ]);
-    const today = dbDate(businessDate).getTime();
-    const showing = open.filter((kot) =>
-      kot.kind === 'NEW'
-        ? kot.lines.some((line) => AT_STATION.has(line.orderItem.state))
-        : // Change and cancellation slips stay until seen and bumped, on the day they were raised.
-          kot.businessDate.getTime() >= today,
-    );
+    const showing = open;
     const views = await this.views(actor.restaurantId, [...showing, ...bumped]);
     return {
-      station,
+      station: stations.length === 1 ? (stations[0] ?? null) : null,
+      stations,
       tickets: views.slice(0, showing.length),
       recentlyBumped: views.slice(showing.length),
       settings: {
@@ -128,6 +131,48 @@ export class KdsService {
       },
       serverTime: now.toISOString(),
     };
+  }
+
+  /**
+   * The tickets a station shows, oldest first: those with an item still to cook or at the pass,
+   * and the day's change and cancellation slips, until bumped. They are found from the items at
+   * the station, a few hundred at most, so a ticket nobody bumped (the waiter served it from the
+   * pass) is never read again. Read from every unbumped ticket, a year at design capacity was
+   * 730,000 tickets and the query failed (P8-01a).
+   */
+  private async openTickets(
+    restaurantId: string,
+    stationIds: readonly string[] | null,
+    businessDate: string,
+  ): Promise<TicketRow[]> {
+    const stations =
+      stationIds === null
+        ? (
+            await this.prisma.station.findMany({ where: { restaurantId }, select: { id: true } })
+          ).map((station) => station.id)
+        : [...stationIds];
+    const cooking = await this.prisma.orderItem.findMany({
+      where: { restaurantId, stationId: { in: stations }, state: { in: [...AT_STATION] } },
+      select: { kotLines: { select: { kotId: true } } },
+    });
+    const kotIds = [...new Set(cooking.flatMap((item) => item.kotLines.map((line) => line.kotId)))];
+    const scope = { restaurantId, stationId: { in: stations }, bumpedAt: null };
+    const [tickets, slips] = await Promise.all([
+      kotIds.length === 0
+        ? Promise.resolve([])
+        : this.prisma.kot.findMany({
+            where: { ...scope, id: { in: kotIds }, kind: 'NEW' },
+            include: TICKET_INCLUDE,
+          }),
+      // Change and cancellation slips stay until seen and bumped, on the day they were raised.
+      this.prisma.kot.findMany({
+        where: { ...scope, kind: { not: 'NEW' }, businessDate: { gte: dbDate(businessDate) } },
+        include: TICKET_INCLUDE,
+      }),
+    ]);
+    return [...tickets, ...slips].sort(
+      (a, b) => a.createdAt.getTime() - b.createdAt.getTime() || a.kotNumber - b.kotNumber,
+    );
   }
 
   /** Takes a finished ticket off the screen (KDS-005). Bumping twice changes nothing. */
@@ -182,56 +227,91 @@ export class KdsService {
   async notifyManager(actor: Actor, kotId: string): Promise<NotifyManagerResponse> {
     return this.prisma.transaction(async (tx) => {
       const kot = await this.lockedTicket(tx, actor, kotId);
-      const waiting = kot.lines.filter((line) => line.orderItem.state === 'READY');
-      if (waiting.length === 0) {
+      const raised = await this.raiseNotCollected(tx, kot, {
+        staffId: actor.staffId ?? null,
+        deviceId: actor.deviceId,
+      });
+      if (raised === undefined) {
         throw new AppError(
           409,
           'NOTHING_WAITING',
           'Nothing on this ticket is ready and waiting to be collected.',
         );
       }
-      // The notification engine delivers it to the managers on duty until acknowledged (P2-03).
-      return this.notifications.raise(tx, {
-        restaurantId: actor.restaurantId,
-        type: READY_NOT_COLLECTED,
-        kotId: kot.id,
-        tableId: kot.order.tableId,
-        tableSessionId: kot.order.tableSessionId,
-        orderId: kot.orderId,
-        dedupeKey: `collect:${kot.id}`,
-        raisedById: actor.staffId ?? null,
-        raisedByDeviceId: actor.deviceId,
-        payload: {
-          kotNumber: kot.kotNumber,
-          stationName: kot.station.name,
-          tableLabel: kot.order.table?.label ?? null,
-          takeawayToken: kot.order.takeawayToken,
-          items: waiting.map((line) => line.orderItem.name),
-        },
-      });
+      return raised;
     });
   }
 
-  /** A station-mode screen sees only its station; a person may choose one or see all. */
-  private stationFor(actor: Actor, requested: string | undefined): string | null {
-    const bound = actor.stationId ?? null;
-    if (bound !== null) {
-      if (requested !== undefined && requested !== bound) {
-        throw new AppError(403, 'FORBIDDEN', 'This screen shows its own station only.');
+  /**
+   * KDS-006 S: the same alert, raised by the server itself (P6-05a); false when nothing on the
+   * ticket is ready any more.
+   */
+  async escalateNotCollected(restaurantId: string, kotId: string): Promise<boolean> {
+    return this.prisma.transaction(async (tx) => {
+      await tx.$queryRaw`SELECT 1 AS locked FROM kots WHERE id = ${kotId}::uuid FOR UPDATE`;
+      const kot = await tx.kot.findFirst({
+        where: { id: kotId, restaurantId, bumpedAt: null },
+        include: TICKET_INCLUDE,
+      });
+      if (kot === null) return false;
+      const raised = await this.raiseNotCollected(tx, kot, { staffId: null, deviceId: null });
+      return raised !== undefined && !raised.alreadyOpen;
+    });
+  }
+
+  /** The managers on duty are alerted until one acknowledges (P2-03); undefined: none ready. */
+  private async raiseNotCollected(
+    tx: TransactionClient,
+    kot: TicketRow,
+    by: { readonly staffId: string | null; readonly deviceId: string | null },
+  ): Promise<NotifyManagerResponse | undefined> {
+    const waiting = kot.lines.filter((line) => line.orderItem.state === 'READY');
+    if (waiting.length === 0) return undefined;
+    return this.notifications.raise(tx, {
+      restaurantId: kot.restaurantId,
+      type: READY_NOT_COLLECTED,
+      kotId: kot.id,
+      tableId: kot.order.tableId,
+      tableSessionId: kot.order.tableSessionId,
+      orderId: kot.orderId,
+      dedupeKey: `collect:${kot.id}`,
+      raisedById: by.staffId,
+      raisedByDeviceId: by.deviceId,
+      payload: {
+        kotNumber: kot.kotNumber,
+        stationName: kot.station.name,
+        tableLabel: kot.order.table?.label ?? null,
+        takeawayToken: kot.order.takeawayToken,
+        items: waiting.map((line) => line.orderItem.name),
+        automatic: by.deviceId === null,
+      },
+    });
+  }
+
+  /**
+   * The stations to show, or null for all: a station-mode screen sees only its own (one or
+   * more, KDS-002), and may narrow to one of them; a person may choose one or see all.
+   */
+  private stationsFor(actor: Actor, requested: string | undefined): readonly string[] | null {
+    const bound = boundStations(actor);
+    if (bound.length > 0) {
+      if (requested === undefined) return bound;
+      if (!bound.includes(requested)) {
+        throw new AppError(403, 'FORBIDDEN', 'This screen shows its own stations only.');
       }
-      return bound;
+      return [requested];
     }
-    return requested ?? null;
+    return requested === undefined ? null : [requested];
   }
 
   private async lockedTicket(tx: TransactionClient, actor: Actor, kotId: string) {
     await tx.$queryRaw`SELECT 1 AS locked FROM kots WHERE id = ${kotId}::uuid FOR UPDATE`;
-    const bound = actor.stationId ?? null;
+    const bound = boundStations(actor);
     const kot = await tx.kot.findFirst({
       where: {
         id: kotId,
         restaurantId: actor.restaurantId,
-        ...(bound !== null && { stationId: bound }),
+        ...(bound.length > 0 && { stationId: { in: [...bound] } }),
       },
       include: TICKET_INCLUDE,
     });
@@ -261,7 +341,8 @@ export class KdsService {
       if (waiterId !== null) staffIds.add(waiterId);
       if (row.order.tableSessionId !== null) sessionIds.add(row.order.tableSessionId);
     }
-    const [staff, moves, alerts] = await Promise.all([
+    const oldest = new Date(Math.min(...rows.map((row) => row.createdAt.getTime())));
+    const [staff, moves, merges, alerts] = await Promise.all([
       this.prisma.staff.findMany({
         where: { restaurantId, id: { in: [...staffIds] } },
         select: { id: true, displayName: true },
@@ -276,6 +357,16 @@ export class KdsService {
         select: { entityId: true, occurredAt: true, before: true },
         orderBy: { occurredAt: 'asc' },
       }),
+      // Orders that went to another table whole: merged tables, or all their dishes moved.
+      this.prisma.auditLog.findMany({
+        where: {
+          restaurantId,
+          action: { in: [...ORDERS_MOVED_ACTIONS] },
+          occurredAt: { gte: oldest },
+        },
+        select: { occurredAt: true, before: true, after: true },
+        orderBy: { occurredAt: 'asc' },
+      }),
       this.prisma.alert.findMany({
         where: {
           restaurantId,
@@ -288,14 +379,33 @@ export class KdsService {
     ]);
     const names = new Map(staff.map((person) => [person.id, person.displayName]));
     const notified = new Set(alerts.map((alert) => alert.kotId));
+    const labelOf = (before: unknown): string | null =>
+      typeof before === 'object' &&
+      before !== null &&
+      'tableLabel' in before &&
+      typeof before.tableLabel === 'string'
+        ? before.tableLabel
+        : null;
+    const ordersOf = (after: unknown): readonly unknown[] =>
+      typeof after === 'object' &&
+      after !== null &&
+      'orderIds' in after &&
+      Array.isArray(after.orderIds)
+        ? after.orderIds
+        : [];
     const movedFrom = (row: TicketRow): string | null => {
       // The first move after the ticket was raised: the kitchen knew the table by that label.
-      const move = moves.find(
-        (entry) => entry.entityId === row.order.tableSessionId && entry.occurredAt >= row.createdAt,
-      );
-      const before = move?.before;
-      if (typeof before !== 'object' || before === null || !('tableLabel' in before)) return null;
-      return typeof before.tableLabel === 'string' ? before.tableLabel : null;
+      const candidates = [
+        ...moves.filter(
+          (entry) =>
+            entry.entityId === row.order.tableSessionId && entry.occurredAt >= row.createdAt,
+        ),
+        ...merges.filter(
+          (entry) =>
+            entry.occurredAt >= row.createdAt && ordersOf(entry.after).includes(row.orderId),
+        ),
+      ].sort((a, b) => a.occurredAt.getTime() - b.occurredAt.getTime());
+      return labelOf(candidates[0]?.before);
     };
     return rows.map((row) => {
       const waiterId = row.order.tableSession?.waiterId ?? row.order.createdById;
@@ -329,6 +439,11 @@ export class KdsService {
           comboName: line.orderItem.parent?.name ?? null,
           state: line.orderItem.state,
           readyAt: line.orderItem.readyAt?.toISOString() ?? null,
+          movedTo:
+            line.orderItem.order.table !== null &&
+            line.orderItem.order.table.label !== row.order.table?.label
+              ? line.orderItem.order.table.label
+              : null,
         })),
       };
     });

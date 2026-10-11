@@ -1,62 +1,59 @@
-import { screen, waitFor, within } from '@testing-library/react';
-import type { CustomRoleRequest } from '@rp/contracts';
+import type { RoleView } from '@rp/contracts';
+import { screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  addable,
+  included,
+  roleProblem,
+  roleRequestOf,
+  sortRoles,
+} from '../src/manage/staff/roles-view.js';
+import {
+  fromRoleChoice,
+  roleChoiceOf,
+  roleChoices,
+  updateRequestOf,
+} from '../src/manage/staff/staff-view.js';
 import type { FakeServer } from './fake-server.js';
-import { login, STAFF } from './fakes.js';
+import { STAFF } from './fakes.js';
 import { expectNoAxeViolations, renderConsole, server, signsInAs, t } from './harness.js';
-import {
-  CAPTAIN,
-  customRole,
-  HEAD_CASHIER,
-  personRole,
-  roleList,
-  RUNNER,
-} from './roles-fixture.js';
-import {
-  ownerSecurity,
-  SECOND_FACTOR_REQUIRED,
-  staffList,
-  staffView,
-  team,
-} from './staff-fixture.js';
+import { ownerSecurity, staffList, staffView } from './staff-fixture.js';
 
-const RAVI = STAFF.WAITER.staffId;
+const uuid = (n: number) => `0199a0e0-0000-7000-8000-${String(n).padStart(12, '0')}`;
+const CAPTAIN = uuid(1201);
 
-function rolesServer(role: 'MANAGER' | 'OWNER' = 'OWNER'): FakeServer {
-  return signsInAs(server(), role)
-    .on('GET', '/api/v1/roles', () => ({ status: 200, body: roleList() }))
-    .on('GET', '/api/v1/staff', () => ({ status: 200, body: staffList() }))
-    .on('GET', '/api/v1/auth/owner/security', () => ({ status: 200, body: ownerSecurity() }));
+function role(overrides: Partial<RoleView> = {}): RoleView {
+  return {
+    id: CAPTAIN,
+    name: 'Senior captain',
+    baseRole: 'WAITER',
+    builtIn: false,
+    capabilities: ['ORDER_APPROVE_CUSTOMER', 'DISCOUNT_WITHIN_LIMIT'],
+    staffCount: 1,
+    archivedAt: null,
+    ...overrides,
+  };
 }
 
-const staffPages = () => screen.getByRole('navigation', { name: t('staff.pages.label') });
-const dashboardNav = () => screen.getByRole('navigation', { name: t('dashboard.navigation') });
-const rowOf = async (name: string) =>
-  (await screen.findByRole('heading', { level: 3, name })).closest('li') as HTMLElement;
-const actionsFor = (name: string) =>
-  screen.findByRole('group', { name: t('customRoles.actionsFor', { name }) });
-const buttonNames = (group: HTMLElement) =>
-  within(group)
-    .getAllByRole('button')
-    .map((button) => button.textContent);
-const permission = (capability: 'BILL_PRINT_AND_PAYMENT' | 'STAFF_MANAGE' | 'ORDER_CREATE') =>
-  screen.getByRole('combobox', { name: new RegExp(`^${t(`capabilities.${capability}`)}`) });
-const optionLabels = (select: HTMLElement) =>
-  within(select)
-    .getAllByRole('option')
-    .map((option) => option.textContent);
+function roles(): RoleView[] {
+  return [
+    role({ id: uuid(1211), name: 'Waiter', builtIn: true, capabilities: [], staffCount: 3 }),
+    role({ id: uuid(1212), name: 'Owner', baseRole: 'OWNER', builtIn: true, capabilities: [] }),
+    role(),
+    role({
+      id: uuid(1202),
+      name: 'Old role',
+      staffCount: 0,
+      archivedAt: '2026-09-20T10:00:00.000Z',
+    }),
+  ];
+}
 
-async function confirmSecondFactor(user: Awaited<ReturnType<typeof renderConsole>>['user']) {
-  const confirm = await screen.findByRole('dialog', { name: t('secondFactor.title') });
-  await user.type(
-    await within(confirm).findByLabelText(new RegExp(`^${t('secondFactor.password')}`)),
-    'correct horse battery',
-  );
-  await user.type(
-    within(confirm).getByLabelText(new RegExp(`^${t('secondFactor.code')}`)),
-    '123456',
-  );
-  await user.click(within(confirm).getByRole('button', { name: t('secondFactor.confirm') }));
+function rolesServer(as: 'MANAGER' | 'OWNER'): FakeServer {
+  return signsInAs(server(), as)
+    .on('GET', '/api/v1/roles', () => ({ status: 200, body: { roles: roles() } }))
+    .on('GET', '/api/v1/staff', () => ({ status: 200, body: staffList() }))
+    .on('GET', '/api/v1/auth/owner/security', () => ({ status: 200, body: ownerSecurity() }));
 }
 
 beforeEach(() => {
@@ -67,8 +64,79 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe('[AUTH-012] the Roles page', () => {
-  it('shows a manager the custom roles to give, without changing them', async () => {
+describe('[AUTH-012] what a custom role may add', () => {
+  it('offers only what the base role lacks, never staff or Owner-only powers', () => {
+    expect(addable('WAITER')).toContain('ORDER_APPROVE_CUSTOMER');
+    expect(addable('WAITER')).not.toContain('ORDER_CREATE');
+    expect(addable('WAITER')).not.toContain('STAFF_MANAGE');
+    expect(included('WAITER')).toContain('ORDER_CREATE');
+    expect(addable('KITCHEN')).not.toContain('ITEM_MARK_PREPARING_READY');
+  });
+
+  it('checks the name and that something is added, and sends only what adds', () => {
+    const form = { name: 'Head chef', baseRole: 'KITCHEN' as const, capabilities: [] };
+    expect(roleProblem(form, roles())).toBe('NOTHING_ADDED');
+    expect(roleProblem({ ...form, capabilities: ['MENU_MANAGE'] }, roles())).toBeUndefined();
+    expect(
+      roleProblem({ ...form, name: 'senior captain', capabilities: ['MENU_MANAGE'] }, roles()),
+    ).toBe('NAME_TAKEN');
+    // Its own name is not taken when it is edited.
+    expect(
+      roleProblem(
+        { ...form, name: 'Senior captain', capabilities: ['MENU_MANAGE'] },
+        roles(),
+        CAPTAIN,
+      ),
+    ).toBeUndefined();
+    expect(
+      roleRequestOf({
+        name: ' Head chef ',
+        baseRole: 'KITCHEN',
+        capabilities: ['MENU_MANAGE', 'ITEM_MARK_PREPARING_READY'],
+      }),
+    ).toEqual({ name: 'Head chef', baseRole: 'KITCHEN', capabilities: ['MENU_MANAGE'] });
+    const sorted = sortRoles(roles());
+    expect(sorted.builtIn.map((entry) => entry.baseRole)).toEqual(['OWNER', 'WAITER']);
+    expect(sorted.custom.map((entry) => entry.name)).toEqual(['Senior captain', 'Old role']);
+  });
+
+  it('offers custom roles under their base role when giving someone a role', () => {
+    const choices = roleChoices(['CASHIER', 'WAITER'], roles(), (r) => r);
+    expect(choices.map((choice) => choice.value)).toEqual([
+      'CASHIER',
+      'WAITER',
+      `custom:${CAPTAIN}`,
+    ]);
+    expect(fromRoleChoice(`custom:${CAPTAIN}`, roles())).toEqual({
+      role: 'WAITER',
+      customRoleId: CAPTAIN,
+    });
+    expect(fromRoleChoice('CASHIER', roles())).toEqual({ role: 'CASHIER', customRoleId: '' });
+    expect(roleChoiceOf({ role: 'WAITER', customRoleId: CAPTAIN })).toBe(`custom:${CAPTAIN}`);
+    const ravi = staffView('WAITER');
+    const form = {
+      displayName: ravi.displayName,
+      role: 'WAITER' as const,
+      customRoleId: CAPTAIN,
+      phone: '',
+      email: '',
+      pin: '',
+      pinAgain: '',
+    };
+    expect(updateRequestOf(ravi, form)).toEqual({ customRoleId: CAPTAIN });
+    expect(
+      updateRequestOf({ ...ravi, customRoleId: CAPTAIN }, { ...form, customRoleId: '' }),
+    ).toEqual({
+      customRoleId: null,
+    });
+    expect(updateRequestOf(ravi, { ...form, role: 'CASHIER', customRoleId: '' })).toEqual({
+      role: 'CASHIER',
+    });
+  });
+});
+
+describe('[AUTH-012] [MGR-004] the Roles page', () => {
+  it('shows a manager the roles without changing them', async () => {
     const { container } = await renderConsole({
       fake: rolesServer('MANAGER'),
       path: '/manage/staff/roles',
@@ -77,271 +145,86 @@ describe('[AUTH-012] the Roles page', () => {
     expect(
       await screen.findByRole('heading', { level: 2, name: t('customRoles.title') }),
     ).toBeVisible();
+    const captain = (
+      await screen.findByRole('heading', { level: 4, name: 'Senior captain' })
+    ).closest('li') as HTMLElement;
     expect(
-      within(staffPages()).getByRole('link', { name: t('staff.pages.roles') }),
-    ).toHaveAttribute('aria-current', 'page');
-
-    const captain = within(await rowOf('Captain'));
-    expect(captain.getByText(t('customRoles.basedOn', { role: t('roles.WAITER') }))).toBeVisible();
-    expect(
-      captain.getByText(t('customRoles.adds', { list: t('capabilities.BILL_PRINT_AND_PAYMENT') })),
+      within(captain).getByText(t('customRoles.onBase', { role: t('roles.WAITER') })),
     ).toBeVisible();
-    expect(captain.getByText(t('customRoles.people', { count: 0 }))).toBeVisible();
-    const headCashier = within(await rowOf('Head cashier'));
-    expect(headCashier.getByText(t('customRoles.countsAsManager'))).toBeVisible();
-    expect(headCashier.getByText(t('customRoles.people', { count: 1 }))).toBeVisible();
-    const runner = within(await rowOf('Runner'));
-    expect(runner.getByText(t('customRoles.archived'))).toBeVisible();
     expect(
-      runner.getByText(t('customRoles.takesAway', { list: t('capabilities.ORDER_CREATE') })),
+      within(captain).getByText(
+        t('customRoles.adds', {
+          list: `${t('capabilities.ORDER_APPROVE_CUSTOMER')}; ${t('capabilities.DISCOUNT_WITHIN_LIMIT')}`,
+        }),
+      ),
     ).toBeVisible();
-
-    // Only the Owner creates and changes roles.
-    expect(screen.getByText(new RegExp(t('customRoles.ownerOnly')))).toBeVisible();
+    expect(screen.getByText(t('customRoles.ownerOnly'), { exact: false })).toBeVisible();
     expect(screen.queryByRole('button', { name: t('customRoles.add') })).toBeNull();
-    expect(screen.queryByRole('group')).toBeNull();
-    await expectNoAxeViolations(container);
-  });
-
-  it('keeps the role editor to the Owner', async () => {
-    await renderConsole({
-      fake: rolesServer('MANAGER'),
-      path: '/manage/staff/roles/new',
-      signedIn: 'MANAGER',
-    });
-    expect(await screen.findByRole('heading', { level: 2, name: t('staff.title') })).toBeVisible();
-  });
-
-  it('[AUTH-006] lets the Owner create a role after confirming the second factor', async () => {
-    const created = customRole({ id: '0199a0e0-0000-7000-8000-00000000c009' });
-    const fake = rolesServer()
-      .on(
-        'GET',
-        '/api/v1/roles',
-        () => ({ status: 200, body: roleList([HEAD_CASHIER, RUNNER]) }),
-        () => ({ status: 200, body: roleList([HEAD_CASHIER, RUNNER]) }),
-        () => ({ status: 200, body: roleList([created, HEAD_CASHIER, RUNNER]) }),
-      )
-      .on(
-        'POST',
-        '/api/v1/roles',
-        () => SECOND_FACTOR_REQUIRED,
-        () => ({ status: 201, body: created }),
-      )
-      .on('POST', '/api/v1/auth/step-up', () => ({
-        status: 200,
-        body: { secondFactorValidUntil: '2026-10-05T10:10:00.000Z' },
-      }));
-    const { user, container } = await renderConsole({
-      fake,
-      path: '/manage/staff/roles',
-      signedIn: 'OWNER',
-    });
-    await user.click(await screen.findByRole('button', { name: t('customRoles.add') }));
     expect(
-      await screen.findByRole('heading', { level: 2, name: t('customRoles.editor.newTitle') }),
-    ).toBeVisible();
-    const create = screen.getByRole('button', { name: t('customRoles.editor.create') });
-    await user.click(create);
-    expect(screen.getByText(t('customRoles.editor.nameRequired'))).toBeVisible();
-    const name = screen.getByLabelText(new RegExp(`^${t('customRoles.editor.name')}`));
-    await user.type(name, 'waiter');
-    expect(screen.getByText(t('customRoles.editor.nameTaken'))).toBeVisible();
-    await user.clear(name);
-    await user.type(name, 'Captain');
-
-    expect(screen.getByRole('combobox', { name: /^Built on/ })).toHaveValue('WAITER');
-    const payments = permission('BILL_PRINT_AND_PAYMENT');
-    expect(optionLabels(payments)).toEqual([
-      t('customRoles.editor.asBase', {
-        grant: t('customRoles.editor.grants.DENY'),
-        role: t('roles.WAITER'),
+      screen.queryByRole('group', {
+        name: t('customRoles.actionsFor', { name: 'Senior captain' }),
       }),
-      t('customRoles.editor.grants.ALLOW'),
-    ]);
-    await user.selectOptions(payments, 'ADD');
-    expect(payments).toHaveAccessibleDescription(t('customRoles.editor.changed'));
-    // What only the Owner may do is not offered at all.
-    expect(
-      screen.queryByRole('combobox', { name: t('capabilities.TAX_AND_INVOICE_SETTINGS') }),
     ).toBeNull();
     await expectNoAxeViolations(container);
-
-    await user.click(create);
-    await confirmSecondFactor(user);
-    expect(await screen.findByText(t('customRoles.created', { name: 'Captain' }))).toBeVisible();
-    expect(fake.callsTo('POST', '/api/v1/roles').map((call) => call.body)).toEqual([
-      { name: 'Captain', baseRole: 'WAITER', added: ['BILL_PRINT_AND_PAYMENT'], removed: [] },
-      { name: 'Captain', baseRole: 'WAITER', added: ['BILL_PRINT_AND_PAYMENT'], removed: [] },
-    ] satisfies CustomRoleRequest[]);
-    expect(await rowOf('Captain')).toBeVisible();
   });
 
-  it('changes a role, saying who it reaches and when it makes someone a manager', async () => {
-    const fake = rolesServer().on('PUT', `/api/v1/roles/${HEAD_CASHIER.id}`, (call) => ({
-      status: 200,
-      body: { ...HEAD_CASHIER, ...(call.body as CustomRoleRequest) },
+  it('lets the Owner add a role built on the kitchen role', async () => {
+    const fake = rolesServer('OWNER').on('POST', '/api/v1/roles', () => ({
+      status: 201,
+      body: role({
+        id: uuid(1203),
+        name: 'Head chef',
+        baseRole: 'KITCHEN',
+        capabilities: ['MENU_MANAGE'],
+      }),
     }));
-    const { user } = await renderConsole({
-      fake,
-      path: `/manage/staff/roles/${HEAD_CASHIER.id}`,
-      signedIn: 'OWNER',
-    });
-    expect(
-      await screen.findByRole('heading', {
-        level: 2,
-        name: t('customRoles.editor.editTitle', { name: 'Head cashier' }),
-      }),
-    ).toBeVisible();
-    expect(screen.getByText(t('customRoles.editor.staffNote', { count: 1 }))).toBeVisible();
-    expect(screen.getByText(t('customRoles.editor.managerNote'))).toBeVisible();
-
-    // Saving without a change sends nothing.
-    await user.click(screen.getByRole('button', { name: t('customRoles.editor.save') }));
-    expect(
-      await screen.findByRole('heading', { level: 2, name: t('customRoles.title') }),
-    ).toBeVisible();
-    expect(fake.callsTo('PUT', `/api/v1/roles/${HEAD_CASHIER.id}`)).toHaveLength(0);
-
-    await user.click(
-      within(await actionsFor('Head cashier')).getByRole('button', { name: 'Edit' }),
+    const { user } = await renderConsole({ fake, path: '/manage/staff/roles', signedIn: 'OWNER' });
+    await user.click(await screen.findByRole('button', { name: t('customRoles.add') }));
+    const dialog = within(
+      await screen.findByRole('dialog', { name: t('customRoles.form.addTitle') }),
     );
-    const staff = await waitFor(() => permission('STAFF_MANAGE'));
-    expect(staff).toHaveValue('ADD');
-    await user.selectOptions(staff, 'BASE');
-    expect(screen.queryByText(t('customRoles.editor.managerNote'))).toBeNull();
-    await user.selectOptions(permission('ORDER_CREATE'), 'REMOVE');
-    await user.click(screen.getByRole('button', { name: t('customRoles.editor.save') }));
-    expect(await screen.findByText(t('customRoles.saved', { name: 'Head cashier' }))).toBeVisible();
-    expect(fake.callsTo('PUT', `/api/v1/roles/${HEAD_CASHIER.id}`)[0]?.body).toEqual({
-      name: 'Head cashier',
-      baseRole: 'CASHIER',
-      added: [],
-      removed: ['ORDER_CREATE'],
-    });
-  });
-
-  it('archives a role nobody has, with a reason, and restores an archived one', async () => {
-    const fake = rolesServer()
-      .on('POST', `/api/v1/roles/${CAPTAIN.id}/archive`, () => ({
-        status: 200,
-        body: { ...CAPTAIN, archivedAt: '2026-10-05T11:00:00.000Z' },
-      }))
-      .on('POST', `/api/v1/roles/${RUNNER.id}/restore`, () => ({
-        status: 200,
-        body: { ...RUNNER, archivedAt: null },
-      }));
-    const { user } = await renderConsole({
-      fake,
-      path: '/manage/staff/roles',
-      signedIn: 'OWNER',
-    });
-    expect(buttonNames(await actionsFor('Captain'))).toEqual([
-      t('customRoles.edit'),
-      t('customRoles.archive'),
-    ]);
-    // Someone has it: they need another role first.
-    expect(buttonNames(await actionsFor('Head cashier'))).toEqual([t('customRoles.edit')]);
-    expect(within(await rowOf('Head cashier')).getByText(t('customRoles.inUse'))).toBeVisible();
-    expect(buttonNames(await actionsFor('Runner'))).toEqual([t('customRoles.restore')]);
-
-    await user.click(
-      within(await actionsFor('Captain')).getByRole('button', { name: t('customRoles.archive') }),
-    );
-    const archive = await screen.findByRole('dialog', {
-      name: t('customRoles.archiveDialog.title', { name: 'Captain' }),
-    });
     await user.type(
-      within(archive).getByLabelText(t('customRoles.archiveDialog.reason')),
-      'Nobody needs it',
+      dialog.getByLabelText(new RegExp(`^${t('customRoles.form.name')}`)),
+      'Head chef',
     );
-    await user.click(
-      within(archive).getByRole('button', { name: t('customRoles.archiveDialog.confirm') }),
+    await user.selectOptions(
+      dialog.getByLabelText(new RegExp(`^${t('customRoles.form.base')}`)),
+      'KITCHEN',
     );
-    expect(
-      await screen.findByText(t('customRoles.archivedDone', { name: 'Captain' })),
-    ).toBeVisible();
-    expect(fake.callsTo('POST', `/api/v1/roles/${CAPTAIN.id}/archive`)[0]?.body).toEqual({
-      reason: 'Nobody needs it',
+    await user.click(dialog.getByRole('button', { name: t('customRoles.form.create') }));
+    expect(dialog.getByText(t('customRoles.form.nothingAdded'))).toBeVisible();
+    await user.click(dialog.getByRole('checkbox', { name: t('capabilities.MENU_MANAGE') }));
+    await user.click(dialog.getByRole('button', { name: t('customRoles.form.create') }));
+    expect(await screen.findByText(t('customRoles.added', { name: 'Head chef' }))).toBeVisible();
+    expect(fake.callsTo('POST', '/api/v1/roles')[0]?.body).toEqual({
+      name: 'Head chef',
+      baseRole: 'KITCHEN',
+      capabilities: ['MENU_MANAGE'],
     });
-
-    await user.click(
-      within(await actionsFor('Runner')).getByRole('button', { name: t('customRoles.restore') }),
-    );
-    const restore = await screen.findByRole('dialog', {
-      name: t('customRoles.restoreDialog.title', { name: 'Runner' }),
-    });
-    await user.click(
-      within(restore).getByRole('button', { name: t('customRoles.restoreDialog.confirm') }),
-    );
-    expect(await screen.findByText(t('customRoles.restored', { name: 'Runner' }))).toBeVisible();
-    expect(fake.callsTo('POST', `/api/v1/roles/${RUNNER.id}/restore`)).toHaveLength(1);
   });
-});
 
-describe('[AUTH-012] [MGR-004] custom roles on the People page', () => {
-  it('shows people’s custom roles and gives one', async () => {
-    const people = team().map((person) =>
-      person.id === STAFF.CASHIER.staffId
-        ? { ...person, customRole: personRole(HEAD_CASHIER) }
-        : person,
-    );
-    const fake = rolesServer('MANAGER')
-      .on('GET', '/api/v1/staff', () => ({ status: 200, body: staffList(people) }))
-      .on('PATCH', `/api/v1/staff/${RAVI}`, () => ({
+  it('gives a person a custom role from the Staff page', async () => {
+    const fake = rolesServer('MANAGER').on(
+      'PATCH',
+      `/api/v1/staff/${STAFF.WAITER.staffId}`,
+      () => ({
         status: 200,
-        body: staffView('WAITER', { customRole: personRole(CAPTAIN) }),
-      }));
+        body: { ...staffView('WAITER'), customRoleId: CAPTAIN, customRoleName: 'Senior captain' },
+      }),
+    );
     const { user } = await renderConsole({ fake, path: '/manage/staff', signedIn: 'MANAGER' });
-    const asha = within(await rowOf('Asha'));
-    expect(asha.getByText('Head cashier (Cashier)')).toBeVisible();
-    // Their role manages staff, so only the Owner changes their record.
-    expect(
-      screen.queryByRole('group', { name: t('staff.actionsFor', { name: 'Asha' }) }),
-    ).toBeNull();
-
     await user.click(
       within(
-        await screen.findByRole('group', { name: t('staff.actionsFor', { name: 'Ravi' }) }),
+        await screen.findByRole('group', {
+          name: t('staff.actionsFor', { name: STAFF.WAITER.displayName }),
+        }),
       ).getByRole('button', { name: t('staff.edit') }),
     );
-    const edit = await screen.findByRole('dialog', {
-      name: t('staff.form.editTitle', { name: 'Ravi' }),
+    const dialog = within(await screen.findByRole('dialog'));
+    await user.selectOptions(dialog.getByLabelText(t('staff.form.role')), `custom:${CAPTAIN}`);
+    await user.click(dialog.getByRole('button', { name: t('staff.form.save') }));
+    expect(fake.callsTo('PATCH', `/api/v1/staff/${STAFF.WAITER.staffId}`)[0]?.body).toEqual({
+      customRoleId: CAPTAIN,
     });
-    const role = within(edit).getByRole('combobox', { name: t('staff.form.role') });
-    await waitFor(() => {
-      expect(optionLabels(role)).toEqual([
-        t('roles.CASHIER'),
-        t('roles.WAITER'),
-        t('roles.KITCHEN'),
-        'Captain (Waiter)',
-      ]);
-    });
-    await user.selectOptions(role, `custom:${CAPTAIN.id}`);
-    await user.click(within(edit).getByRole('button', { name: t('staff.form.save') }));
-    expect(await screen.findByText(t('staff.saved', { name: 'Ravi' }))).toBeVisible();
-    expect(fake.callsTo('PATCH', `/api/v1/staff/${RAVI}`)[0]?.body).toEqual({
-      role: 'WAITER',
-      customRoleId: CAPTAIN.id,
-    });
-  });
-
-  it('opens the dashboard on Staff for a cashier whose custom role looks after staff', async () => {
-    const headCashier = login('CASHIER');
-    const fake = rolesServer().on('POST', '/api/v1/auth/pin-login', () => ({
-      status: 200,
-      body: {
-        ...headCashier,
-        staff: { ...headCashier.staff, customRole: personRole(HEAD_CASHIER) },
-      },
-    }));
-    await renderConsole({ fake, path: '/manage', signedIn: 'CASHIER' });
-    expect(await screen.findByRole('heading', { level: 2, name: t('staff.title') })).toBeVisible();
-    expect(
-      within(dashboardNav())
-        .getAllByRole('link')
-        .map((link) => link.textContent),
-    ).toEqual([t('dashboard.section.alerts'), t('dashboard.section.staff')]);
-    expect(screen.getByText(/Head cashier/)).toBeVisible();
   });
 });

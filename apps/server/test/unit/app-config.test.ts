@@ -21,6 +21,7 @@ describe('server configuration', () => {
     const config = loadConfig({
       ...base,
       NODE_ENV: 'production',
+      RP_TLS: 'on',
       PORT: '9443',
       LOG_LEVEL: 'warn',
       LOG_PRETTY: '1',
@@ -35,6 +36,20 @@ describe('server configuration', () => {
       dataDir: 'D:\\RestaurantData',
       buildId: 'abc123',
     });
+  });
+
+  it('reads on/off flags as the docs write them (RP_TLS=on)', () => {
+    expect(loadConfig({ ...base, RP_TLS: 'on' }).tls).toBe(true);
+    expect(loadConfig({ ...base, RP_TLS: 'off' }).tls).toBe(false);
+    expect(loadConfig({ ...base, RP_TLS: 'true' }).tls).toBe(true);
+    expect(() => loadConfig({ ...base, RP_TLS: 'yes' })).toThrow(/tls/);
+  });
+
+  it('[SEC-001] needs TLS in production', () => {
+    expect(() => loadConfig({ ...base, NODE_ENV: 'production' })).toThrow(/RP_TLS/);
+    expect(() => loadConfig({ ...base, NODE_ENV: 'production', RP_TLS: 'off' })).toThrow(/RP_TLS/);
+    expect(loadConfig({ ...base, NODE_ENV: 'production', RP_TLS: 'on' }).tls).toBe(true);
+    expect(loadConfig({ ...base, RP_TLS: 'off' }).tls).toBe(false);
   });
 
   it('rejects invalid values with a readable message', () => {
@@ -55,5 +70,47 @@ describe('server configuration', () => {
     expect(() =>
       loadConfig({ NODE_ENV: 'development', DATABASE_URL: 'postgresql://u@10.0.0.5/rp' }),
     ).not.toThrow();
+  });
+
+  it('[LIC-003] always applies the licence in production, with only the keys built in', () => {
+    expect(loadConfig({ ...base, NODE_ENV: 'production', RP_TLS: 'on' }).licenceEnforce).toBe(true);
+    expect(loadConfig({ ...base, NODE_ENV: 'development' }).licenceEnforce).toBe(false);
+    expect(loadConfig({ ...base, RP_LICENCE_ENFORCE: 'true' }).licenceEnforce).toBe(true);
+    expect(() =>
+      loadConfig({ ...base, NODE_ENV: 'production', RP_LICENCE_ENFORCE: 'false' }),
+    ).toThrow(ConfigError);
+    expect(() => loadConfig({ ...base, NODE_ENV: 'production', RP_LICENCE_KEYS: 'QUJD' })).toThrow(
+      ConfigError,
+    );
+    expect(loadConfig({ ...base, RP_LICENCE_KEYS: 'QUJD, REVG' }).licenceKeys).toEqual([
+      'QUJD',
+      'REVG',
+    ]);
+  });
+
+  it('[PGR-011] trusts only the firmware keys built in, in production', () => {
+    const digest = 'AB'.repeat(32);
+    expect(
+      loadConfig({ ...base, RP_PAGER_FIRMWARE_KEYS: ` ${digest}, ` }).pagerFirmwareKeys,
+    ).toEqual(['ab'.repeat(32)]);
+    expect(loadConfig(base).pagerFirmwareKeys).toEqual([]);
+    expect(() => loadConfig({ ...base, RP_PAGER_FIRMWARE_KEYS: 'not-a-digest' })).toThrow(
+      /SHA-256/,
+    );
+    expect(() =>
+      loadConfig({ ...base, NODE_ENV: 'production', RP_PAGER_FIRMWARE_KEYS: digest }),
+    ).toThrow(/firmware keys/);
+  });
+
+  it('[DATA-002] keeps the nightly backup on in production, with the PostgreSQL programs', () => {
+    expect(loadConfig(base).backups).toBe('on');
+    expect(loadConfig({ ...base, RP_BACKUPS: 'off' }).backups).toBe('off');
+    expect(() => loadConfig({ ...base, NODE_ENV: 'production', RP_BACKUPS: 'off' })).toThrow(
+      /backup/,
+    );
+    expect(loadConfig({ ...base, RP_PG_BIN: 'C:\\PostgreSQL\\16\\bin' }).pgBin).toBe(
+      'C:\\PostgreSQL\\16\\bin',
+    );
+    expect(loadConfig({ ...base, RP_PG_BIN: '' }).pgBin).toBeUndefined();
   });
 });

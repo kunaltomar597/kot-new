@@ -155,13 +155,11 @@ export class TaxGroupsService {
       if (existing.archivedAt !== null) return toView(existing, 0);
       const itemCount = (await this.itemCounts(tx, [taxGroupId])).get(taxGroupId) ?? 0;
       if (itemCount > 0) {
-        // The Owner reads this as it is on the Tax and invoice page (P4-03e).
         throw new AppError(
           409,
           'TAX_GROUP_IN_USE',
-          itemCount === 1
-            ? '1 menu item uses this tax group. Give it another tax group first.'
-            : `${String(itemCount)} menu items use this tax group. Give them another tax group first.`,
+          `${String(itemCount)} menu items use this tax group. Move them to another tax group ` +
+            'first, then archive it.',
           { itemCount },
         );
       }

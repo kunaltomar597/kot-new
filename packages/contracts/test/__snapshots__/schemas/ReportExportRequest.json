@@ -4,7 +4,25 @@
     "properties": {
       "report": {
         "type": "string",
-        "enum": ["SALES", "ITEMS", "PAYMENTS", "SHIFTS", "GST", "INVOICE_REGISTER"]
+        "enum": [
+          "SALES",
+          "ITEMS",
+          "PAYMENTS",
+          "SHIFTS",
+          "GST",
+          "INVOICE_REGISTER",
+          "SOURCES",
+          "STAFF",
+          "DISCOUNTS",
+          "CANCELLATIONS",
+          "REPRINTS",
+          "KITCHEN",
+          "TABLES",
+          "RECOMMENDATIONS",
+          "AUDIT",
+          "SUSPICIOUS",
+          "FEEDBACK"
+        ]
       },
       "from": {
         "type": "string",
@@ -16,7 +34,13 @@
         "format": "date",
         "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
       },
-      "format": { "default": "CSV", "type": "string", "const": "CSV" }
+      "format": { "default": "CSV", "type": "string", "enum": ["CSV", "XLSX", "PDF"] },
+      "action": { "type": "string", "pattern": "^[A-Z][A-Z_]{1,59}$" },
+      "actorId": {
+        "type": "string",
+        "format": "uuid",
+        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+      }
     },
     "required": ["report", "from", "to"],
     "additionalProperties": false
@@ -26,7 +50,25 @@
     "properties": {
       "report": {
         "type": "string",
-        "enum": ["SALES", "ITEMS", "PAYMENTS", "SHIFTS", "GST", "INVOICE_REGISTER"]
+        "enum": [
+          "SALES",
+          "ITEMS",
+          "PAYMENTS",
+          "SHIFTS",
+          "GST",
+          "INVOICE_REGISTER",
+          "SOURCES",
+          "STAFF",
+          "DISCOUNTS",
+          "CANCELLATIONS",
+          "REPRINTS",
+          "KITCHEN",
+          "TABLES",
+          "RECOMMENDATIONS",
+          "AUDIT",
+          "SUSPICIOUS",
+          "FEEDBACK"
+        ]
       },
       "from": {
         "type": "string",
@@ -38,7 +80,13 @@
         "format": "date",
         "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
       },
-      "format": { "default": "CSV", "type": "string", "const": "CSV" }
+      "format": { "default": "CSV", "type": "string", "enum": ["CSV", "XLSX", "PDF"] },
+      "action": { "type": "string", "pattern": "^[A-Z][A-Z_]{1,59}$" },
+      "actorId": {
+        "type": "string",
+        "format": "uuid",
+        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+      }
     },
     "required": ["report", "from", "to", "format"],
     "additionalProperties": false

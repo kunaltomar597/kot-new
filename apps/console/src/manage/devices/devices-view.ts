@@ -1,240 +1,190 @@
 import {
-  type CreatePairingCodeRequest,
+  CreatePairingCodeRequest,
   type DeviceView,
+  DeviceName,
   type FloorResponse,
-  RevokeDeviceRequest,
   type StaffView,
   type StationView,
-  UpdateDeviceRequest,
 } from '@rp/contracts';
-import { calendarDateOf, timeOfDayOf } from '@rp/domain';
 
-/**
- * The devices page (P4-02c, MGR-006): how devices are grouped and described, and the pairing form.
- * The server checks everything again; these checks only say what is wrong before sending.
- */
+/** Devices (P4-02c, MGR-006): what the device list says and what pairing a new device asks. */
 
-export type DeviceType = DeviceView['type'];
-
-/** Groups in the order a restaurant sets them up: the counter, the kitchen, the floor. */
-export const DEVICE_TYPE_ORDER: readonly DeviceType[] = [
+/** Types a manager pairs from this page. Pagers are registered by serial on the Pagers page. */
+export const PAIRABLE_TYPES = [
+  'TABLE_TABLET',
+  'WAITER_PHONE',
+  'KDS',
   'POS',
   'MANAGER_BROWSER',
+] as const;
+export type PairableType = (typeof PAIRABLE_TYPES)[number];
+
+/** The order device groups appear in: what the floor relies on first. */
+const TYPE_ORDER: readonly DeviceView['type'][] = [
+  'POS',
   'KDS',
   'WAITER_PHONE',
   'TABLE_TABLET',
   'PAGER',
-];
-
-/** Paired with a code; pagers are registered with their serial instead (Staff → Pagers). */
-export type PairableType = Exclude<DeviceType, 'PAGER'>;
-export const PAIRABLE_TYPES: readonly PairableType[] = [
-  'POS',
   'MANAGER_BROWSER',
-  'KDS',
-  'WAITER_PHONE',
-  'TABLE_TABLET',
 ];
 
 export interface DeviceGroup {
-  readonly type: DeviceType;
+  readonly type: DeviceView['type'];
   readonly devices: readonly DeviceView[];
 }
 
-/** Paired devices by type, each group by name. Unpaired devices are left out: they are gone. */
-export function deviceGroups(devices: readonly DeviceView[]): DeviceGroup[] {
-  return DEVICE_TYPE_ORDER.map((type) => ({
+/** Paired devices by type (in floor order), each group by name; unpaired ones apart, newest first. */
+export function groupDevices(devices: readonly DeviceView[]): {
+  readonly groups: readonly DeviceGroup[];
+  readonly unpaired: readonly DeviceView[];
+} {
+  const byName = (a: DeviceView, b: DeviceView) =>
+    a.name.localeCompare(b.name, undefined, { numeric: true });
+  const groups = TYPE_ORDER.map((type) => ({
     type,
     devices: devices
-      .filter((device) => device.type === type && device.status !== 'REVOKED')
-      .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true })),
+      .filter((device) => device.type === type && device.status === 'ACTIVE')
+      .sort(byName),
   })).filter((group) => group.devices.length > 0);
+  const unpaired = devices
+    .filter((device) => device.status === 'REVOKED')
+    .sort((a, b) => (b.revokedAt ?? '').localeCompare(a.revokedAt ?? ''));
+  return { groups, unpaired };
 }
 
-/** Names of the tables, stations and people devices are bound to, archived ones included. */
-export interface BindingNames {
+/** What a device is bound to, in words (AUTH-009, KDS-002, P2-06a). */
+export type Binding =
+  | { readonly kind: 'TABLE'; readonly label: string }
+  | { readonly kind: 'STATION'; readonly name: string }
+  | { readonly kind: 'ALL_STATIONS' }
+  | { readonly kind: 'PERSON'; readonly name: string }
+  | { readonly kind: 'NONE' };
+
+export interface Names {
   readonly tables: ReadonlyMap<string, string>;
   readonly stations: ReadonlyMap<string, string>;
   readonly people: ReadonlyMap<string, string>;
 }
 
-export function bindingNamesOf(
-  floor: FloorResponse | undefined,
+export function namesOf(
+  floor: FloorResponse,
   stations: readonly StationView[],
   people: readonly StaffView[],
-): BindingNames {
+): Names {
   return {
     tables: new Map(
-      (floor?.sections ?? []).flatMap((section) =>
-        section.tables.map((table) => [table.id, table.label] as const),
-      ),
+      floor.sections.flatMap((section) => section.tables.map((table) => [table.id, table.label])),
     ),
     stations: new Map(stations.map((station) => [station.id, station.name])),
     people: new Map(people.map((person) => [person.id, person.displayName])),
   };
 }
 
-/** What a device is bound to, in words (MGR-006 "assigned table/station/person"). */
-export type Binding =
-  | { readonly kind: 'NONE' }
-  | { readonly kind: 'TABLE'; readonly table: string | undefined }
-  | { readonly kind: 'STATION'; readonly station: string | undefined }
-  | { readonly kind: 'ALL_STATIONS' }
-  | { readonly kind: 'HOLDER' | 'WEARER'; readonly name: string | undefined }
-  | { readonly kind: 'NO_HOLDER' | 'NOT_WORN' };
-
-export function bindingOf(device: DeviceView, names: BindingNames): Binding {
-  switch (device.type) {
-    case 'TABLE_TABLET':
-      return device.tableId === null
-        ? { kind: 'NONE' }
-        : { kind: 'TABLE', table: names.tables.get(device.tableId) };
-    case 'KDS':
-      return device.stationId === null
-        ? { kind: 'ALL_STATIONS' }
-        : { kind: 'STATION', station: names.stations.get(device.stationId) };
-    case 'WAITER_PHONE':
-      return device.staffId === null
-        ? { kind: 'NO_HOLDER' }
-        : { kind: 'HOLDER', name: names.people.get(device.staffId) };
-    case 'PAGER':
-      return device.staffId === null
-        ? { kind: 'NOT_WORN' }
-        : { kind: 'WEARER', name: names.people.get(device.staffId) };
-    default:
-      return { kind: 'NONE' };
+export function bindingOf(device: DeviceView, names: Names): Binding {
+  if (device.tableId !== null) {
+    return { kind: 'TABLE', label: names.tables.get(device.tableId) ?? '?' };
   }
+  if (device.stationIds.length > 0) {
+    // KDS-002: one or more stations.
+    return {
+      kind: 'STATION',
+      name: device.stationIds.map((id) => names.stations.get(id) ?? '?').join(', '),
+    };
+  }
+  if (device.type === 'KDS') return { kind: 'ALL_STATIONS' };
+  if (device.staffId !== null) {
+    return { kind: 'PERSON', name: names.people.get(device.staffId) ?? '?' };
+  }
+  return { kind: 'NONE' };
 }
 
-/** A device's battery in words, never in colour alone (TAB-015, PGR-013). */
-export type DeviceBattery =
-  { readonly kind: 'UNKNOWN' } | { readonly kind: 'OK' | 'LOW'; readonly percent: number };
-
-export function deviceBatteryOf(device: DeviceView): DeviceBattery {
-  if (device.batteryPercent === null) return { kind: 'UNKNOWN' };
-  return { kind: device.batteryLow ? 'LOW' : 'OK', percent: device.batteryPercent };
+/** Tables a tablet can serve: active tables, by section and label, with their section's name. */
+export function tableChoices(
+  floor: FloorResponse,
+): { readonly value: string; readonly label: string }[] {
+  return floor.sections
+    .filter((section) => section.archivedAt === null)
+    .flatMap((section) =>
+      section.tables
+        .filter((table) => table.archivedAt === null)
+        .map((table) => ({ value: table.id, label: `${table.label} · ${section.name}` })),
+    );
 }
 
-/** When a device was last seen, in IST: the time today, or the day and time before today. */
-export type LastSeen =
-  | { readonly kind: 'NEVER' }
-  | { readonly kind: 'TODAY'; readonly time: string }
-  | { readonly kind: 'EARLIER'; readonly date: string; readonly time: string };
-
-export function lastSeenOf(lastSeenAt: string | null, now: Date): LastSeen {
-  if (lastSeenAt === null) return { kind: 'NEVER' };
-  const seen = new Date(lastSeenAt);
-  const time = timeOfDayOf(seen);
-  const date = calendarDateOf(seen);
-  return date === calendarDateOf(now) ? { kind: 'TODAY', time } : { kind: 'EARLIER', date, time };
+export function stationChoices(stations: readonly StationView[]) {
+  return stations
+    .filter((station) => station.archivedAt === null)
+    .map((station) => ({ value: station.id, label: station.name }));
 }
 
-/** A calendar date as people write it on a list, e.g. "27 Sep". */
-export function shortDateOf(isoDate: string, locale: string): string {
-  return new Intl.DateTimeFormat(locale, {
-    day: 'numeric',
-    month: 'short',
-    timeZone: 'UTC',
-  }).format(new Date(`${isoDate}T00:00:00Z`));
+/** People a waiter phone can be kept for: active staff who take orders, by name. */
+export function holderChoices(people: readonly StaffView[]) {
+  return people
+    .filter((person) => person.active && person.role !== 'KITCHEN')
+    .sort((a, b) => a.displayName.localeCompare(b.displayName))
+    .map((person) => ({ value: person.id, label: person.displayName }));
 }
 
-// ---------------------------------------------------------------- pairing
-
-export interface PairForm {
+export interface PairingForm {
   readonly type: PairableType;
   readonly name: string;
-  /** Empty until chosen; table tablets only. */
+  /** Empty for none. */
   readonly tableId: string;
-  /** Empty for every station; kitchen screens only. */
-  readonly stationId: string;
-  /** Empty for whoever signs in; waiter phones only. */
+  /** A kitchen screen's stations; none for every station (KDS-002). */
+  readonly stationIds: readonly string[];
   readonly staffId: string;
 }
 
-export type PairField = 'name' | 'tableId';
-export type PairProblem = 'nameRequired' | 'tableRequired';
+export type PairingField = 'name' | 'tableId';
+export type PairingProblem = 'nameRequired' | 'tableRequired';
 
 /** The same checks as the server: a name, and a table for a table tablet (AUTH-009). */
-export function checkPairing(form: PairForm): Partial<Record<PairField, PairProblem>> {
-  const problems: Partial<Record<PairField, PairProblem>> = {};
-  if (!UpdateDeviceRequest.shape.name.safeParse(form.name).success) problems.name = 'nameRequired';
+export function checkPairing(form: PairingForm): Partial<Record<PairingField, PairingProblem>> {
+  const problems: Partial<Record<PairingField, PairingProblem>> = {};
+  if (!DeviceName.safeParse(form.name).success) problems.name = 'nameRequired';
   if (form.type === 'TABLE_TABLET' && form.tableId === '') problems.tableId = 'tableRequired';
   return problems;
 }
 
-/** Only the binding the type uses is sent, so a choice left over from another type never is. */
-export function pairingRequestOf(form: PairForm): CreatePairingCodeRequest {
-  const request: CreatePairingCodeRequest = { type: form.type, name: form.name.trim() };
-  if (form.type === 'TABLE_TABLET' && form.tableId !== '') request.tableId = form.tableId;
-  if (form.type === 'KDS' && form.stationId !== '') request.stationId = form.stationId;
-  if (form.type === 'WAITER_PHONE' && form.staffId !== '') request.staffId = form.staffId;
-  return request;
+/** Only the binding the type uses is sent, so changing the type never leaves a stray one. */
+export function pairingRequestOf(form: PairingForm): CreatePairingCodeRequest {
+  const optional = (value: string) => (value === '' ? undefined : value);
+  const tableId = form.type === 'TABLE_TABLET' ? optional(form.tableId) : undefined;
+  const stationIds =
+    form.type === 'KDS' && form.stationIds.length > 0 ? form.stationIds : undefined;
+  const staffId = form.type === 'WAITER_PHONE' ? optional(form.staffId) : undefined;
+  return CreatePairingCodeRequest.parse({
+    type: form.type,
+    name: form.name.trim(),
+    ...(tableId !== undefined && { tableId }),
+    ...(stationIds !== undefined && { stationIds: [...stationIds] }),
+    ...(staffId !== undefined && { staffId }),
+  });
 }
 
-/** "Kitchen screen N" with the first number no device uses, so the name rarely needs typing. */
-export function suggestedName(
-  devices: readonly { readonly name: string }[],
+/** "<Type> N" with the first number no device of that type uses. */
+export function suggestedDeviceName(
+  devices: readonly DeviceView[],
   nameFor: (number: number) => string,
 ): string {
-  const taken = new Set(devices.map((device) => device.name.trim().toLowerCase()));
+  const taken = new Set(
+    devices
+      .filter((device) => device.status === 'ACTIVE')
+      .map((device) => device.name.trim().toLowerCase()),
+  );
   let number = 1;
   while (taken.has(nameFor(number).toLowerCase())) number += 1;
   return nameFor(number);
 }
 
-/** The device that took the code: new since the code was issued, of its type and name. */
-export function newlyPaired(
-  knownIds: ReadonlySet<string>,
-  devices: readonly DeviceView[],
-  request: Pick<CreatePairingCodeRequest, 'type' | 'name'>,
-): DeviceView | undefined {
-  return devices.find(
-    (device) =>
-      !knownIds.has(device.id) &&
-      device.status === 'ACTIVE' &&
-      device.type === request.type &&
-      device.name === request.name,
-  );
+/** Seconds left on a pairing code, never below zero. */
+export function secondsLeft(expiresAt: string, now: number): number {
+  return Math.max(0, Math.ceil((Date.parse(expiresAt) - now) / 1000));
 }
 
-export interface TableChoice {
-  readonly id: string;
-  readonly label: string;
-  readonly section: string;
-}
-
-/** Tables a tablet may be bound to or moved to: those in use, but not the one it serves. */
-export function tableChoices(
-  floor: FloorResponse | undefined,
-  except?: string | null,
-): TableChoice[] {
-  return (floor?.sections ?? [])
-    .filter((section) => section.archivedAt === null)
-    .flatMap((section) =>
-      section.tables
-        .filter((table) => table.archivedAt === null && table.id !== except)
-        .map((table) => ({ id: table.id, label: table.label, section: section.name })),
-    );
-}
-
-/** Kitchen stations in use, for a kitchen screen. */
-export function stationChoices(stations: readonly StationView[]): StationView[] {
-  return stations.filter((station) => station.archivedAt === null);
-}
-
-/** Who a waiter phone may alert while nobody is signed in: anyone active, by name. */
-export function holderChoices(people: readonly StaffView[]): StaffView[] {
-  return people
-    .filter((person) => person.active)
-    .sort((a, b) => a.displayName.localeCompare(b.displayName));
-}
-
-// ---------------------------------------------------------------- rename and unpair
-
-export function nameProblem(name: string): 'nameRequired' | undefined {
-  return UpdateDeviceRequest.shape.name.safeParse(name).success ? undefined : 'nameRequired';
-}
-
-export function reasonProblem(reason: string): 'reasonRequired' | undefined {
-  return RevokeDeviceRequest.shape.reason.safeParse(reason).success ? undefined : 'reasonRequired';
+/** "9:41" for a countdown. */
+export function countdown(seconds: number): string {
+  const minutes = Math.floor(seconds / 60);
+  return `${String(minutes)}:${String(seconds % 60).padStart(2, '0')}`;
 }

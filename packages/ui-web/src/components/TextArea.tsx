@@ -10,7 +10,10 @@ export interface TextAreaProps extends TextareaHTMLAttributes<HTMLTextAreaElemen
   ref?: Ref<HTMLTextAreaElement>;
 }
 
-/** Labelled multi-line text, such as a dish's description, wired like `TextField` (NFR-U05). */
+/**
+ * Labelled multi-line text input, like `TextField` (NFR-U05): for lists typed one per line and
+ * longer notes.
+ */
 export function TextArea({
   label,
   hint,
@@ -18,7 +21,7 @@ export function TextArea({
   id,
   className,
   required,
-  rows = 3,
+  rows = 4,
   ref,
   ...rest
 }: TextAreaProps) {
@@ -41,7 +44,7 @@ export function TextArea({
           required={required}
           aria-invalid={error ? true : undefined}
           aria-describedby={describedBy(ids, { label, hint, error })}
-          className="rp-field__input rp-textarea__input"
+          className="rp-field__input rp-field__input--multiline"
         />
       </div>
     </Field>

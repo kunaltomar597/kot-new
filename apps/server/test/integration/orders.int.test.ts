@@ -14,6 +14,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { PrismaService } from '../../src/database/prisma.service.js';
 import { MenuPublishService } from '../../src/menu/menu-publish.service.js';
 import { OrdersService } from '../../src/orders/orders.service.js';
+import { SettingsService } from '../../src/settings/settings.service.js';
 import { authHeaders, type AuthKit, createAuthKit, signIn } from '../helpers/auth-kit.js';
 import { createTestApp, httpServer } from '../helpers/test-app.js';
 import { createTestDatabase, type TestDatabase } from '../helpers/test-database.js';
@@ -131,7 +132,7 @@ beforeAll(async () => {
   await publish();
 
   const hall = await prisma.section.create({ data: { ...base, name: 'Hall' } });
-  for (const label of ['T1', 'T2']) {
+  for (const label of ['T1', 'T2', 'T3']) {
     ids[label] = (
       await prisma.diningTable.create({ data: { ...base, sectionId: hall.id, label } })
     ).id;
@@ -187,7 +188,7 @@ async function orderOf(response: request.Response): Promise<OrderView> {
 describe('[ORD-001] [ORD-014] submitting an order', () => {
   let session: TableSessionView;
 
-  it('[WTR-012] prices every line on the server and sends staff orders to the kitchen by station', async () => {
+  it('[ORD-006] [WTR-012] prices every line on the server and sends staff orders to the kitchen by station', async () => {
     session = await openTable('T1');
     const response = await submit({
       idempotencyKey: randomUUID(),
@@ -444,7 +445,7 @@ describe('[ORD-001] [ORD-014] submitting an order', () => {
 });
 
 describe('[TBL-007] [TBL-008] listing orders for the POS', () => {
-  it('lists a table session’s orders oldest first, with item states', async () => {
+  it('[ORD-009] lists a table session’s orders (rounds) oldest first, with item states', async () => {
     const session = await openTable('T2');
     for (const name of ['Dal', 'Roti']) {
       const response = await submit({
@@ -495,5 +496,121 @@ describe('[TBL-007] [TBL-008] listing orders for the POS', () => {
     expect(mine).toMatchObject({ customerName: 'Anil', takeawayToken: placed.takeawayToken });
     expect(mine?.takeawayToken).not.toBeNull();
     expect((await server().get('/api/v1/orders/takeaway')).status).toBe(401);
+  });
+});
+
+describe('[ORD-016] hold and fire', () => {
+  let session: TableSessionView;
+  const kotLinesOf = async (orderId: string) =>
+    (
+      await prisma.kotLine.findMany({
+        where: { kot: { orderId } },
+        include: { orderItem: { select: { name: true } }, kot: { select: { kind: true } } },
+      })
+    )
+      .map((entry) => entry.orderItem.name)
+      .sort();
+
+  it('keeps held lines from the kitchen, taking their stock, until they are fired', async () => {
+    // Earlier tests sold the counted Dal; the kitchen made more.
+    await prisma.stockLevel.update({ where: { itemId: id('Dal') }, data: { quantity: 10 } });
+    await prisma.item.update({ where: { id: id('Dal') }, data: { available: true } });
+    session = await openTable('T3');
+    const dalBefore = await stockOf('Dal');
+    const response = await submit({
+      idempotencyKey: randomUUID(),
+      source: 'WAITER_APP',
+      orderType: 'DINE_IN',
+      tableSessionId: session.id,
+      lines: [
+        line(id('Roti')),
+        line(id('Dal'), { hold: true }),
+        line(id('Thali'), { hold: true, comboChoices: [id('Chaas')] }),
+      ],
+    });
+    expect(response.status, JSON.stringify(response.body)).toBe(200);
+    expect(SubmitOrderResponse.parse(response.body)).toMatchObject({ itemState: 'SENT' });
+    const order = await orderOf(response);
+    ids.held = order.id;
+    const states = Object.fromEntries(
+      order.items
+        .filter((item) => item.parentOrderItemId === null)
+        .map((item) => [item.name, item.state]),
+    );
+    expect(states).toEqual({ Roti: 'SENT', Dal: 'HELD', Thali: 'HELD' });
+    expect(await kotLinesOf(order.id)).toEqual(['Roti']);
+    // Ordered: counted stock is taken now (the Dal, and the Dal in the Thali).
+    expect(await stockOf('Dal')).toBe(dalBefore - 2);
+  });
+
+  it('fires the lines named, then the rest, each as a new ticket per station', async () => {
+    const order = OrderView.parse(
+      (
+        await server()
+          .get(`/api/v1/orders/${id('held')}`)
+          .set(as(waiter))
+      ).body,
+    );
+    const dal = order.items.find((item) => item.name === 'Dal' && item.parentOrderItemId === null);
+    const first = await server()
+      .post(`/api/v1/orders/${id('held')}/fire`)
+      .set(as(waiter))
+      .send({ orderItemIds: [dal?.id] });
+    expect(first.status, JSON.stringify(first.body)).toBe(200);
+    expect(await kotLinesOf(id('held'))).toEqual(['Dal', 'Roti']);
+    const rest = await server()
+      .post(`/api/v1/orders/${id('held')}/fire`)
+      .set(as(waiter))
+      .send({});
+    expect(rest.status, JSON.stringify(rest.body)).toBe(200);
+    expect(OrderView.parse(rest.body).items.every((item) => item.state === 'SENT')).toBe(true);
+    // The combo's parts reach their own stations.
+    expect(await kotLinesOf(id('held'))).toEqual(['Chaas', 'Dal', 'Dal', 'Roti', 'Roti']);
+    const again = await server()
+      .post(`/api/v1/orders/${id('held')}/fire`)
+      .set(as(waiter))
+      .send({});
+    expect([again.status, codeOf(again)]).toEqual([409, 'NOTHING_HELD']);
+    const audit = await prisma.auditLog.count({
+      where: { action: 'ORDER_FIRED', entityId: id('held') },
+    });
+    expect(audit).toBe(2);
+  });
+
+  it('cancels a held line with its stock returned, and holds a whole order', async () => {
+    const before = await stockOf('Dal');
+    const held = await orderOf(
+      await submit({
+        idempotencyKey: randomUUID(),
+        source: 'WAITER_APP',
+        orderType: 'DINE_IN',
+        tableSessionId: session.id,
+        lines: [line(id('Dal'), { hold: true })],
+      }),
+    );
+    expect(held.items[0]?.state).toBe('HELD');
+    const cancelled = await server()
+      .post(`/api/v1/order-items/${held.items[0]?.id ?? ''}/cancel`)
+      .set(as(waiter))
+      .send({ reason: 'Guest changed their mind' });
+    expect(cancelled.status, JSON.stringify(cancelled.body)).toBe(200);
+    expect(OrderView.parse(cancelled.body).items[0]?.state).toBe('CANCELLED');
+    expect(await stockOf('Dal')).toBe(before);
+    expect(await kotLinesOf(held.id)).toEqual([]);
+  });
+
+  it('refuses holding where the restaurant turned it off', async () => {
+    await prisma.setting.create({
+      data: { restaurantId: kit.restaurantId, key: 'orders.holdAndFire', value: false },
+    });
+    app.get(SettingsService).invalidate();
+    const refused = await submit({
+      idempotencyKey: randomUUID(),
+      source: 'WAITER_APP',
+      orderType: 'DINE_IN',
+      tableSessionId: session.id,
+      lines: [line(id('Roti'), { hold: true })],
+    });
+    expect([refused.status, codeOf(refused)]).toEqual([422, 'HOLD_NOT_ALLOWED']);
   });
 });

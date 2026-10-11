@@ -1,13 +1,11 @@
 import type {
-  CreatePairingCodeRequest,
   DeviceView,
   FloorResponse,
   PairingCodeResponse,
   StaffView,
   StationView,
 } from '@rp/contracts';
-import { timeOfDayOf } from '@rp/domain';
-import { Button, Dialog, QrCode, Select, TextField } from '@rp/ui-web';
+import { Button, ChoiceGroup, ConfirmDialog, Dialog, QrCode, Select, TextField } from '@rp/ui-web';
 import { useId, useState } from 'react';
 import { useConsole } from '../../app/console-context.js';
 import { useT } from '../../app/i18n.js';
@@ -15,39 +13,23 @@ import { messageOf } from '../../app/messages.js';
 import { useNow } from '../../app/use-now.js';
 import {
   checkPairing,
+  countdown,
   holderChoices,
-  nameProblem,
-  newlyPaired,
   PAIRABLE_TYPES,
   type PairableType,
-  type PairField,
-  type PairForm,
+  type PairingField,
+  type PairingForm,
   pairingRequestOf,
+  secondsLeft,
   stationChoices,
-  suggestedName,
-  type TableChoice,
+  suggestedDeviceName,
   tableChoices,
 } from './devices-view.js';
 
-/** How often the pairing dialog checks whether its code has expired. */
-const CODE_CLOCK_MS = 1_000;
-
-/** Devices that pair by scanning the QR code in their app; the others open the console. */
-const SCANS_QR: ReadonlySet<string> = new Set<PairableType>(['WAITER_PHONE', 'TABLE_TABLET']);
-
-interface IssuedCode {
-  readonly request: CreatePairingCodeRequest;
-  readonly code: PairingCodeResponse;
-  /** Devices paired before the code was issued: the new one is the one not among them. */
-  readonly knownIds: ReadonlySet<string>;
-}
-
 /**
- * Pairs a device (AUTH-007, AUTH-009, MGR-006). First what the device is for: its type, its name,
- * and a tablet's table, a kitchen screen's station or a waiter phone's holder. Then the one-time
- * code with its QR code (for the phone and tablet apps), the server's addresses and the CA
- * fingerprint that phones typing an address compare (P2-01d), until the device has paired or the
- * code expires.
+ * Pairing a device (AUTH-007, MGR-006): the manager says what it is, what it is for and what it is
+ * called; the server answers with a one-time code, shown as a QR code with the code itself, the
+ * server's addresses and the CA fingerprint a phone checks when its address was typed (P2-01d).
  */
 export function PairDeviceDialog({
   devices,
@@ -57,7 +39,7 @@ export function PairDeviceDialog({
   onClose,
 }: {
   devices: readonly DeviceView[];
-  floor: FloorResponse | undefined;
+  floor: FloorResponse;
   stations: readonly StationView[];
   people: readonly StaffView[];
   onClose: () => void;
@@ -65,50 +47,34 @@ export function PairDeviceDialog({
   const t = useT();
   const controller = useConsole();
   const formId = useId();
-  const tables = tableChoices(floor);
-  const tableLabel = (tableId: string) => tables.find((table) => table.id === tableId)?.label;
-
-  /** A name for the device until someone types their own. */
-  const suggestionFor = (form: Pick<PairForm, 'type' | 'tableId'>): string => {
-    const table = form.type === 'TABLE_TABLET' ? tableLabel(form.tableId) : undefined;
-    if (table !== undefined) return t('devices.pairDialog.tabletName', { table });
-    return suggestedName(devices, (number) =>
-      t(`devices.pairDialog.defaultName.${form.type}`, { number }),
-    );
-  };
-
-  const [form, setForm] = useState<PairForm>(() => ({
-    type: 'POS',
-    name: suggestionFor({ type: 'POS', tableId: '' }),
+  const nameFor = (type: PairableType) =>
+    suggestedDeviceName(devices, (number) => t(`devices.defaultName.${type}`, { number }));
+  const [form, setForm] = useState<PairingForm>(() => ({
+    type: 'TABLE_TABLET',
+    name: nameFor('TABLE_TABLET'),
     tableId: '',
-    stationId: '',
+    stationIds: [],
     staffId: '',
   }));
-  const [nameTyped, setNameTyped] = useState(false);
+  // The suggested name follows the type until the manager types their own.
+  const [nameEdited, setNameEdited] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState<string | undefined>();
   const [busy, setBusy] = useState(false);
-  const [issued, setIssued] = useState<IssuedCode | undefined>();
+  const [code, setCode] = useState<PairingCodeResponse | undefined>();
   const problems = checkPairing(form);
-  const problemOf = (field: PairField) => {
+  const problemOf = (field: PairingField) => {
     const problem = problems[field];
-    return submitted && problem !== undefined ? t(`devices.pairDialog.${problem}`) : undefined;
+    return submitted && problem !== undefined ? t(`devices.pairForm.${problem}`) : undefined;
   };
 
-  /** Changes the type or table, and with them the suggested name if nobody typed one. */
-  const choose = (changes: Partial<Pick<PairForm, 'type' | 'tableId'>>) => {
-    setForm((current) => {
-      const next = { ...current, ...changes };
-      return nameTyped ? next : { ...next, name: suggestionFor(next) };
-    });
-  };
-
-  const issue = async (request: CreatePairingCodeRequest) => {
+  const create = async () => {
+    setSubmitted(true);
+    if (Object.keys(problems).length > 0) return;
     setError(undefined);
     setBusy(true);
     try {
-      const code = await controller.api.createPairingCode({ body: request });
-      setIssued({ request, code, knownIds: new Set(devices.map((device) => device.id)) });
+      setCode(await controller.api.createPairingCode({ body: pairingRequestOf(form) }));
     } catch (failure) {
       setError(messageOf(failure, t));
     } finally {
@@ -116,36 +82,34 @@ export function PairDeviceDialog({
     }
   };
 
-  if (issued !== undefined) {
+  if (code !== undefined) {
     return (
-      <PairingCodeView
-        issued={issued}
-        devices={devices}
+      <PairingCodeDialog
+        name={form.name.trim()}
+        code={code}
         busy={busy}
         error={error}
         onNewCode={() => {
-          void issue(issued.request);
+          void create();
         }}
-        onClose={onClose}
+        onDone={onClose}
       />
     );
   }
 
-  const noTables = form.type === 'TABLE_TABLET' && tables.length === 0;
   return (
     <Dialog
       open
       onClose={onClose}
       dismissible={!busy}
-      title={t('devices.pairDialog.title')}
-      description={t('devices.pairDialog.description')}
+      title={t('devices.pairForm.title')}
       footer={
         <>
           <Button variant="secondary" onClick={onClose} disabled={busy}>
-            {t('devices.pairDialog.cancel')}
+            {t('devices.pairForm.cancel')}
           </Button>
-          <Button type="submit" form={formId} loading={busy} disabled={noTables}>
-            {t('devices.pairDialog.create')}
+          <Button type="submit" form={formId} loading={busy}>
+            {t('devices.pairForm.create')}
           </Button>
         </>
       }
@@ -156,91 +120,81 @@ export function PairDeviceDialog({
         noValidate
         onSubmit={(event) => {
           event.preventDefault();
-          setSubmitted(true);
-          if (Object.keys(problems).length > 0) return;
-          void issue(pairingRequestOf(form));
+          void create();
         }}
       >
         <Select
-          label={t('devices.pairDialog.type')}
+          label={t('devices.pairForm.type')}
           value={form.type}
           data-autofocus
           options={PAIRABLE_TYPES.map((type) => ({
             value: type,
-            label: t(`devices.type.${type}`),
+            label: t(`devices.typeOne.${type}`),
           }))}
           onChange={(event) => {
-            const type = PAIRABLE_TYPES.find((candidate) => candidate === event.target.value);
-            if (type !== undefined) choose({ type });
+            const type = event.target.value as PairableType;
+            setForm((current) => ({
+              ...current,
+              type,
+              ...(!nameEdited && { name: nameFor(type) }),
+            }));
           }}
         />
-        {form.type === 'TABLE_TABLET' ? (
-          <Select
-            label={t('devices.pairDialog.table')}
-            placeholder={t('devices.pairDialog.chooseTable')}
-            hint={noTables ? undefined : t('devices.pairDialog.tableHint')}
-            value={form.tableId}
-            required
-            error={noTables ? t('devices.pairDialog.noTables') : problemOf('tableId')}
-            options={tables.map((table) => ({
-              value: table.id,
-              label: t('devices.pairDialog.tableIn', {
-                table: table.label,
-                section: table.section,
-              }),
-            }))}
-            onChange={(event) => {
-              choose({ tableId: event.target.value });
-            }}
-          />
-        ) : null}
-        {form.type === 'KDS' ? (
-          <Select
-            label={t('devices.pairDialog.station')}
-            hint={t('devices.pairDialog.stationHint')}
-            value={form.stationId}
-            options={[
-              { value: '', label: t('devices.pairDialog.allStations') },
-              ...stationChoices(stations).map((station) => ({
-                value: station.id,
-                label: station.name,
-              })),
-            ]}
-            onChange={(event) => {
-              setForm((current) => ({ ...current, stationId: event.target.value }));
-            }}
-          />
-        ) : null}
-        {form.type === 'WAITER_PHONE' ? (
-          <Select
-            label={t('devices.pairDialog.holder')}
-            hint={t('devices.pairDialog.holderHint')}
-            value={form.staffId}
-            options={[
-              { value: '', label: t('devices.pairDialog.nobody') },
-              ...holderChoices(people).map((person) => ({
-                value: person.id,
-                label: person.displayName,
-              })),
-            ]}
-            onChange={(event) => {
-              setForm((current) => ({ ...current, staffId: event.target.value }));
-            }}
-          />
-        ) : null}
         <TextField
-          label={t('devices.pairDialog.name')}
-          hint={t('devices.pairDialog.nameHint')}
+          label={t('devices.pairForm.name')}
+          hint={t('devices.pairForm.nameHint')}
           value={form.name}
           maxLength={60}
           autoComplete="off"
           required
           error={problemOf('name')}
           onChange={(event) => {
-            setNameTyped(true);
+            setNameEdited(true);
             setForm((current) => ({ ...current, name: event.target.value }));
           }}
         />
+        {form.type === 'TABLE_TABLET' ? (
+          <Select
+            label={t('devices.pairForm.table')}
+            hint={t('devices.pairForm.tableHint')}
+            value={form.tableId}
+            required
+            error={problemOf('tableId')}
+            options={[
+              { value: '', label: t('devices.pairForm.chooseTable') },
+              ...tableChoices(floor),
+            ]}
+            onChange={(event) => {
+              setForm((current) => ({ ...current, tableId: event.target.value }));
+            }}
+          />
+        ) : null}
+        {form.type === 'KDS' ? (
+          <ChoiceGroup
+            legend={t('devices.pairForm.stations')}
+            hint={t('devices.pairForm.stationsHint')}
+            mode="multiple"
+            options={stationChoices(stations).map((choice) => ({
+              id: choice.value,
+              label: choice.label,
+            }))}
+            value={form.stationIds}
+            onChange={(stationIds) => {
+              setForm((current) => ({ ...current, stationIds }));
+            }}
+          />
+        ) : null}
+        {form.type === 'WAITER_PHONE' ? (
+          <Select
+            label={t('devices.pairForm.person')}
+            hint={t('devices.pairForm.personHint')}
+            value={form.staffId}
+            options={[{ value: '', label: t('devices.whoeverSignsIn') }, ...holderChoices(people)]}
+            onChange={(event) => {
+              setForm((current) => ({ ...current, staffId: event.target.value }));
+            }}
+          />
+        ) : null}
         {error === undefined ? null : (
           <p role="alert" className="console-notice console-notice--danger">
             {error}
@@ -251,113 +205,100 @@ export function PairDeviceDialog({
   );
 }
 
-/** The issued code, until the device pairs with it (shown as soon as the list has it) or it expires. */
-function PairingCodeView({
-  issued,
-  devices,
+/** The one-time code with a countdown; an expired code can be replaced in one press. */
+function PairingCodeDialog({
+  name,
+  code,
   busy,
   error,
   onNewCode,
-  onClose,
+  onDone,
 }: {
-  issued: IssuedCode;
-  devices: readonly DeviceView[];
+  name: string;
+  code: PairingCodeResponse;
   busy: boolean;
   error: string | undefined;
   onNewCode: () => void;
-  onClose: () => void;
+  onDone: () => void;
 }) {
   const t = useT();
-  const now = useNow(CODE_CLOCK_MS);
-  const { request, code } = issued;
-  const paired = newlyPaired(issued.knownIds, devices, request);
-  const expired = paired === undefined && Date.parse(code.expiresAt) <= now;
-  const scansQr = SCANS_QR.has(request.type);
-
-  let state: string;
-  if (paired !== undefined) state = t('devices.pairDialog.paired', { name: paired.name });
-  else if (expired) state = t('devices.pairDialog.expired');
-  else state = t('devices.pairDialog.waiting');
-
+  const now = useNow(1000);
+  const left = secondsLeft(code.expiresAt, now);
   return (
     <Dialog
       open
-      onClose={onClose}
-      dismissible={!busy}
-      title={t('devices.pairDialog.codeTitle', { name: request.name })}
-      description={scansQr ? t('devices.pairDialog.scanApp') : t('devices.pairDialog.openConsole')}
+      onClose={onDone}
+      title={t('devices.codeDialog.title', { name })}
       footer={
-        paired !== undefined ? (
-          <Button data-autofocus onClick={onClose}>
-            {t('devices.pairDialog.done')}
+        <>
+          {left === 0 ? (
+            <Button variant="secondary" loading={busy} onClick={onNewCode}>
+              {t('devices.codeDialog.newCode')}
+            </Button>
+          ) : null}
+          <Button onClick={onDone} data-autofocus>
+            {t('devices.codeDialog.done')}
           </Button>
-        ) : expired ? (
-          <Button data-autofocus loading={busy} onClick={onNewCode}>
-            {t('devices.pairDialog.newCode')}
-          </Button>
-        ) : undefined
+        </>
       }
     >
-      <div className="pairing-code">
-        {scansQr && !expired && paired === undefined ? (
+      <p className="dashboard-section__hint">{t('devices.codeDialog.steps')}</p>
+      {left === 0 ? (
+        <p role="status" className="console-notice console-notice--warning">
+          {t('devices.codeDialog.expired')}
+        </p>
+      ) : (
+        <div className="device-pairing">
           <QrCode
             value={code.qrPayload}
-            label={t('devices.pairDialog.qrLabel', { name: request.name })}
+            label={t('devices.codeDialog.qrLabel', { name })}
             size={208}
           />
-        ) : null}
-        <dl className="pager-credential">
-          <dt>{t('devices.pairDialog.code')}</dt>
-          <dd>
-            <code className="pager-credential__value">{code.code}</code>
-          </dd>
-          {code.serverUrls.length === 0 ? null : (
-            <>
-              <dt>{t('devices.pairDialog.addresses')}</dt>
-              <dd className="pairing-code__addresses">
-                {code.serverUrls.map((url) => (
-                  <code key={url} className="pairing-code__address">
-                    {url}
-                  </code>
-                ))}
-              </dd>
-            </>
-          )}
-          {code.caSha256 === null ? null : (
-            <>
-              <dt>{t('devices.pairDialog.fingerprint')}</dt>
-              <dd>
-                <code className="pairing-code__fingerprint">{code.caSha256}</code>
-                <p className="pairing-code__hint">{t('devices.pairDialog.fingerprintHint')}</p>
-              </dd>
-            </>
-          )}
-        </dl>
-        {expired || paired !== undefined ? null : (
-          <p className="pairing-code__hint">
-            {t('devices.pairDialog.validUntil', {
-              time: timeOfDayOf(new Date(code.expiresAt)),
-            })}
-          </p>
-        )}
-        <p
-          role="status"
-          className="pairing-code__state"
-          data-state={paired !== undefined ? 'paired' : expired ? 'expired' : 'waiting'}
-        >
-          {state}
+          <dl className="pager-credential">
+            <dt>{t('devices.codeDialog.code')}</dt>
+            <dd>
+              <span className="pager-credential__value device-pairing__code">{code.code}</span>
+              <span className="device-pairing__expiry" role="timer" aria-live="off">
+                {t('devices.codeDialog.validFor', { time: countdown(left) })}
+              </span>
+            </dd>
+            {code.serverUrls.length === 0 ? null : (
+              <>
+                <dt>{t('devices.codeDialog.addresses')}</dt>
+                <dd>
+                  <ul className="device-pairing__urls">
+                    {code.serverUrls.map((url) => (
+                      <li key={url} className="pager-credential__value">
+                        {url}
+                      </li>
+                    ))}
+                  </ul>
+                </dd>
+              </>
+            )}
+            {code.caSha256 === null ? null : (
+              <>
+                <dt>{t('devices.codeDialog.fingerprint')}</dt>
+                <dd>
+                  <span className="device-pairing__fingerprint">{code.caSha256}</span>
+                  <span className="device-pairing__hint">
+                    {t('devices.codeDialog.fingerprintHint')}
+                  </span>
+                </dd>
+              </>
+            )}
+          </dl>
+        </div>
+      )}
+      {error === undefined ? null : (
+        <p role="alert" className="console-notice console-notice--danger">
+          {error}
         </p>
-        {error === undefined ? null : (
-          <p role="alert" className="console-notice console-notice--danger">
-            {error}
-          </p>
-        )}
-      </div>
+      )}
     </Dialog>
   );
 }
 
-/** Renames a device (MGR-006), e.g. after it moved to another counter. */
 export function RenameDeviceDialog({
   device,
   busy,
@@ -375,13 +316,12 @@ export function RenameDeviceDialog({
   const formId = useId();
   const [name, setName] = useState(device.name);
   const [submitted, setSubmitted] = useState(false);
-  const problem = nameProblem(name);
+  const blank = name.trim() === '';
   return (
     <Dialog
       open
       onClose={onClose}
       dismissible={!busy}
-      size="sm"
       title={t('devices.renameDialog.title', { name: device.name })}
       footer={
         <>
@@ -389,7 +329,7 @@ export function RenameDeviceDialog({
             {t('devices.renameDialog.cancel')}
           </Button>
           <Button type="submit" form={formId} loading={busy}>
-            {t('devices.renameDialog.confirm')}
+            {t('devices.renameDialog.save')}
           </Button>
         </>
       }
@@ -401,7 +341,7 @@ export function RenameDeviceDialog({
         onSubmit={(event) => {
           event.preventDefault();
           setSubmitted(true);
-          if (problem === undefined) onRename(name.trim());
+          if (!blank) onRename(name.trim());
         }}
       >
         <TextField
@@ -411,20 +351,21 @@ export function RenameDeviceDialog({
           autoComplete="off"
           required
           data-autofocus
-          error={submitted && problem !== undefined ? t(`devices.renameDialog.${problem}`) : error}
+          error={submitted && blank ? t('devices.pairForm.nameRequired') : undefined}
           onChange={(event) => {
             setName(event.target.value);
           }}
         />
+        {error === undefined ? null : (
+          <p role="alert" className="console-notice console-notice--danger">
+            {error}
+          </p>
+        )}
       </form>
     </Dialog>
   );
 }
 
-/**
- * Moves a table tablet to another table (AUTH-009, TAB-002): a manager does it, and the tablet
- * then serves only the new table.
- */
 export function MoveTabletDialog({
   device,
   floor,
@@ -434,32 +375,29 @@ export function MoveTabletDialog({
   onClose,
 }: {
   device: DeviceView;
-  floor: FloorResponse | undefined;
+  floor: FloorResponse;
   busy: boolean;
   error: string | undefined;
-  onMove: (table: TableChoice) => void;
+  onMove: (tableId: string) => void;
   onClose: () => void;
 }) {
   const t = useT();
   const formId = useId();
-  const tables = tableChoices(floor, device.tableId);
-  const [tableId, setTableId] = useState('');
-  const chosen = tables.find((table) => table.id === tableId);
+  const choices = tableChoices(floor).filter((choice) => choice.value !== device.tableId);
+  const [tableId, setTableId] = useState(choices[0]?.value ?? '');
   return (
     <Dialog
       open
       onClose={onClose}
       dismissible={!busy}
-      size="sm"
       title={t('devices.moveDialog.title', { name: device.name })}
-      description={t('devices.moveDialog.description')}
       footer={
         <>
           <Button variant="secondary" onClick={onClose} disabled={busy}>
             {t('devices.moveDialog.cancel')}
           </Button>
-          <Button type="submit" form={formId} loading={busy} disabled={chosen === undefined}>
-            {t('devices.moveDialog.confirm')}
+          <Button type="submit" form={formId} loading={busy} disabled={tableId === ''}>
+            {t('devices.moveDialog.move')}
           </Button>
         </>
       }
@@ -470,19 +408,15 @@ export function MoveTabletDialog({
         noValidate
         onSubmit={(event) => {
           event.preventDefault();
-          if (chosen !== undefined) onMove(chosen);
+          if (tableId !== '') onMove(tableId);
         }}
       >
+        <p className="dashboard-section__hint">{t('devices.moveDialog.description')}</p>
         <Select
           label={t('devices.moveDialog.table')}
-          placeholder={t('devices.moveDialog.choose')}
           value={tableId}
-          required
           data-autofocus
-          options={tables.map((table) => ({
-            value: table.id,
-            label: t('devices.pairDialog.tableIn', { table: table.label, section: table.section }),
-          }))}
+          options={choices}
           onChange={(event) => {
             setTableId(event.target.value);
           }}
@@ -494,5 +428,126 @@ export function MoveTabletDialog({
         )}
       </form>
     </Dialog>
+  );
+}
+
+/** KDS-002: the stations a kitchen screen shows; none for every station (Expo/Pass). */
+export function DeviceStationsDialog({
+  device,
+  stations,
+  busy,
+  error,
+  onSave,
+  onClose,
+}: {
+  device: DeviceView;
+  stations: readonly StationView[];
+  busy: boolean;
+  error: string | undefined;
+  onSave: (stationIds: string[]) => void;
+  onClose: () => void;
+}) {
+  const t = useT();
+  const formId = useId();
+  const [stationIds, setStationIds] = useState<string[]>([...device.stationIds]);
+  return (
+    <Dialog
+      open
+      onClose={onClose}
+      dismissible={!busy}
+      title={t('devices.stationsDialog.title', { name: device.name })}
+      footer={
+        <>
+          <Button variant="secondary" onClick={onClose} disabled={busy}>
+            {t('devices.moveDialog.cancel')}
+          </Button>
+          <Button type="submit" form={formId} loading={busy}>
+            {t('devices.stationsDialog.save')}
+          </Button>
+        </>
+      }
+    >
+      <form
+        id={formId}
+        className="console-form"
+        noValidate
+        onSubmit={(event) => {
+          event.preventDefault();
+          onSave(stationIds);
+        }}
+      >
+        <ChoiceGroup
+          legend={t('devices.pairForm.stations')}
+          hint={t('devices.pairForm.stationsHint')}
+          mode="multiple"
+          options={stationChoices(stations).map((choice) => ({
+            id: choice.value,
+            label: choice.label,
+          }))}
+          value={stationIds}
+          onChange={setStationIds}
+        />
+        {error === undefined ? null : (
+          <p role="alert" className="console-notice console-notice--danger">
+            {error}
+          </p>
+        )}
+      </form>
+    </Dialog>
+  );
+}
+
+/** Unpairing is destructive and audited, so it asks for a reason (AUTH-008, AUD-001). */
+export function UnpairDeviceDialog({
+  device,
+  busy,
+  error,
+  onUnpair,
+  onClose,
+}: {
+  device: DeviceView;
+  busy: boolean;
+  error: string | undefined;
+  onUnpair: (reason: string) => void;
+  onClose: () => void;
+}) {
+  const t = useT();
+  const [reason, setReason] = useState('');
+  const [submitted, setSubmitted] = useState(false);
+  const short = reason.trim().length < 3;
+  return (
+    <ConfirmDialog
+      open
+      tone="danger"
+      title={t('devices.unpairDialog.title', { name: device.name })}
+      description={t('devices.unpairDialog.description')}
+      confirmLabel={t('devices.unpairDialog.confirm')}
+      cancelLabel={t('devices.unpairDialog.cancel')}
+      busy={busy}
+      onConfirm={() => {
+        setSubmitted(true);
+        if (!short) onUnpair(reason.trim());
+      }}
+      onCancel={onClose}
+    >
+      <TextField
+        label={t('devices.unpairDialog.reason')}
+        hint={t('devices.unpairDialog.reasonHint')}
+        value={reason}
+        maxLength={200}
+        autoComplete="off"
+        required
+        data-autofocus
+        error={submitted && short ? t('devices.unpairDialog.reasonRequired') : undefined}
+        onChange={(event) => {
+          setReason(event.target.value);
+        }}
+      />
+      {error === undefined ? null : (
+        <p role="alert" className="console-notice console-notice--danger">
+          {error}
+        </p>
+      )}
+    </ConfirmDialog>
   );
 }

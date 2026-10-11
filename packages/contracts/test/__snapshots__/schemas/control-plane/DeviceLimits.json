@@ -1,0 +1,24 @@
+{
+  "input": {
+    "type": "object",
+    "properties": {
+      "TABLE_TABLET": { "type": "integer", "minimum": 0, "maximum": 500 },
+      "PAGER": { "type": "integer", "minimum": 0, "maximum": 500 },
+      "WAITER_PHONE": { "type": "integer", "minimum": 0, "maximum": 500 },
+      "KDS": { "type": "integer", "minimum": 0, "maximum": 100 }
+    },
+    "required": ["TABLE_TABLET", "PAGER", "WAITER_PHONE", "KDS"],
+    "additionalProperties": false
+  },
+  "output": {
+    "type": "object",
+    "properties": {
+      "TABLE_TABLET": { "type": "integer", "minimum": 0, "maximum": 500 },
+      "PAGER": { "type": "integer", "minimum": 0, "maximum": 500 },
+      "WAITER_PHONE": { "type": "integer", "minimum": 0, "maximum": 500 },
+      "KDS": { "type": "integer", "minimum": 0, "maximum": 100 }
+    },
+    "required": ["TABLE_TABLET", "PAGER", "WAITER_PHONE", "KDS"],
+    "additionalProperties": false
+  }
+}

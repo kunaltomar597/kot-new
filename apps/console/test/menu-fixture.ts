@@ -1,81 +1,69 @@
 import type {
   CategoryView,
-  ComboView,
   ItemView,
   MenuDraftResponse,
   ModifierGroupView,
   StationView,
   TaxGroupView,
 } from '@rp/contracts';
-import { RESTAURANT_ID } from './fakes.js';
 
-/** A small menu for the menu editor tests. */
+/** A small draft menu for the menu editor's tests (P4-02d). */
 
-const AT = '2026-09-28T10:00:00.000Z';
-const id = (n: number) => `0199a0e0-0000-7000-8000-000000000${String(300 + n)}`;
+const uuid = (n: number) => `0199a0e0-0000-7000-8000-${String(n).padStart(12, '0')}`;
+const AT = '2026-09-20T10:00:00.000Z';
 
-export const IDS = {
-  starters: id(1),
-  vegStarters: id(2),
-  mains: id(3),
-  drinks: id(4),
-  festive: id(5),
-  paneerTikka: id(11),
-  hariyaliKebab: id(12),
-  dalMakhani: id(13),
-  lassi: id(14),
-  chaas: id(15),
-  thali: id(16),
-  oldSoup: id(17),
-  roti: id(21),
-  addOns: id(22),
-  oldGroup: id(23),
-  plain: id(31),
-  butter: id(32),
-  garlic: id(33),
-  cheese: id(34),
-  half: id(41),
-  full: id(42),
-  gst5: id(51),
-  oldTax: id(52),
-  kitchen: id(61),
-  bar: id(62),
-  photo: id(71),
-} as const;
+export const MAINS = uuid(1001);
+export const CURRIES = uuid(1002);
+export const BREADS = uuid(1003);
+export const OLD_CATEGORY = uuid(1004);
 
-export function category(
-  key: keyof typeof IDS,
-  name: string,
-  overrides: Partial<CategoryView> = {},
-): CategoryView {
-  return { id: IDS[key], name, parentId: null, displayOrder: 0, archivedAt: null, ...overrides };
+export const GST5 = uuid(1011);
+export const KITCHEN = uuid(1021);
+export const TANDOOR = uuid(1022);
+
+export const ROTI_TYPE = uuid(1031);
+export const ADD_ONS = uuid(1032);
+
+export const PANEER = uuid(1041);
+export const NAAN = uuid(1042);
+export const THALI = uuid(1043);
+export const OLD_DISH = uuid(1044);
+export const HALF = uuid(1051);
+export const FULL = uuid(1052);
+
+export function category(overrides: Partial<CategoryView> = {}): CategoryView {
+  return {
+    id: MAINS,
+    name: 'Mains',
+    parentId: null,
+    displayOrder: 10,
+    archivedAt: null,
+    ...overrides,
+  };
 }
 
-export function item(
-  key: keyof typeof IDS,
-  name: string,
-  overrides: Partial<ItemView> = {},
-): ItemView {
+export function item(overrides: Partial<ItemView> = {}): ItemView {
   return {
-    id: IDS[key],
-    categoryId: IDS.mains,
-    name,
-    shortCode: null,
+    id: NAAN,
+    categoryId: BREADS,
+    name: 'Butter Naan',
+    shortCode: 'BN',
     description: null,
     photoId: null,
-    basePrice: 25_000,
-    taxGroupId: IDS.gst5,
+    basePrice: 6000,
+    taxGroupId: GST5,
     foodType: 'VEG',
     spiceLevel: 0,
     tags: [],
-    stationId: IDS.kitchen,
+    stationId: TANDOOR,
     prepTimeMinutes: null,
-    displayOrder: 0,
+    timeWindow: null,
+    displayOrder: 10,
     channels: ['POS', 'WAITER_APP', 'TABLE_TABLET', 'QR'],
     variants: [],
     modifierGroupIds: [],
     synonyms: [],
-    repeatable: false,
+    repeatable: true,
     externalId: null,
     available: true,
     trackStock: false,
@@ -86,35 +74,27 @@ export function item(
   };
 }
 
-export function rotiType(overrides: Partial<ModifierGroupView> = {}): ModifierGroupView {
+export function group(overrides: Partial<ModifierGroupView> = {}): ModifierGroupView {
   return {
-    id: IDS.roti,
+    id: ROTI_TYPE,
     name: 'Roti type',
     minSelections: 1,
     maxSelections: 1,
     options: [
       {
-        id: IDS.plain,
+        id: uuid(1061),
         name: 'Plain',
         priceDelta: 0,
         available: true,
-        displayOrder: 1,
+        displayOrder: 0,
         archivedAt: null,
       },
       {
-        id: IDS.butter,
+        id: uuid(1062),
         name: 'Butter',
-        priceDelta: 1_000,
+        priceDelta: 1000,
         available: true,
-        displayOrder: 2,
-        archivedAt: null,
-      },
-      {
-        id: IDS.garlic,
-        name: 'Garlic',
-        priceDelta: 2_000,
-        available: false,
-        displayOrder: 3,
+        displayOrder: 1,
         archivedAt: null,
       },
     ],
@@ -124,180 +104,111 @@ export function rotiType(overrides: Partial<ModifierGroupView> = {}): ModifierGr
   };
 }
 
-export const THALI_COMBO: ComboView = {
-  itemId: IDS.thali,
-  components: [
-    { kind: 'FIXED', itemId: IDS.dalMakhani, label: null, itemIds: [], quantity: 1 },
-    {
-      kind: 'CHOICE',
-      itemId: null,
-      label: 'Any 1 drink',
-      itemIds: [IDS.lassi, IDS.chaas],
-      quantity: 1,
-    },
-  ],
-  activeFrom: null,
-  activeUntil: null,
-  timeWindow: { start: '11:00', end: '16:00' },
-};
-
-/**
- * Starters (with the Veg starters sub-category), Mains, Drinks and an archived Festive category;
- * a paneer tikka in two sizes, a counted kebab, dal, two drinks (one out of stock, one not on the
- * QR menu), a thali combo, and an archived soup.
- */
-export function menuDraft(overrides: Partial<MenuDraftResponse> = {}): MenuDraftResponse {
+export function draftMenu(): MenuDraftResponse {
   return {
     categories: [
-      category('starters', 'Starters', { displayOrder: 1 }),
-      category('vegStarters', 'Veg starters', { parentId: IDS.starters, displayOrder: 1 }),
-      category('mains', 'Mains', { displayOrder: 2 }),
-      category('drinks', 'Drinks', { displayOrder: 3 }),
-      category('festive', 'Festive', { displayOrder: 4, archivedAt: AT }),
+      category(),
+      category({ id: CURRIES, name: 'Curries', parentId: MAINS, displayOrder: 10 }),
+      category({ id: BREADS, name: 'Breads', displayOrder: 20 }),
+      category({ id: OLD_CATEGORY, name: 'Monsoon specials', displayOrder: 30, archivedAt: AT }),
     ],
     modifierGroups: [
-      rotiType(),
-      {
-        id: IDS.addOns,
+      group(),
+      group({
+        id: ADD_ONS,
         name: 'Add-ons',
         minSelections: 0,
-        maxSelections: 2,
-        options: [
-          {
-            id: IDS.cheese,
-            name: 'Extra cheese',
-            priceDelta: 3_000,
-            available: true,
-            displayOrder: 1,
-            archivedAt: null,
-          },
-        ],
-        itemCount: 0,
-        archivedAt: null,
-      },
-      {
-        id: IDS.oldGroup,
-        name: 'Old sauces',
-        minSelections: 0,
-        maxSelections: 1,
-        options: [],
+        maxSelections: 3,
         itemCount: 0,
         archivedAt: AT,
-      },
+      }),
     ],
     items: [
-      item('paneerTikka', 'Paneer Tikka', {
-        categoryId: IDS.vegStarters,
-        shortCode: 'PT',
-        basePrice: 22_000,
+      item({
+        id: PANEER,
+        categoryId: CURRIES,
+        name: 'Paneer Tikka Masala',
+        shortCode: 'PTM',
+        basePrice: 28000,
+        stationId: KITCHEN,
         spiceLevel: 2,
-        tags: ['Bestseller'],
+        tags: ['bestseller'],
         synonyms: ['panir'],
         variants: [
           {
-            id: IDS.half,
+            id: HALF,
             name: 'Half',
-            price: 18_000,
-            displayOrder: 1,
-            externalId: 'POS-PT-H',
+            price: 18000,
+            displayOrder: 0,
+            externalId: null,
             archivedAt: null,
           },
           {
-            id: IDS.full,
+            id: FULL,
             name: 'Full',
-            price: 32_000,
-            displayOrder: 2,
+            price: 28000,
+            displayOrder: 1,
             externalId: null,
             archivedAt: null,
           },
         ],
-        modifierGroupIds: [IDS.addOns],
-      }),
-      item('hariyaliKebab', 'Hariyali Kebab', {
-        categoryId: IDS.vegStarters,
+        modifierGroupIds: [],
+        available: true,
         trackStock: true,
-        stockCount: 6,
-        photoId: IDS.photo,
+        stockCount: 4,
       }),
-      item('dalMakhani', 'Dal Makhani', {
-        basePrice: 28_000,
-        modifierGroupIds: [IDS.roti],
-        prepTimeMinutes: 15,
-      }),
-      item('thali', 'Veg Thali', { basePrice: 34_900, displayOrder: 1 }),
-      item('lassi', 'Lassi', {
-        categoryId: IDS.drinks,
-        basePrice: 9_000,
-        stationId: IDS.bar,
+      item({ modifierGroupIds: [ROTI_TYPE] }),
+      item({
+        id: THALI,
+        categoryId: MAINS,
+        name: 'Veg Thali',
+        shortCode: null,
+        basePrice: 35000,
+        stationId: KITCHEN,
         available: false,
-        repeatable: true,
       }),
-      item('chaas', 'Masala Chaas', {
-        categoryId: IDS.drinks,
-        basePrice: 6_000,
-        stationId: IDS.bar,
-        channels: ['POS', 'WAITER_APP', 'TABLE_TABLET'],
-      }),
-      item('oldSoup', 'Tomato Soup', { categoryId: IDS.starters, archivedAt: AT }),
+      item({ id: OLD_DISH, name: 'Mango Lassi', categoryId: BREADS, archivedAt: AT }),
     ],
-    combos: [THALI_COMBO],
-    published: { version: 3, publishedAt: '2026-09-28T08:30:00.000Z' },
-    unpublished: true,
-    ...overrides,
+    combos: [
+      {
+        itemId: THALI,
+        components: [
+          { kind: 'FIXED', itemId: PANEER, label: null, itemIds: [], quantity: 1 },
+          { kind: 'FIXED', itemId: NAAN, label: null, itemIds: [], quantity: 2 },
+        ],
+        activeFrom: null,
+        activeUntil: null,
+        timeWindow: null,
+      },
+    ],
   };
 }
 
-export function taxGroups(): TaxGroupView[] {
-  return [
-    {
-      id: IDS.gst5,
-      name: 'GST 5 %',
-      sacCode: '996331',
-      components: [
-        { code: 'CGST', rateBp: 250 },
-        { code: 'SGST', rateBp: 250 },
-      ],
-      totalRateBp: 500,
-      itemCount: 6,
-      archivedAt: null,
-      updatedAt: AT,
-    },
-    {
-      id: IDS.oldTax,
-      name: 'Old VAT',
-      sacCode: null,
-      components: [{ code: 'VAT', rateBp: 1_400 }],
-      totalRateBp: 1_400,
-      itemCount: 0,
-      archivedAt: AT,
-      updatedAt: AT,
-    },
-  ];
-}
-
-export function stations(): StationView[] {
-  return [
-    { id: IDS.kitchen, name: 'Kitchen', mode: 'SCREEN', printerId: null, archivedAt: null },
-    { id: IDS.bar, name: 'Bar', mode: 'SCREEN', printerId: null, archivedAt: null },
-  ];
-}
-
-/** A menu event as the live connection delivers it. */
-export function menuEvent(
-  sequence: number,
-  type: 'MenuDraftChanged' | 'MenuPublished',
-  payload: Record<string, unknown>,
-) {
+export function taxGroups(): { taxGroups: TaxGroupView[] } {
   return {
-    sequence,
-    event: {
-      eventId: `0199a0e0-0000-7000-8000-0000000008${String(sequence).padStart(2, '0')}`,
-      type,
-      version: 1,
-      occurredAt: AT,
-      restaurantId: RESTAURANT_ID,
-      businessDate: '2026-09-28',
-      payload,
-    },
+    taxGroups: [
+      {
+        id: GST5,
+        name: 'GST 5%',
+        sacCode: '996331',
+        components: [
+          { code: 'CGST', rateBp: 250 },
+          { code: 'SGST', rateBp: 250 },
+        ],
+        totalRateBp: 500,
+        itemCount: 3,
+        archivedAt: null,
+        updatedAt: AT,
+      },
+    ],
+  };
+}
+
+export function stations(): { stations: StationView[] } {
+  return {
+    stations: [
+      { id: KITCHEN, name: 'Kitchen', mode: 'SCREEN', printerId: null, archivedAt: null },
+      { id: TANDOOR, name: 'Tandoor', mode: 'SCREEN', printerId: null, archivedAt: null },
+    ],
   };
 }

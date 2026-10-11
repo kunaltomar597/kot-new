@@ -10,6 +10,11 @@ import {
   SemVer,
   signedRequestMessage,
   UpdatesQuery,
+  VENDOR_CAPABILITIES,
+  vendorCapabilitiesOf,
+  vendorMay,
+  VendorSetupRequest,
+  VendorSignInRequest,
 } from '../src/control-plane/index.js';
 
 const HEARTBEAT = {
@@ -118,7 +123,37 @@ describe('[UPD-002] [UPD-007] releases', () => {
   it('keeps every Control Plane route under /v1 with its access declared', () => {
     for (const route of CONTROL_PLANE_ROUTES) {
       expect(route.path.startsWith('/v1/')).toBe(true);
-      expect(['INSTALLATION', 'PUBLIC']).toContain(route.capability);
+      expect(['INSTALLATION', 'PUBLIC', 'VENDOR', ...VENDOR_CAPABILITIES]).toContain(
+        route.capability,
+      );
     }
+  });
+});
+
+describe('[VCP-001] [SEC-018] vendor roles', () => {
+  it('gives each role least privilege, the Super Admin everything, Read-only only reading', () => {
+    expect(vendorCapabilitiesOf('SUPER_ADMIN')).toEqual(VENDOR_CAPABILITIES);
+    expect(vendorCapabilitiesOf('READ_ONLY')).toEqual(['FLEET_VIEW']);
+    expect(vendorMay('FINANCE', 'BILLING_MANAGE')).toBe(true);
+    expect(vendorMay('SUPPORT', 'BILLING_MANAGE')).toBe(false);
+    expect(vendorMay('ONBOARDING', 'TENANTS_MANAGE')).toBe(true);
+    expect(vendorMay('FINANCE', 'TENANTS_MANAGE')).toBe(false);
+    for (const role of ['ONBOARDING', 'SUPPORT', 'FINANCE', 'READ_ONLY'] as const) {
+      expect(vendorMay(role, 'USERS_MANAGE')).toBe(false);
+      expect(vendorMay(role, 'RELEASES_MANAGE')).toBe(false);
+      expect(vendorMay(role, 'FLEET_VIEW')).toBe(true);
+    }
+  });
+
+  it('asks for the authenticator’s code with every sign-in, and long passwords', () => {
+    expect(
+      VendorSignInRequest.safeParse({ email: 'A@Vendor.in', password: 'x', code: '123456' }),
+    ).toMatchObject({ success: true, data: { email: 'a@vendor.in' } });
+    expect(VendorSignInRequest.safeParse({ email: 'a@vendor.in', password: 'x' }).success).toBe(
+      false,
+    );
+    expect(VendorSetupRequest.safeParse({ token: 'a'.repeat(43), password: 'short' }).success).toBe(
+      false,
+    );
   });
 });

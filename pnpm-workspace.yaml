@@ -1,6 +1,8 @@
 packages:
   - 'apps/*'
   - 'packages/*'
+  - 'infra/supabase'
+  - 'infra/dast'
 
 # pnpm 10 blocks dependency install scripts unless listed here.
 onlyBuiltDependencies:
@@ -19,6 +21,14 @@ overrides:
   shell-quote@>=1.8.4 <1.11.0: ^1.11.0
   # GHSA-68fv-2mgg-jv7q, via @vitest/coverage-v8's magicast (tests only).
   source-map-js@<1.2.2: ^1.2.2
+  # GHSA-wq5f-xc86-pv6w, via next (the QR menu's image optimiser); the server depends on it directly.
+  sharp@<0.35.5: ^0.35.5
+  # @fast-csv (via exceljs) lists @types/node 14 as a dependency; its old Node globals clash with
+  # the workspace's in type checking. It needs no types of its own at run time.
+  '@fast-csv/format>@types/node': ^22.20.4
+  '@fast-csv/parse>@types/node': ^22.20.4
+  # Electron lists the @types/node of its own Node.js release; one version for the workspace.
+  'electron>@types/node': ^22.20.4
 
 # Advisories with no fixed release, accepted after review (reasons and review dates in
 # infra/ci/README.md). Remove each one when a fix ships.

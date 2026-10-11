@@ -1,8 +1,10 @@
 import { createTranslator } from '@rp/i18n';
 import {
+  type ApkUpdater,
   DeviceSession,
   type DeviceSessionOptions,
   MemoryStore,
+  type OtaUpdater,
   type ServerTrust,
 } from '@rp/mobile-core';
 import { FakeKeys, type FakeServer, fakeLocalServer, SocketFactory } from '@rp/mobile-core/testing';
@@ -35,9 +37,16 @@ export function newSession(
 export async function renderShell(
   session: DeviceSession,
   ui: ReactElement,
+  updater?: OtaUpdater,
+  apkUpdater?: ApkUpdater,
 ): Promise<Awaited<ReturnType<typeof render>>> {
   return render(
-    <ShellProvider session={session} translator={translator}>
+    <ShellProvider
+      session={session}
+      translator={translator}
+      {...(updater !== undefined && { updater })}
+      {...(apkUpdater !== undefined && { apkUpdater })}
+    >
       {ui}
     </ShellProvider>,
   );

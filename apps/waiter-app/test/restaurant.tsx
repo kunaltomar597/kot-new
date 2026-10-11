@@ -8,6 +8,7 @@ import type {
   OrderView,
   OverrideRequest,
   PagerView,
+  RecommendationsResponse,
   ServiceRequestView,
   SubmitOrderRequest,
   SubmitOrderResponse,
@@ -96,6 +97,35 @@ export class Restaurant {
       session: session(9005, KIRAN, 4),
     },
   ];
+  /** The licence as the server answers it (LIC-005); active and not applied by default. */
+  licence: Record<string, unknown> = {
+    state: 'ACTIVE',
+    recorded: 'ACTIVE',
+    problem: null,
+    restrictedFrom: null,
+    daysLeft: null,
+    validUntil: null,
+    enforced: false,
+    capabilities: {
+      openNewTableSessions: true,
+      createOrders: true,
+      sendKots: true,
+      billOpenTables: true,
+      print: true,
+      viewReports: true,
+      exportData: true,
+      backups: true,
+      showPaymentReminder: false,
+      showGraceBanner: false,
+    },
+    details: null,
+  };
+  /** The restaurant lets waiters print bills from the app (WTR-008, `bills.waiterMayPrint`). */
+  waiterMayPrint = false;
+  /** Open takeaway orders (TBL-008, WTR-013). */
+  readonly takeaway: OrderView[] = [];
+  /** When the signed-in waiter went on break, or null (NTF-009). */
+  breakSince: string | null = null;
   pager: PagerView | null = {
     deviceId: PAGER_ID,
     name: 'Pager 3',
@@ -106,6 +136,8 @@ export class Restaurant {
     rssi: -60,
     firmwareVersion: '1.0.3',
     lastSeenAt: AT,
+    signInFailures: 0,
+    lastSignInFailureAt: null,
   };
   /** Ravi looks after the hall today. */
   assignments: WaiterAssignmentsResponse['current']['assignments'] = [
@@ -133,6 +165,10 @@ export class Restaurant {
   /** Manager approvals issued and not used yet (single use, AUTH-011). */
   private readonly approvals = new Set<string>();
   private nextOrder = 20;
+  /** What the server suggests for a table (P3-05a); none unless a test sets them. */
+  suggestions: RecommendationsResponse['recommendations'] = [];
+  /** Approve and reject requests the server received (P3-03b). */
+  readonly decisions: { orderId: string; kind: 'approve' | 'reject'; body: unknown }[] = [];
 
   constructor() {
     // T2 asked for water four minutes ago, on its tablet (TAB-004).
@@ -182,8 +218,9 @@ export class Restaurant {
     return found;
   }
 
-  overview(): { tables: TableOverviewEntry[] } {
+  overview(): { tables: TableOverviewEntry[]; mayPrintBill: boolean } {
     return {
+      mayPrintBill: this.waiterMayPrint,
       tables: this.tables.map((table) => ({
         tableId: table.id,
         label: table.label,
@@ -370,6 +407,7 @@ export class Restaurant {
             state: table.state,
             displayOrder: order,
             tabletDeviceIds: [],
+            layout: null,
             archivedAt: null,
             updatedAt: AT,
           })),
@@ -438,20 +476,22 @@ export class Restaurant {
         unitPrice: item?.basePrice ?? 0,
         lineTotal: (item?.basePrice ?? 0) * line.quantity,
         stationId: IDS.kitchen,
-        state: 'SENT',
+        state: line.hold === true ? 'HELD' : 'SENT',
         instructions: line.instructions ?? null,
       };
     });
+    const takeaway = request.orderType === 'TAKEAWAY';
     const order: OrderView = {
       id: orderId,
       orderNumber: this.nextOrder,
-      orderType: 'DINE_IN',
+      orderType: request.orderType,
       source: request.source,
       status: 'OPEN',
-      tableSessionId: sessionId,
+      tableSessionId: takeaway ? null : sessionId,
       tableId: null,
-      takeawayToken: null,
-      customerName: null,
+      // TBL-008: takeaway orders get the next token of the day.
+      takeawayToken: takeaway ? 40 + this.nextOrder : null,
+      customerName: request.customerName ?? null,
       businessDate: '2026-09-26',
       createdAt: AT,
       note: null,
@@ -468,6 +508,7 @@ export class Restaurant {
       ],
     };
     this.orders.set(sessionId, [...(this.orders.get(sessionId) ?? []), order]);
+    if (takeaway) this.takeaway.push(order);
     const answer: SubmitOrderResponse = {
       status: 'ACCEPTED',
       orderId,
@@ -479,6 +520,109 @@ export class Restaurant {
     return answer;
   }
 
+  /**
+   * A diner's order from the table's tablet, waiting for approval (P3-03b, ORD-003): 2 Paneer
+   * Tikka (half, extra cheese) and a dal.
+   */
+  dinerOrder(label: string, minutesAgo = 1): OrderView {
+    const table = this.table(label);
+    if (table.session === null) throw new Error(`${label} is not open`);
+    this.nextOrder += 1;
+    const orderId = id(7000 + this.nextOrder);
+    const order: OrderView = {
+      id: orderId,
+      orderNumber: this.nextOrder,
+      orderType: 'DINE_IN',
+      source: 'TABLE_TABLET',
+      status: 'OPEN',
+      tableSessionId: table.session.id,
+      tableId: table.id,
+      takeawayToken: null,
+      customerName: null,
+      businessDate: '2026-09-26',
+      createdAt: new Date(Date.now() - minutesAgo * 60_000).toISOString(),
+      note: null,
+      items: [
+        {
+          id: id(7400 + this.nextOrder),
+          itemId: IDS.tikka,
+          parentOrderItemId: null,
+          name: 'Paneer Tikka',
+          variantId: IDS.half,
+          variantName: 'Half',
+          modifiers: [{ optionId: IDS.cheese, name: 'Extra cheese', priceDelta: 3_000 }],
+          quantity: 2,
+          unitPrice: 21_000,
+          lineTotal: 42_000,
+          stationId: IDS.kitchen,
+          state: 'PENDING_APPROVAL',
+          instructions: null,
+        },
+        {
+          id: id(7500 + this.nextOrder),
+          itemId: IDS.dal,
+          parentOrderItemId: null,
+          name: 'Dal Makhani',
+          variantId: null,
+          variantName: null,
+          modifiers: [],
+          quantity: 1,
+          unitPrice: 24_000,
+          lineTotal: 24_000,
+          stationId: IDS.kitchen,
+          state: 'PENDING_APPROVAL',
+          instructions: 'Less spicy',
+        },
+      ],
+      kots: [],
+    };
+    this.orders.set(table.session.id, [...(this.orders.get(table.session.id) ?? []), order]);
+    return order;
+  }
+
+  /** Orders with a line waiting for approval, oldest first, with their table. */
+  pendingApprovals() {
+    return this.allOrders()
+      .filter((order) => order.items.some((item) => item.state === 'PENDING_APPROVAL'))
+      .map((order) => {
+        const table = this.tables.find((candidate) => candidate.id === order.tableId);
+        return {
+          order,
+          tableLabel: table?.label ?? null,
+          waiterId: table?.session?.waiterId ?? null,
+        };
+      });
+  }
+
+  private decide(call: RecordedCall, kind: 'approve' | 'reject'): FakeResponse {
+    const order = this.allOrders().find((candidate) => call.path.includes(candidate.id));
+    if (order === undefined)
+      return { status: 404, body: { code: 'ORDER_NOT_FOUND', message: 'No such order.' } };
+    this.decisions.push({ orderId: order.id, kind, body: call.body });
+    const changes = new Map(
+      ((call.body as { changes?: { orderItemId: string; quantity: number }[] }).changes ?? []).map(
+        (change) => [change.orderItemId, change.quantity],
+      ),
+    );
+    const decided: OrderView = {
+      ...order,
+      items: order.items.map((item) => {
+        if (item.state !== 'PENDING_APPROVAL') return item;
+        const quantity = changes.get(item.id) ?? item.quantity;
+        if (kind === 'reject' || quantity === 0) return { ...item, state: 'REJECTED' };
+        return { ...item, quantity, lineTotal: item.unitPrice * quantity, state: 'SENT' };
+      }),
+    };
+    const sessionId = order.tableSessionId ?? '';
+    this.orders.set(
+      sessionId,
+      (this.orders.get(sessionId) ?? []).map((candidate) =>
+        candidate.id === order.id ? decided : candidate,
+      ),
+    );
+    return { status: 200, body: decided };
+  }
+
   /** Every order the server has made, whichever table. */
   allOrders(): OrderView[] {
     return [...this.orders.values()].flat();
@@ -488,6 +632,7 @@ export class Restaurant {
   server(): FakeServer {
     return fakeLocalServer()
       .on('GET', '/api/v1/tables/overview', () => ({ status: 200, body: this.overview() }))
+      .on('GET', '/api/v1/licence', () => ({ status: 200, body: this.licence }))
       .on('GET', '/api/v1/floor', () => ({ status: 200, body: this.floor() }))
       .on('GET', '/api/v1/waiter-assignments', () => ({
         status: 200,
@@ -502,6 +647,38 @@ export class Restaurant {
         const answer = this.submitOrder(call.body as SubmitOrderRequest);
         if (this.network === 'loseAnswers') throw new TypeError('Network request failed');
         return { status: 200, body: answer };
+      })
+      .on('GET', '/api/v1/orders/takeaway', () => ({
+        status: 200,
+        body: { orders: this.takeaway },
+      }))
+      .on('GET', '/api/v1/orders/:orderId', (call) => {
+        const order = [...this.orders.values()]
+          .flat()
+          .find((entry) => call.path.endsWith(entry.id));
+        return order === undefined
+          ? { status: 404, body: { code: 'ORDER_NOT_FOUND', message: 'No such order.' } }
+          : { status: 200, body: order };
+      })
+      .on('POST', '/api/v1/orders/:orderId/fire', (call) => {
+        const order = [...this.orders.values()]
+          .flat()
+          .find((entry) => call.path.includes(entry.id));
+        if (order === undefined)
+          return { status: 404, body: { code: 'ORDER_NOT_FOUND', message: 'No' } };
+        const fired: OrderView = {
+          ...order,
+          items: order.items.map((item) =>
+            item.state === 'HELD' ? { ...item, state: 'SENT' as const } : item,
+          ),
+        };
+        for (const [sessionId, list] of this.orders) {
+          this.orders.set(
+            sessionId,
+            list.map((entry) => (entry.id === order.id ? fired : entry)),
+          );
+        }
+        return { status: 200, body: fired };
       })
       .on('POST', '/api/v1/order-items/:orderItemId/status', (call) => this.itemStep(call))
       .on('POST', '/api/v1/order-items/:orderItemId/cancel', (call) => this.endItem(call, 'CANCEL'))
@@ -533,10 +710,55 @@ export class Restaurant {
       .on('POST', '/api/v1/service-requests/:requestId/resolve', (call) =>
         this.requestStep(call, 'resolve'),
       )
+      .on('GET', '/api/v1/recommendations', () => ({
+        status: 200,
+        body: { recommendations: this.suggestions, daypart: null, menuVersion: 1 },
+      }))
+      .on('POST', '/api/v1/recommendations/events', () => ({ status: 204 }))
+      .on('GET', '/api/v1/orders/pending-approval', () => ({
+        status: 200,
+        body: { orders: this.pendingApprovals() },
+      }))
+      .on('POST', '/api/v1/orders/:orderId/approve', (call) => this.decide(call, 'approve'))
+      .on('POST', '/api/v1/orders/:orderId/reject', (call) => this.decide(call, 'reject'))
+      .on('GET', '/api/v1/staff/me/break', () => ({
+        status: 200,
+        body: { staffId: RAVI, onBreak: this.breakSince !== null, since: this.breakSince },
+      }))
+      .on('POST', '/api/v1/staff/me/break', (call) => {
+        this.breakSince = (call.body as { onBreak: boolean }).onBreak ? AT : null;
+        return {
+          status: 200,
+          body: { staffId: RAVI, onBreak: this.breakSince !== null, since: this.breakSince },
+        };
+      })
       .on('GET', '/api/v1/pagers/mine', () => ({
         status: 200,
         body: { pager: this.pager, lowBatteryPercent: 15 } satisfies MyPagerResponse,
       }))
+      .on('POST', '/api/v1/table-sessions/:sessionId/print-bill', (call) => {
+        const table = this.tables.find(
+          (candidate) => candidate.session !== null && call.path.includes(candidate.session.id),
+        );
+        if (table === undefined || !this.waiterMayPrint) return { status: 403, body: {} };
+        table.state = 'BILL_PRINTED';
+        return {
+          status: 200,
+          body: {
+            invoiceId: id(9900),
+            invoiceNumber: 'INV/26-27/000042',
+            grandTotal: 64_000,
+            printed: true,
+            error: null,
+          },
+        };
+      })
+      .on('POST', '/api/v1/tables/:tableId/clean', (call) => {
+        const table = this.tables.find((candidate) => call.path.includes(candidate.id));
+        if (table?.state !== 'NEEDS_CLEANING') return { status: 409, body: {} };
+        table.state = 'FREE';
+        return { status: 200, body: { tableId: table.id, state: 'FREE' } };
+      })
       .on('POST', '/api/v1/tables/:tableId/open', (call) => {
         const table = this.tables.find((candidate) => call.path.includes(candidate.id));
         if (table?.state !== 'FREE') {

@@ -195,7 +195,8 @@
           },
           { "type": "null" }
         ]
-      }
+      },
+      "amountInWords": { "default": false, "type": "boolean" }
     },
     "required": [
       "id",
@@ -421,7 +422,8 @@
           },
           { "type": "null" }
         ]
-      }
+      },
+      "amountInWords": { "default": false, "type": "boolean" }
     },
     "required": [
       "id",
@@ -442,7 +444,8 @@
       "grandTotal",
       "customer",
       "invoiceIds",
-      "editingInvoiceId"
+      "editingInvoiceId",
+      "amountInWords"
     ],
     "additionalProperties": false
   }

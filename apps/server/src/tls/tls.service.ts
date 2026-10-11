@@ -125,7 +125,7 @@ export class TlsService implements OnApplicationBootstrap, OnModuleDestroy {
   }
 
   /** The port the HTTP(S) server listens on (tests listen on any free port), else `PORT`. */
-  private listeningPort(): number {
+  listeningPort(): number {
     const adapter = this.adapterHost.httpAdapter as typeof this.adapterHost.httpAdapter | undefined;
     const server: unknown = adapter?.getHttpServer();
     const address = server instanceof NetServer ? server.address() : null;

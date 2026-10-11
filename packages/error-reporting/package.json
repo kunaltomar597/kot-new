@@ -1,0 +1,27 @@
+{
+  "name": "@rp/error-reporting",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Error reports to a Sentry-compatible service, scrubbed of secrets and personal data, rate-limited (NFR-O02), for the local server and the Control Plane.",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "clean": "rm -rf dist coverage"
+  },
+  "dependencies": {
+    "@rp/domain": "workspace:*"
+  }
+}

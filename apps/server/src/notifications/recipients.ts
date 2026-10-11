@@ -1,4 +1,4 @@
-import type { RecipientContext } from '@rp/domain';
+import { type RecipientContext, responsibleWaiters } from '@rp/domain';
 import { dbDate } from '../common/business-dates.js';
 import type { TransactionClient } from '../database/prisma.service.js';
 
@@ -37,7 +37,10 @@ export async function recipientContext(
         }),
     subject.tableId === null
       ? Promise.resolve(null)
-      : tx.diningTable.findUnique({ where: { id: subject.tableId }, select: { sectionId: true } }),
+      : tx.diningTable.findUnique({
+          where: { id: subject.tableId },
+          select: { id: true, sectionId: true },
+        }),
     tx.staff.findMany({
       where: { restaurantId, active: true, archivedAt: null },
       select: { id: true, onBreakSince: true, role: { select: { baseRole: true } } },
@@ -57,21 +60,25 @@ export async function recipientContext(
     const present = ids.filter((id) => preferred.has(id));
     return present.length > 0 ? present : [...ids];
   };
+  const assignments =
+    table === null
+      ? []
+      : await tx.shiftAssignment.findMany({
+          where: { restaurantId, businessDate: dbDate(subject.businessDate) },
+          orderBy: { id: 'asc' },
+          select: { staffId: true, sectionId: true, tableId: true },
+        });
   const sectionWaiterIds =
     table === null
       ? []
-      : (
-          await tx.shiftAssignment.findMany({
-            where: {
-              restaurantId,
-              sectionId: table.sectionId,
-              businessDate: dbDate(subject.businessDate),
-            },
-            select: { staffId: true },
-          })
-        ).map((assignment) => assignment.staffId);
+      : assignments
+          .filter((assignment) => assignment.sectionId === table.sectionId)
+          .map((assignment) => assignment.staffId);
+  // A table that is not open has no session waiter yet: the one who would get it when it opens
+  // is responsible (QR-010, TBL-002).
+  const tableWaiterId = table === null ? null : (responsibleWaiters(table, assignments)[0] ?? null);
   return {
-    responsibleWaiterId: session?.waiterId ?? null,
+    responsibleWaiterId: session?.waiterId ?? tableWaiterId,
     sectionWaiterIds: [...new Set(sectionWaiterIds)],
     allWaiterIds: byRole(['WAITER']),
     managersOnDuty: onDuty(managers, online),

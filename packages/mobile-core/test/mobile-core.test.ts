@@ -203,7 +203,7 @@ describe('[AUTH-007] [SEC-010] credentials in the secure store', () => {
       expiresAt: inMinutes(600),
       inactivityTimeoutSeconds: 600,
     },
-    staff: { id: STAFF_ID, displayName: 'Ravi', role: 'WAITER', customRole: null },
+    staff: { id: STAFF_ID, displayName: 'Ravi', role: 'WAITER' },
     secondFactorValidUntil: null,
   };
 

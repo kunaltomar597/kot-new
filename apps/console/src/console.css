@@ -612,9 +612,23 @@ body {
 
 .bill__discount {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: var(--rp-space-2);
+}
+
+/* An invoice's digital bill (P7-09b): its own line under the invoice. */
+.bill__digital {
+  display: flex;
+  flex-basis: 100%;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--rp-space-2);
+  margin: 0;
+  color: var(--rp-color-text-muted);
+  font-size: 0.875rem;
 }
 
 .bill__actions {
@@ -1154,6 +1168,18 @@ body {
   gap: var(--rp-space-2);
 }
 
+/* Reading a pager's QR code with the camera in the register dialog (P2-04b2, PGR-012). */
+.pager-scan {
+  display: grid;
+  gap: var(--rp-space-2);
+  justify-items: start;
+}
+
+.pager-scan__status {
+  margin: 0;
+  color: var(--rp-color-text-muted);
+}
+
 /* A pager's credential, shown once (P4-02b, SEC-012). */
 .pager-credential {
   display: grid;
@@ -1177,309 +1203,6 @@ body {
   font-size: var(--rp-font-size-lg);
   overflow-wrap: anywhere;
   user-select: all;
-}
-
-/* Devices (P4-02c, MGR-006): one group per type, the pairing code with its QR code. */
-.device-group {
-  display: flex;
-  flex-direction: column;
-  gap: var(--rp-space-3);
-  min-width: 0;
-}
-
-.device-group__heading {
-  margin: 0;
-  font-size: var(--rp-font-size-lg);
-  font-weight: var(--rp-font-weight-semibold);
-}
-
-.pairing-code {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--rp-space-3);
-}
-
-.pairing-code .pager-credential {
-  width: 100%;
-}
-
-.pairing-code__addresses {
-  display: flex;
-  flex-direction: column;
-  gap: var(--rp-space-1);
-}
-
-.pairing-code__address,
-.pairing-code__fingerprint {
-  font-family: var(--rp-font-mono);
-  overflow-wrap: anywhere;
-  user-select: all;
-}
-
-.pairing-code__hint {
-  margin: 0;
-  color: var(--rp-color-text-muted);
-  align-self: stretch;
-}
-
-.pairing-code__state {
-  margin: 0;
-  align-self: stretch;
-  font-weight: var(--rp-font-weight-semibold);
-}
-
-.pairing-code__state[data-state='paired'] {
-  color: var(--rp-color-success-text);
-}
-
-.pairing-code__state[data-state='expired'] {
-  color: var(--rp-color-danger-text);
-}
-
-/* A located console (MGR-006): its name large enough to read from across the room. */
-.locate-dialog .rp-dialog__title {
-  font-size: var(--rp-font-size-2xl);
-}
-
-/* The menu editor (P4-02d, MGR-005): the publishing bar, the item list and the item page. */
-.menu-publish {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--rp-space-3);
-  padding: var(--rp-space-3) var(--rp-space-4);
-  border: 1px solid var(--rp-color-border);
-  border-radius: var(--rp-radius-lg);
-  background: var(--rp-color-surface);
-}
-
-.menu-publish__state {
-  display: flex;
-  flex: 1 1 16rem;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--rp-space-2) var(--rp-space-3);
-  min-width: 0;
-}
-
-.menu-publish__version {
-  margin: 0;
-  overflow-wrap: anywhere;
-}
-
-.menu-filter {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-end;
-  gap: var(--rp-space-2) var(--rp-space-4);
-}
-
-.menu-filter .rp-field {
-  flex: 1 1 16rem;
-}
-
-.menu-group {
-  display: flex;
-  flex-direction: column;
-  gap: var(--rp-space-3);
-  min-width: 0;
-}
-
-.menu-group__heading {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--rp-space-2);
-  margin: var(--rp-space-2) 0 0;
-  font-size: var(--rp-font-size-lg);
-  font-weight: var(--rp-font-weight-semibold);
-  overflow-wrap: anywhere;
-}
-
-.menu-group[data-sub] .menu-group__heading {
-  font-size: var(--rp-font-size-md);
-}
-
-.menu-group__empty {
-  margin: 0;
-  color: var(--rp-color-text-muted);
-  font-style: italic;
-}
-
-.menu-row__photo {
-  flex: 0 0 auto;
-  width: 4rem;
-  height: 4rem;
-  border-radius: var(--rp-radius-md);
-  object-fit: cover;
-}
-
-.menu-row__code {
-  padding: 0 var(--rp-space-2);
-  border-radius: var(--rp-radius-sm);
-  background: var(--rp-color-surface-sunken);
-  color: var(--rp-color-text-muted);
-  font-family: var(--rp-font-mono);
-  font-size: var(--rp-font-size-sm);
-  font-weight: var(--rp-font-weight-medium);
-}
-
-/* Facts on one line that wrap on a phone, such as the price and the number of sizes. */
-.menu-facts {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0 var(--rp-space-4);
-}
-
-.staff-row[data-sub] {
-  margin-inline-start: var(--rp-space-6);
-}
-
-.menu-options {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--rp-space-1) var(--rp-space-4);
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.menu-options__price {
-  margin-inline-start: var(--rp-space-1);
-  color: var(--rp-color-text-muted);
-}
-
-.menu-editor__section {
-  display: flex;
-  flex-direction: column;
-  gap: var(--rp-space-3);
-  min-width: 0;
-  margin: 0;
-  padding: var(--rp-space-4);
-  border: 1px solid var(--rp-color-border);
-  border-radius: var(--rp-radius-lg);
-  background: var(--rp-color-surface);
-}
-
-.menu-editor__subsection {
-  display: flex;
-  flex-direction: column;
-  gap: var(--rp-space-3);
-  min-width: 0;
-  margin: 0;
-  padding: var(--rp-space-3);
-  border: 1px solid var(--rp-color-border);
-  border-radius: var(--rp-radius-md);
-}
-
-.menu-editor__legend {
-  padding: 0 var(--rp-space-1);
-  font-size: var(--rp-font-size-md);
-  font-weight: var(--rp-font-weight-semibold);
-}
-
-/* Fields side by side on a wide screen, one under the other on a phone. */
-.menu-editor__row {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr));
-  gap: var(--rp-space-3);
-  align-items: start;
-}
-
-.menu-editor__row--removable {
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr)) var(--rp-touch-target);
-  align-items: end;
-}
-
-.menu-editor__short {
-  max-width: 14rem;
-}
-
-.menu-editor__note {
-  margin: 0;
-  font-weight: var(--rp-font-weight-medium);
-}
-
-.menu-editor__actions {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: var(--rp-space-2);
-}
-
-/* The role editor (P4-02e): one choice per permission, side by side on a wide screen. */
-.role-editor__heading {
-  display: flex;
-  flex-direction: column;
-  gap: var(--rp-space-1);
-}
-
-.role-editor__permissions {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr));
-  gap: var(--rp-space-3);
-  align-items: start;
-}
-
-.menu-field-group {
-  display: flex;
-  flex-direction: column;
-  gap: var(--rp-space-2);
-}
-
-.menu-photo {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: var(--rp-space-3);
-}
-
-.menu-photo__image {
-  width: min(100%, 15rem);
-  aspect-ratio: 4 / 3;
-  border-radius: var(--rp-radius-md);
-  object-fit: cover;
-}
-
-.menu-photo__none {
-  margin: 0;
-  color: var(--rp-color-text-muted);
-  font-style: italic;
-}
-
-.menu-photo__actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--rp-space-2);
-}
-
-.menu-chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--rp-space-2);
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.menu-chips__chip {
-  display: flex;
-  align-items: center;
-  gap: var(--rp-space-1);
-  padding-inline-start: var(--rp-space-3);
-  border: 1px solid var(--rp-color-border-strong);
-  border-radius: var(--rp-radius-md);
-  background: var(--rp-color-surface-sunken);
-}
-
-.menu-option-row {
-  display: flex;
-  flex-direction: column;
-  gap: var(--rp-space-1);
-  padding-block-end: var(--rp-space-2);
-  border-block-end: 1px solid var(--rp-color-border);
 }
 
 /* The Owner's sign-in security (P4-02a, AUTH-006). */
@@ -1537,118 +1260,6 @@ body {
   padding-left: var(--rp-space-6);
 }
 
-/* Settings (P4-03a, MGR-007): a group per area, a row per setting with its value in words. */
-.settings-group {
-  display: flex;
-  flex-direction: column;
-  gap: var(--rp-space-3);
-  min-width: 0;
-}
-
-.settings-group__heading {
-  margin: var(--rp-space-2) 0 0;
-  font-size: var(--rp-font-size-lg);
-  font-weight: var(--rp-font-weight-semibold);
-  overflow-wrap: anywhere;
-}
-
-.settings-row__value {
-  margin: 0;
-  font-weight: var(--rp-font-weight-medium);
-  overflow-wrap: anywhere;
-}
-
-.settings-default {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--rp-space-2) var(--rp-space-3);
-}
-
-.settings-default__text {
-  margin: 0;
-  color: var(--rp-color-text-muted);
-  overflow-wrap: anywhere;
-}
-
-.settings-window {
-  display: flex;
-  flex-direction: column;
-  gap: var(--rp-space-2);
-  min-width: 0;
-  margin: 0;
-  padding: 0;
-  border: 0;
-}
-
-.settings-window__legend {
-  padding: 0;
-  font-weight: var(--rp-font-weight-semibold);
-}
-
-.settings-window__times {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 9rem), 1fr));
-  gap: var(--rp-space-2) var(--rp-space-3);
-}
-
-/* The restaurant's profile and invoice particulars (P4-03e): each fact beside its name. */
-.settings-facts {
-  display: grid;
-  grid-template-columns: minmax(6rem, max-content) minmax(0, 1fr);
-  gap: var(--rp-space-2) var(--rp-space-4);
-  align-items: baseline;
-  margin: 0;
-  padding: var(--rp-space-4);
-  border: 1px solid var(--rp-color-border);
-  border-radius: var(--rp-radius-lg);
-  background: var(--rp-color-surface);
-}
-
-.settings-facts dt {
-  color: var(--rp-color-text-muted);
-}
-
-.settings-facts dd {
-  margin: 0;
-  min-width: 0;
-  overflow-wrap: anywhere;
-}
-
-.settings-logo {
-  display: block;
-  max-width: min(100%, 12rem);
-  max-height: 6rem;
-  object-fit: contain;
-}
-
-/* A day of opening hours in the hours dialog. */
-.settings-day {
-  display: flex;
-  flex-direction: column;
-  gap: var(--rp-space-2);
-  padding-block-end: var(--rp-space-3);
-  border-bottom: 1px solid var(--rp-color-border);
-}
-
-.settings-day__name {
-  margin: 0;
-  font-size: var(--rp-font-size-md);
-  font-weight: var(--rp-font-weight-semibold);
-}
-
-.settings-day__closed {
-  margin: 0;
-  color: var(--rp-color-text-muted);
-}
-
-.settings-day__actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--rp-space-2);
-}
-
 /* A phone's width is for content, not margins (MGR-011). */
 @media (max-width: 40rem) {
   .console-main {
@@ -1658,4 +1269,807 @@ body {
   .console-header {
     padding: var(--rp-space-3) var(--rp-space-4);
   }
+}
+
+/* Devices (P4-02c, MGR-006): one group per type, unpaired ones folded away. */
+.device-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--rp-space-3);
+}
+
+.device-group__heading {
+  margin: 0;
+  font-size: var(--rp-font-size-md);
+  font-weight: var(--rp-font-weight-semibold);
+}
+
+.device-group--unpaired summary {
+  display: flex;
+  align-items: center;
+  min-height: var(--rp-touch-min);
+  cursor: pointer;
+}
+
+.device-group--unpaired summary:focus-visible {
+  outline: 3px solid var(--rp-color-focus-ring);
+  outline-offset: 2px;
+}
+
+/* The pairing code: the QR code beside the code and addresses, stacked on a phone. */
+.device-pairing {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: var(--rp-space-4);
+}
+
+.device-pairing .pager-credential {
+  flex: 1 1 14rem;
+}
+
+.device-pairing__code {
+  display: block;
+  font-size: var(--rp-font-size-2xl);
+  letter-spacing: 0.08em;
+}
+
+.device-pairing__expiry,
+.device-pairing__hint {
+  display: block;
+  color: var(--rp-color-text-muted);
+  font-size: var(--rp-font-size-sm);
+}
+
+.device-pairing__urls {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.device-pairing__fingerprint {
+  display: block;
+  font-family: var(--rp-font-mono);
+  font-size: var(--rp-font-size-sm);
+  overflow-wrap: anywhere;
+}
+
+/* The menu editor (P4-02d, MGR-005). */
+.menu-tab {
+  display: flex;
+  flex-direction: column;
+  gap: var(--rp-space-3);
+  padding-top: var(--rp-space-3);
+}
+
+.menu-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--rp-space-3);
+}
+
+.menu-toolbar > .rp-field {
+  flex: 1 1 14rem;
+}
+
+.menu-toolbar__check {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--rp-space-2);
+  min-height: var(--rp-touch-min);
+  cursor: pointer;
+}
+
+.menu-toolbar__check input {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+.menu-row__photo {
+  flex: 0 0 auto;
+  width: 4rem;
+  height: 4rem;
+  border-radius: var(--rp-radius-md);
+  object-fit: cover;
+}
+
+.menu-row__code {
+  padding: 0 var(--rp-space-2);
+  border: 1px solid var(--rp-color-border-strong);
+  border-radius: var(--rp-radius-sm);
+  font-family: var(--rp-font-mono);
+  font-size: var(--rp-font-size-sm);
+  font-weight: var(--rp-font-weight-regular);
+}
+
+.staff-row[data-depth='1'] {
+  margin-left: var(--rp-space-6);
+}
+
+.menu-form__section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--rp-space-3);
+  margin: 0;
+  padding: var(--rp-space-4);
+  border: 1px solid var(--rp-color-border);
+  border-radius: var(--rp-radius-lg);
+}
+
+.menu-form__section > legend {
+  padding: 0 var(--rp-space-2);
+  font-weight: var(--rp-font-weight-semibold);
+}
+
+.menu-form__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--rp-space-3);
+}
+
+.menu-form__row > .rp-field {
+  flex: 1 1 10rem;
+}
+
+.menu-form__hint {
+  margin: 0;
+  color: var(--rp-color-text-muted);
+  font-size: var(--rp-font-size-sm);
+}
+
+.menu-form__error {
+  margin: 0;
+  color: var(--rp-color-danger-text);
+  font-weight: var(--rp-font-weight-medium);
+}
+
+.menu-photo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: var(--rp-space-3);
+}
+
+.menu-photo__preview {
+  width: 6rem;
+  height: 6rem;
+  border-radius: var(--rp-radius-md);
+  object-fit: cover;
+}
+
+.menu-photo__actions {
+  display: flex;
+  flex: 1 1 14rem;
+  flex-direction: column;
+  gap: var(--rp-space-1);
+}
+
+.menu-photo__label {
+  font-weight: var(--rp-font-weight-medium);
+}
+
+.menu-photo__hint {
+  color: var(--rp-color-text-muted);
+  font-size: var(--rp-font-size-sm);
+}
+
+/* The real file input stays for screen readers and tests; the button opens it. */
+.menu-photo__input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.menu-combo {
+  display: flex;
+  flex-direction: column;
+  gap: var(--rp-space-3);
+}
+
+.menu-combo__part {
+  display: flex;
+  flex-direction: column;
+  gap: var(--rp-space-3);
+  margin: 0;
+  padding: var(--rp-space-3);
+  border: 1px dashed var(--rp-color-border-strong);
+  border-radius: var(--rp-radius-md);
+}
+
+/* Settings (P4-03a, MGR-007): the current value stands out from the hint above it. */
+.restaurant-facts {
+  display: grid;
+  gap: var(--rp-space-3);
+  margin: 0;
+}
+
+.restaurant-facts__row {
+  display: grid;
+  grid-template-columns: minmax(8rem, 14rem) 1fr;
+  gap: var(--rp-space-3);
+}
+
+.restaurant-facts__row > dt {
+  color: var(--rp-color-text-muted);
+}
+
+.restaurant-facts__row > dd {
+  margin: 0;
+  font-weight: var(--rp-font-weight-medium);
+  overflow-wrap: anywhere;
+}
+
+.restaurant-facts__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+@media (max-width: 40rem) {
+  .restaurant-facts__row {
+    grid-template-columns: 1fr;
+    gap: var(--rp-space-1);
+  }
+}
+
+.report-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--rp-space-3);
+  margin-bottom: var(--rp-space-4);
+}
+
+.report-filters__presets,
+.report-filters__custom {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--rp-space-2);
+}
+
+.report-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--rp-space-2) var(--rp-space-6);
+  margin-bottom: var(--rp-space-4);
+}
+
+.report-nav__group {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--rp-space-3);
+}
+
+.report-nav__heading {
+  color: var(--rp-color-text-muted);
+  font-size: var(--rp-font-size-sm);
+  font-weight: var(--rp-font-weight-semibold);
+}
+
+.report-nav .staff-pages__link[aria-current='page'] {
+  font-weight: var(--rp-font-weight-semibold);
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
+.audit-changes > summary {
+  cursor: pointer;
+  color: var(--rp-color-primary);
+}
+
+.audit-changes__label {
+  margin: var(--rp-space-2) 0 0;
+  color: var(--rp-color-text-muted);
+  font-size: var(--rp-font-size-sm);
+}
+
+.audit-changes__value {
+  max-width: 32rem;
+  max-height: 16rem;
+  margin: var(--rp-space-1) 0 0;
+  padding: var(--rp-space-2);
+  overflow: auto;
+  border-radius: var(--rp-radius-md);
+  background: var(--rp-color-surface-sunken);
+  font-size: var(--rp-font-size-sm);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.report-exports {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--rp-space-2);
+}
+
+.report-exports__label {
+  color: var(--rp-color-text-muted);
+  font-size: var(--rp-font-size-sm);
+}
+
+.report-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--rp-space-4);
+  transition: opacity 150ms ease;
+}
+
+.report-body[data-refreshing='true'] {
+  opacity: 0.55;
+}
+
+.report-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(10rem, 1fr));
+  gap: var(--rp-space-3);
+  margin: 0;
+}
+
+.report-stat {
+  padding: var(--rp-space-3) var(--rp-space-4);
+  border: 1px solid var(--rp-color-border);
+  border-radius: var(--rp-radius-lg);
+  background: var(--rp-color-surface);
+}
+
+.report-stat__label {
+  color: var(--rp-color-text-muted);
+  font-size: var(--rp-font-size-sm);
+}
+
+.report-stat__value {
+  margin: var(--rp-space-1) 0 0;
+  font-size: var(--rp-font-size-xl);
+  font-weight: var(--rp-font-weight-semibold);
+  overflow-wrap: anywhere;
+}
+
+.report-chart {
+  margin: 0;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.report-chart__title {
+  margin-bottom: var(--rp-space-2);
+  color: var(--rp-color-text-muted);
+  font-size: var(--rp-font-size-sm);
+}
+
+.system-meter {
+  width: 100%;
+  height: var(--rp-space-4);
+}
+
+.restaurant-hours {
+  display: flex;
+  flex-direction: column;
+  gap: var(--rp-space-2);
+  padding-block: var(--rp-space-2);
+  border-top: 1px solid var(--rp-color-border);
+}
+
+.restaurant-hours__day {
+  font-weight: var(--rp-font-weight-semibold);
+}
+
+.restaurant-hours__closed {
+  color: var(--rp-color-text-muted);
+}
+
+.settings-row__value {
+  margin: 0;
+  font-weight: var(--rp-font-weight-semibold);
+  overflow-wrap: anywhere;
+}
+
+/* The tablets' accent colour on the Restaurant page (P3-01a). */
+.accent-swatch {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--rp-space-2);
+}
+
+.accent-swatch__colour {
+  inline-size: 1.25rem;
+  block-size: 1.25rem;
+  border-radius: var(--rp-radius-sm);
+  border: 1px solid var(--rp-color-border);
+}
+
+/* Diners' orders waiting for approval above the POS floor (P3-03b, WTR-004). */
+.approvals {
+  display: grid;
+  gap: var(--rp-space-2);
+  padding: var(--rp-space-3);
+  border: 1px solid var(--rp-color-warning);
+  border-radius: var(--rp-radius-lg);
+  background: var(--rp-color-warning-subtle);
+}
+
+.approvals__list {
+  display: grid;
+  gap: var(--rp-space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.approvals__order {
+  display: grid;
+  gap: var(--rp-space-1);
+  padding: var(--rp-space-3);
+  border: 1px solid var(--rp-color-border);
+  border-radius: var(--rp-radius-md);
+  background: var(--rp-color-surface);
+}
+
+.approvals__title {
+  margin: 0;
+  font-weight: var(--rp-font-weight-semibold);
+}
+
+.approvals__facts {
+  margin: 0;
+  color: var(--rp-color-text-muted);
+}
+
+.approvals__lines {
+  margin: 0;
+  padding-inline-start: var(--rp-space-4);
+}
+
+.approvals__details {
+  display: block;
+  color: var(--rp-color-text-muted);
+}
+
+.approvals__change {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--rp-space-3);
+}
+
+/* AI menu import (P6-04b): reading, choosing files, and the dish-by-dish review. */
+.ai-import__reading {
+  display: grid;
+  justify-items: start;
+  gap: var(--rp-space-2);
+  padding: var(--rp-space-4) 0;
+}
+
+.ai-import__chooser {
+  display: grid;
+  justify-items: start;
+  gap: var(--rp-space-3);
+}
+
+.ai-import__dish {
+  display: grid;
+  gap: var(--rp-space-2);
+  align-items: start;
+}
+
+.ai-import__unsure {
+  margin: 0;
+  color: var(--rp-color-warning-text, var(--rp-color-text-muted));
+  font-size: var(--rp-font-size-sm);
+}
+
+/* Bulk photo upload (P6-04c): a preview beside each match. */
+.bulk-photos__row {
+  align-items: center;
+  gap: var(--rp-space-3);
+}
+
+/* KDS-002: the Tickets / Orders (Expo) switch on a screen of several stations. */
+.kds-board__views {
+  display: flex;
+  gap: var(--rp-space-2);
+}
+
+/* BILL-013 S: the denomination count when closing a shift. */
+.shift-notes {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(7rem, 1fr));
+  gap: var(--rp-space-2);
+  border: 0;
+  padding: 0;
+  margin: 0;
+}
+
+.shift-notes__total {
+  grid-column: 1 / -1;
+  margin: 0;
+  font-weight: var(--rp-font-weight-semibold);
+}
+
+/* The floor plan (ONB-004 step 5): a 40 × 24 grid, tables placed in cells. */
+.floor-plan {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 40 / 24;
+  border: 1px solid var(--rp-color-border);
+  border-radius: var(--rp-radius-md);
+  background-color: var(--rp-color-surface-sunken);
+  background-image:
+    linear-gradient(to right, var(--rp-color-border) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--rp-color-border) 1px, transparent 1px);
+  background-size: calc(100% / 40) calc(100% / 24);
+  overflow: hidden;
+  touch-action: none;
+}
+
+.floor-plan__table {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 2px;
+  border: 2px solid var(--rp-color-border-strong);
+  border-radius: 6px;
+  background: var(--rp-color-surface);
+  color: var(--rp-color-text);
+  font: inherit;
+  font-weight: 600;
+  overflow: hidden;
+  cursor: grab;
+  user-select: none;
+}
+
+.floor-plan__table:active {
+  cursor: grabbing;
+}
+
+.floor-plan__table:focus-visible {
+  outline: 3px solid var(--rp-color-focus-ring);
+  outline-offset: 2px;
+  z-index: 1;
+}
+
+.floor-plan__table--round {
+  border-radius: 50%;
+}
+
+.floor-plan__state {
+  font-size: 0.75rem;
+  font-weight: 400;
+}
+
+.floor-plan__table[data-tone='success'] {
+  border-color: var(--rp-color-success-text);
+}
+
+.floor-plan__table[data-tone='info'] {
+  border-color: var(--rp-color-info-text);
+  background: var(--rp-color-info-subtle);
+}
+
+.floor-plan__table[data-tone='warning'] {
+  border-color: var(--rp-color-warning-text);
+  background: var(--rp-color-warning-subtle);
+}
+
+.floor-plan__table[data-tone='danger'] {
+  border-color: var(--rp-color-danger-text);
+  background: var(--rp-color-danger-subtle);
+}
+
+/* The licence's reminder or banner on every staff screen (LIC-005). */
+.licence-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--rp-space-2);
+  border-radius: 0;
+}
+
+.licence-facts {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: var(--rp-space-2) var(--rp-space-4);
+  margin: 0;
+}
+
+.licence-facts dd {
+  margin: 0;
+}
+
+.licence-devices {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.diagnostics-requests {
+  display: grid;
+  gap: var(--rp-space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.diagnostics-requests p {
+  margin: 0 0 var(--rp-space-2);
+}
+
+.setup-steps {
+  display: grid;
+  gap: var(--rp-space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* The site-readiness checklist (ONB-011): printed and ticked by hand. */
+.readiness__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--rp-space-3);
+}
+
+.readiness-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.readiness-table th,
+.readiness-table td {
+  padding: var(--rp-space-2) var(--rp-space-3);
+  border: 1px solid var(--rp-color-border);
+  text-align: start;
+  vertical-align: top;
+}
+
+.readiness-box {
+  display: inline-block;
+  width: 1.25rem;
+  height: 1.25rem;
+  border: 2px solid var(--rp-color-text);
+  border-radius: 2px;
+}
+
+.readiness-notes {
+  min-width: 10rem;
+}
+
+.go-live-paths {
+  display: grid;
+  gap: var(--rp-space-2);
+  padding: 0;
+  list-style: none;
+}
+
+.settings-transfer__list {
+  margin: 0 0 var(--rp-space-3);
+  padding-inline-start: var(--rp-space-5);
+}
+
+@media print {
+  .console-shell:has(.readiness) .console-header,
+  .dashboard:has(.readiness) .dashboard__nav,
+  .readiness__actions {
+    display: none;
+  }
+
+  .readiness-table th,
+  .readiness-table td {
+    border-color: #000;
+  }
+}
+
+/* Backups on the System page (P7-05a). */
+.backups__path {
+  overflow-wrap: anywhere;
+  font-family: var(--rp-font-mono, monospace);
+}
+
+.backups-table {
+  width: 100%;
+  margin-top: var(--rp-space-3);
+  border-collapse: collapse;
+}
+
+.backups-table caption {
+  padding-bottom: var(--rp-space-2);
+  font-weight: 600;
+  text-align: start;
+}
+
+.backups-table th,
+.backups-table td {
+  padding: var(--rp-space-2);
+  border-bottom: 1px solid var(--rp-color-border);
+  text-align: start;
+  vertical-align: top;
+}
+
+.backups__owner {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--rp-space-2);
+  margin-top: var(--rp-space-2);
+}
+
+.backups__recovery-key {
+  padding: var(--rp-space-3);
+  border: 1px dashed var(--rp-color-border-strong);
+  border-radius: var(--rp-radius-md, 8px);
+  font-family: var(--rp-font-mono, monospace);
+  font-size: 1.125rem;
+  letter-spacing: 0.05em;
+  overflow-wrap: anywhere;
+}
+
+/* The archive viewer (P7-06c): an archived invoice as printed, and printed again on its own. */
+.archive-invoice__figure {
+  margin: 0;
+}
+
+.archive-invoice {
+  margin: 0;
+  overflow-x: auto;
+  font-family: var(--rp-font-mono, monospace);
+  font-size: 0.875rem;
+  white-space: pre;
+}
+
+@media print {
+  body:has(.archive-invoice) * {
+    visibility: hidden;
+  }
+
+  .archive-invoice,
+  .archive-invoice * {
+    visibility: visible;
+  }
+
+  .archive-invoice {
+    position: absolute;
+    inset-block-start: 0;
+    inset-inline-start: 0;
+    overflow: visible;
+    color: #000;
+  }
+}
+
+.screen-help {
+  display: flex;
+  justify-content: flex-end;
+  margin-block-end: var(--rp-space-2, 0.5rem);
+}
+
+.screen-help {
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--rp-space-2, 0.5rem);
+}
+
+.screen-help__tip {
+  display: flex;
+  flex: 1 1 20rem;
+  align-items: center;
+  gap: var(--rp-space-2, 0.5rem);
+  padding: var(--rp-space-2, 0.5rem) var(--rp-space-3, 0.75rem);
+  border: 1px solid var(--rp-color-border, currentColor);
+  border-radius: var(--rp-radius-md, 0.5rem);
+}
+
+.screen-help__tip p {
+  flex: 1;
+  margin: 0;
 }

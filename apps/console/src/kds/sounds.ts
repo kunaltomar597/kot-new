@@ -4,15 +4,14 @@
  * after a tap on the page, so the screen unlocks it on the first touch.
  */
 export interface KitchenSounds {
+  /**
+   * Makes the sound ready, still silent, before anyone touches the screen: making it takes the
+   * browser long enough to slow the first tap past NFR-P07's 100 ms (found by P8-01b).
+   */
+  prepare(): void;
   unlock(): void;
   newTicket(volumePercent: number): void;
   change(volumePercent: number): void;
-}
-
-/** "Here I am" when a manager looks for this device (MGR-006 "Locate"): three rising notes. */
-export interface LocateSound {
-  unlock(): void;
-  locate(volumePercent: number): void;
 }
 
 type Note = readonly [frequencyHz: number, startSeconds: number, lengthSeconds: number];
@@ -25,15 +24,10 @@ const BUZZ: readonly Note[] = [
   [330, 0, 0.22],
   [330, 0.3, 0.22],
 ];
-const HERE: readonly Note[] = [
-  [660, 0, 0.16],
-  [880, 0.2, 0.16],
-  [1175, 0.4, 0.32],
-];
 
 export function webAudioSounds(
   create: () => AudioContext = () => new AudioContext(),
-): KitchenSounds & LocateSound {
+): KitchenSounds {
   let context: AudioContext | undefined;
   const play = (notes: readonly Note[], volumePercent: number, wave: OscillatorType) => {
     if (context === undefined || volumePercent <= 0) return;
@@ -51,6 +45,13 @@ export function webAudioSounds(
     }
   };
   return {
+    prepare() {
+      try {
+        context ??= create();
+      } catch {
+        // No audio on this device: the screen still works, silently.
+      }
+    },
     unlock() {
       try {
         context ??= create();
@@ -64,9 +65,6 @@ export function webAudioSounds(
     },
     change(volumePercent) {
       play(BUZZ, volumePercent, 'square');
-    },
-    locate(volumePercent) {
-      play(HERE, volumePercent, 'triangle');
     },
   };
 }

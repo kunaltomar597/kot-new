@@ -1,4 +1,4 @@
 {
-  "input": { "type": "string", "enum": ["PINNED", "RULE", "LEARNED", "BOOSTED", "BEST_SELLER"] },
-  "output": { "type": "string", "enum": ["PINNED", "RULE", "LEARNED", "BOOSTED", "BEST_SELLER"] }
+  "input": { "type": "string", "enum": ["RULE", "LEARNED", "BEST_SELLER"] },
+  "output": { "type": "string", "enum": ["RULE", "LEARNED", "BEST_SELLER"] }
 }

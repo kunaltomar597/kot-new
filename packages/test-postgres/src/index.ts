@@ -10,7 +10,15 @@
 // it (CREATE DATABASE ... TEMPLATE), which takes milliseconds and isolates test files.
 import { execFileSync, spawnSync } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
-import { chownSync, existsSync, mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
+import {
+  appendFileSync,
+  chownSync,
+  existsSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+} from 'node:fs';
 import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -24,10 +32,15 @@ export interface TestDatabaseCluster {
 }
 
 export interface TestDatabaseOptions {
-  /** The Prisma migrations folder (`prisma/migrations`) applied to the template. */
+  /**
+   * The migrations folder applied to the template: Prisma's (`<name>/migration.sql`) or the
+   * Supabase CLI's (`<timestamp>_<name>.sql`).
+   */
   readonly migrationsDir: string;
   /** Prefix of every database the run creates, e.g. `rp` or `cp` (lower case, digits, `_`). */
   readonly prefix: string;
+  /** SQL files applied before the migrations, e.g. the objects a hosted platform provides. */
+  readonly preludeFiles?: readonly string[];
 }
 
 export interface TestDatabase {
@@ -47,7 +60,8 @@ function quoteIdentifier(name: string): string {
   return `"${name}"`;
 }
 
-function findPgBin(): string | undefined {
+/** The folder of the PostgreSQL programs: `PG_BIN`, `pg_config` or a known install path. */
+export function findPgBin(): string | undefined {
   const fromEnv = process.env.PG_BIN;
   if (fromEnv !== undefined && existsSync(join(fromEnv, 'initdb'))) return fromEnv;
   try {
@@ -95,7 +109,29 @@ function runPg(bin: string, args: string[], asPostgresUser: boolean): void {
   }
 }
 
-async function startLocalCluster(): Promise<{ adminUrl: string; stop: () => Promise<void> }> {
+/** A value for postgresql.conf, quoted. */
+function confValue(value: string): string {
+  return `'${value.replaceAll('\\', '\\\\').replaceAll("'", "''")}'`;
+}
+
+/** A throwaway PostgreSQL cluster of its own (see `startLocalPostgres`). */
+export interface LocalPostgres {
+  readonly adminUrl: string;
+  readonly dataDir: string;
+  /** The folder of the PostgreSQL programs it was started with. */
+  readonly bin: string;
+  readonly port: number;
+  stop(): Promise<void>;
+}
+
+/**
+ * Starts a throwaway cluster on a free localhost port with `settings` added to its
+ * postgresql.conf (for example WAL archiving), and removes it on `stop`. Durability is off unless
+ * a setting turns it back on.
+ */
+export async function startLocalPostgres(
+  settings: Readonly<Record<string, string>> = {},
+): Promise<LocalPostgres> {
   const bin = findPgBin();
   if (bin === undefined) {
     throw new Error(
@@ -117,21 +153,31 @@ async function startLocalCluster(): Promise<{ adminUrl: string; stop: () => Prom
     ['-D', dataDir, '--auth=trust', '--username=postgres', '--encoding=UTF8', '--no-sync'],
     asPostgresUser,
   );
-  const options = [
-    '-c listen_addresses=127.0.0.1',
-    `-c port=${String(port)}`,
-    `-c unix_socket_directories=${baseDir}`,
-    '-c fsync=off',
-    '-c synchronous_commit=off',
-    '-c full_page_writes=off',
-  ].join(' ');
+  const conf: Record<string, string> = {
+    listen_addresses: '127.0.0.1',
+    port: String(port),
+    unix_socket_directories: baseDir,
+    fsync: 'off',
+    synchronous_commit: 'off',
+    full_page_writes: 'off',
+    ...settings,
+  };
+  appendFileSync(
+    join(dataDir, 'postgresql.conf'),
+    `\n${Object.entries(conf)
+      .map(([key, value]) => `${key} = ${confValue(value)}`)
+      .join('\n')}\n`,
+  );
   runPg(
     join(bin, 'pg_ctl'),
-    ['-D', dataDir, '-o', options, '-l', join(baseDir, 'server.log'), '-w', 'start'],
+    ['-D', dataDir, '-l', join(baseDir, 'server.log'), '-w', 'start'],
     asPostgresUser,
   );
   return {
     adminUrl: `postgresql://postgres@127.0.0.1:${String(port)}/postgres`,
+    dataDir,
+    bin,
+    port,
     stop: () => {
       try {
         runPg(
@@ -147,13 +193,27 @@ async function startLocalCluster(): Promise<{ adminUrl: string; stop: () => Prom
   };
 }
 
-/** Migration SQL files in the order Prisma applies them. */
+async function startLocalCluster(): Promise<{ adminUrl: string; stop: () => Promise<void> }> {
+  return startLocalPostgres();
+}
+
+/**
+ * Migration SQL files in the order they are applied: by name, as Prisma (`<name>/migration.sql`)
+ * and the Supabase CLI (`<timestamp>_<name>.sql`) both do.
+ */
 export function migrationFiles(migrationsDir: string): string[] {
   return readdirSync(migrationsDir, { withFileTypes: true })
-    .filter((entry) => entry.isDirectory())
-    .map((entry) => entry.name)
-    .sort()
-    .map((name) => join(migrationsDir, name, 'migration.sql'))
+    .map((entry) => ({
+      name: entry.name,
+      file: entry.isDirectory()
+        ? join(migrationsDir, entry.name, 'migration.sql')
+        : entry.isFile() && entry.name.endsWith('.sql')
+          ? join(migrationsDir, entry.name)
+          : undefined,
+    }))
+    .filter((entry): entry is { name: string; file: string } => entry.file !== undefined)
+    .sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0))
+    .map((entry) => entry.file)
     .filter((file) => existsSync(file));
 }
 
@@ -170,13 +230,17 @@ async function withClient<T>(
   }
 }
 
-/** Applies every migration in `migrationsDir` to the database at `connectionString`. */
+/**
+ * Applies the prelude files, then every migration in `migrationsDir`, to the database at
+ * `connectionString`.
+ */
 export async function applyMigrations(
   connectionString: string,
   migrationsDir: string,
+  preludeFiles: readonly string[] = [],
 ): Promise<void> {
   await withClient(connectionString, async (client) => {
-    for (const file of migrationFiles(migrationsDir)) {
+    for (const file of [...preludeFiles, ...migrationFiles(migrationsDir)]) {
       await client.query(readFileSync(file, 'utf8'));
     }
   });
@@ -196,7 +260,11 @@ export async function startTestDatabase(
   await withClient(adminUrl, (client) =>
     client.query(`CREATE DATABASE ${quoteIdentifier(templateDatabase)}`),
   );
-  await applyMigrations(withDatabase(adminUrl, templateDatabase), options.migrationsDir);
+  await applyMigrations(
+    withDatabase(adminUrl, templateDatabase),
+    options.migrationsDir,
+    options.preludeFiles,
+  );
 
   return {
     adminUrl,
@@ -260,19 +328,21 @@ export async function cloneTemplateDatabase(options: {
 
 /**
  * A fresh database migrated from `migrationsDir` in the same cluster, for a test that needs a
- * second schema (for example the Control Plane next to the local server). Slower than a clone.
+ * second schema (for example the Control Plane or the QR relay next to the local server). Slower
+ * than a clone.
  */
 export async function createMigratedDatabase(options: {
   readonly adminUrl: string;
   readonly runId: string;
   readonly prefix: string;
   readonly migrationsDir: string;
+  readonly preludeFiles?: readonly string[];
 }): Promise<TestDatabase> {
   const { adminUrl, runId, prefix, migrationsDir } = options;
   const name = `${prefix}_test_${runId}_${randomBytes(4).toString('hex')}`;
   await withClient(adminUrl, (client) => client.query(`CREATE DATABASE ${quoteIdentifier(name)}`));
   const url = withDatabase(adminUrl, name);
-  await applyMigrations(url, migrationsDir);
+  await applyMigrations(url, migrationsDir, options.preludeFiles);
   return {
     name,
     url,

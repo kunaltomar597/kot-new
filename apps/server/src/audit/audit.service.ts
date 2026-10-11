@@ -47,15 +47,17 @@ export interface AuditEntryInput {
   readonly correlationId?: string | null;
 }
 
+/** The entry's id; its place in the chain is known once its transaction commits. */
 export interface RecordedAuditEntry {
   readonly id: string;
-  readonly seq: number;
-  readonly hash: string;
 }
 
 function jsonInput(value: unknown): Prisma.InputJsonValue | undefined {
   return value === null ? undefined : value;
 }
+
+/** An entry with everything but its place in the chain, waiting for its transaction's end. */
+type PreparedEntry = Omit<AuditHashFields, 'seq' | 'prevHash'>;
 
 /**
  * The tamper-evident, append-only audit trail every module writes to (AUD-001 to AUD-004).
@@ -64,12 +66,23 @@ function jsonInput(value: unknown): Prisma.InputJsonValue | undefined {
  * its content plus that previous hash. Writers take a transaction-scoped advisory lock, so
  * concurrent writers queue and the chain stays linear; the entry commits or rolls back with the
  * business change it describes.
+ *
+ * An entry is prepared when recorded and written at the end of its transaction, just before it
+ * commits (P8-01a). The chain's lock is then the last one a transaction takes and is held for
+ * milliseconds. Taken where the entry was recorded, it was held over the rest of the work, and a
+ * transaction that locked a row after it (a payment closing its table) deadlocked with one that
+ * held the row and waited for it (an order for the same table).
  */
 @Injectable()
 export class AuditService {
+  private readonly pending = new WeakMap<TransactionClient, PreparedEntry[]>();
+
   constructor(private readonly prisma: PrismaService) {}
 
-  /** Appends an entry inside the caller's transaction. */
+  /**
+   * Records an entry in the caller's transaction: checked and stamped now, written with the
+   * transaction's other entries when it commits, or not at all when it rolls back.
+   */
   async record(tx: TransactionClient, entry: AuditEntryInput): Promise<RecordedAuditEntry> {
     if (!ACTION.test(entry.action)) {
       throw new Error(`Audit action must be UPPER_SNAKE_CASE, got "${entry.action}"`);
@@ -80,8 +93,6 @@ export class AuditService {
     if (entry.businessDate !== undefined && !ISO_DATE.test(entry.businessDate)) {
       throw new Error(`Audit business date must be YYYY-MM-DD, got "${entry.businessDate}"`);
     }
-
-    await tx.$queryRaw`SELECT 1 AS locked FROM pg_advisory_xact_lock(${AUDIT_CHAIN_LOCK})`;
 
     const restaurant = await tx.restaurant.findFirst({
       ...(entry.restaurantId !== undefined && { where: { id: entry.restaurantId } }),
@@ -95,14 +106,8 @@ export class AuditService {
         'The restaurant is not set up yet. Finish the setup wizard first.',
       );
     }
-
-    const head = await tx.auditLog.findFirst({
-      orderBy: { chainSeq: 'desc' },
-      select: { chainSeq: true, hash: true },
-    });
     const occurredAt = new Date();
-    const fields: AuditHashFields = {
-      seq: head === null ? 1 : Number(head.chainSeq) + 1,
+    const prepared: PreparedEntry = {
       id: newId(),
       restaurantId: restaurant.id,
       businessDate:
@@ -125,16 +130,44 @@ export class AuditService {
         entry.correlationId !== undefined
           ? entry.correlationId
           : (currentRequestContext()?.correlationId ?? null),
-      prevHash: head?.hash ?? GENESIS_HASH,
     };
-    const hash = computeAuditHash(fields);
 
-    await tx.auditLog.create({
-      data: {
+    const queued = this.pending.get(tx);
+    if (queued !== undefined) {
+      queued.push(prepared);
+      return { id: prepared.id };
+    }
+    const entries = [prepared];
+    if (this.prisma.beforeCommit(tx, () => this.write(tx, entries))) {
+      this.pending.set(tx, entries);
+      return { id: prepared.id };
+    }
+    // Another client's transaction (tools, tests): written at once, as it cannot be told when
+    // that one ends.
+    await this.write(tx, entries);
+    return { id: prepared.id };
+  }
+
+  /** Appends the entries to the chain, in the order they were recorded, under its lock. */
+  private async write(tx: TransactionClient, entries: readonly PreparedEntry[]): Promise<void> {
+    if (entries.length === 0) return;
+    await tx.$queryRaw`SELECT 1 AS locked FROM pg_advisory_xact_lock(${AUDIT_CHAIN_LOCK})`;
+    const head = await tx.auditLog.findFirst({
+      orderBy: { chainSeq: 'desc' },
+      select: { chainSeq: true, hash: true },
+    });
+    let seq = head === null ? 0 : Number(head.chainSeq);
+    let prevHash = head?.hash ?? GENESIS_HASH;
+    const rows: Prisma.AuditLogCreateManyInput[] = [];
+    for (const entry of entries) {
+      seq += 1;
+      const fields: AuditHashFields = { ...entry, seq, prevHash };
+      const hash = computeAuditHash(fields);
+      rows.push({
         id: fields.id,
         restaurantId: fields.restaurantId,
         businessDate: new Date(`${fields.businessDate}T00:00:00.000Z`),
-        occurredAt,
+        occurredAt: new Date(fields.occurredAt),
         action: fields.action,
         actorId: fields.actorId,
         approverId: fields.approverId,
@@ -148,9 +181,10 @@ export class AuditService {
         chainSeq: BigInt(fields.seq),
         prevHash: fields.prevHash,
         hash,
-      },
-    });
-    return { id: fields.id, seq: fields.seq, hash };
+      });
+      prevHash = hash;
+    }
+    await tx.auditLog.createMany({ data: rows });
   }
 
   /** Latest entry of the chain, for heartbeats (P0-17, P7-03); null while the log is empty. */
@@ -162,6 +196,27 @@ export class AuditService {
       select: { chainSeq: true, hash: true },
     });
     return head === null ? null : { seq: Number(head.chainSeq), hash: head.hash };
+  }
+
+  /**
+   * The answer to the Control Plane's audit check (AUD-003, P7-03): the hash this log holds for
+   * entry `sequence` now, and its oldest entry (those before were archived and purged, P7-06).
+   */
+  async checkpoint(
+    sequence: number,
+  ): Promise<{ sequence: number; hash: string | null; oldestSequence: number | null }> {
+    const [entry, oldest] = await Promise.all([
+      this.prisma.auditLog.findUnique({
+        where: { chainSeq: BigInt(sequence) },
+        select: { hash: true },
+      }),
+      this.prisma.auditLog.findFirst({ orderBy: { chainSeq: 'asc' }, select: { chainSeq: true } }),
+    ]);
+    return {
+      sequence,
+      hash: entry?.hash ?? null,
+      oldestSequence: oldest === null ? null : Number(oldest.chainSeq),
+    };
   }
 
   /**

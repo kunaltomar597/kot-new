@@ -8,12 +8,14 @@ variant/modifier/combo selection components (MENU-012).
 
 - Actions: `Button`, `IconButton`, `Icon`, `Spinner`
 - Input: `PinPad` (login and manager overrides, AUTH-004), `NumberPad` (+ `applyNumberPadKey`),
-  `TextField`, `TextArea` (P4-02d), `Select`
+  `TextField`, `Select`
 - Overlays: `Dialog`, `Sheet`, `ConfirmDialog` (NFR-U04), `ToastProvider` + `useToast`
 - Navigation: `Tabs`
 - Display: `Badge`, `StatusChip` (order item states, `ORDER_ITEM_STATE_STYLES`), `Money` (paise via
   `formatRupees`), `Card`, `Table`, `QrCode` (drawn offline with `uqr`, ADR-0014: the Owner's
   authenticator, device pairing)
+- Camera: `QrScanner` (reads QR codes with the device's camera and `jsqr`, offline, ADR-0019: a
+  pager's code on the Pagers page), with `hasCameraApi`, `decodeQr` and `CameraProblem`
 - States (NFR-U04): `EmptyState`, `LoadingState`, `ErrorState`, `ConnectionBanner`
 - Setup: `ThemeRoot` (theme + accent), `UiStringsProvider`
 

@@ -14,7 +14,8 @@ While someone holds the phone, Android shows a quiet notification "Alerts for Ra
 the person). It goes when they sign out on the phone. If it is missing while someone is signed in,
 the phone is not listening in the background: work through the setup below.
 
-Each alert is its own notification, on the lock screen too, with Acknowledge. Acknowledging there
+Each alert is its own notification with Acknowledge. On the lock screen it says only that there is
+an alert; the words show, and Acknowledge works, once the phone is unlocked. Acknowledging there
 or in the app stops the pager's reminders and tells the managers' screens. An alert that is not
 acknowledged rings again at each reminder.
 

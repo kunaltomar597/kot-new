@@ -1,7 +1,9 @@
 // @vitest-environment node
 import 'fake-indexeddb/auto';
+import { CLIENT_API_VERSION, CLIENT_HEADER } from '@rp/contracts';
 import { describe, expect, it } from 'vitest';
 import { ConsoleController } from '../src/app/console-controller.js';
+import { RELOAD_GUARD_MS, reloadForNewConsole } from '../src/app/reload.js';
 import { BrowserStorage, MemoryStorage } from '../src/app/storage.js';
 import { FakeServer } from './fake-server.js';
 import {
@@ -28,6 +30,7 @@ function server(): FakeServer {
         name: 'Counter POS',
         tableId: null,
         stationId: null,
+        stationIds: [],
         staffId: null,
       },
     }))
@@ -228,42 +231,78 @@ describe('[AUTH-001] [AUTH-005] signing in and out', () => {
   });
 });
 
-describe('[MGR-006] a manager renames this console', () => {
-  const devicesChanged = (sequence: number, part: 'DEVICES' | 'STAFF') => ({
-    sequence,
-    event: {
-      eventId: `0199a0e0-0000-4000-8000-00000000090${String(sequence)}`,
-      type: 'RestaurantChanged',
-      version: 1,
-      occurredAt: new Date().toISOString(),
-      restaurantId: RESTAURANT_ID,
-      businessDate: '2026-09-28',
-      payload: { part },
-    },
+describe('[UPD-006] a console the server no longer serves', () => {
+  it('says it is the console, with its version and client API, on every request', async () => {
+    const { fake } = await paired();
+    const identity = `console/0.1.0-test api/${CLIENT_API_VERSION}`;
+    expect(fake.calls.length).toBeGreaterThan(0);
+    expect(new Set(fake.calls.map((call) => call.headers[CLIENT_HEADER]))).toEqual(
+      new Set([identity]),
+    );
   });
 
-  it('shows and keeps its new name as soon as the restaurant’s devices change', async () => {
-    const fake = server().on(
-      'GET',
-      '/api/v1/devices/current',
-      () => ({ status: 200, body: deviceSummary() }),
-      () => ({ status: 200, body: deviceSummary({ name: 'Bar POS' }) }),
-    );
-    const { controller, storage, sockets } = setup(fake);
+  it('stops and asks for the page to be loaded again, once', async () => {
+    const fake = server().on('GET', '/api/v1/auth/staff-tiles', () => ({
+      status: 426,
+      body: { code: 'CLIENT_TOO_OLD', message: 'Update the app.' },
+    }));
+    const sockets = new SocketFactory();
+    let reloads = 0;
+    const controller = new ConsoleController({
+      baseUrl: BASE,
+      storage: new MemoryStorage(),
+      fetch: fake.fetch,
+      connect: sockets.connect,
+      generateKey: fakeKey,
+      keyFromPair: async () => (await fakeKey()).key,
+      appVersion: '0.1.0-test',
+      onClientTooOld: () => {
+        reloads += 1;
+      },
+    });
     await controller.start();
     await controller.pair('ABCD-EFGH');
-    sockets.sync(0);
+    await expect(controller.staffTiles()).rejects.toMatchObject({ code: 'CLIENT_TOO_OLD' });
+    await expect(controller.staffTiles()).rejects.toMatchObject({ code: 'CLIENT_TOO_OLD' });
+    expect(controller.getSnapshot()).toMatchObject({ clientTooOld: true, connection: 'stopped' });
+    expect(reloads).toBe(1);
+  });
+});
 
-    sockets.last.fire('event', devicesChanged(1, 'DEVICES'));
-    await expect.poll(() => controller.getSnapshot().device?.name).toBe('Bar POS');
-    await expect.poll(() => storage.device?.summary.name).toBe('Bar POS');
-    expect(storage.device?.device).toMatchObject({ deviceId: DEVICE_ID });
+describe('[UPD-006] loading the server’s new console', () => {
+  const memory = () => {
+    const values = new Map<string, string>();
+    return {
+      getItem: (key: string) => values.get(key) ?? null,
+      setItem: (key: string, value: string) => void values.set(key, value),
+    };
+  };
 
-    // Other changes to the setup do not read the device again.
-    const reads = fake.callsTo('GET', '/api/v1/devices/current').length;
-    sockets.last.fire('event', devicesChanged(2, 'STAFF'));
-    await Promise.resolve();
-    expect(fake.callsTo('GET', '/api/v1/devices/current')).toHaveLength(reads);
+  it('reloads, but not again within ten minutes, so a refusing server never loops the page', () => {
+    const storage = memory();
+    let now = 1_000_000;
+    let reloads = 0;
+    const deps = { storage, now: () => now, reload: () => void (reloads += 1) };
+    expect(reloadForNewConsole(deps)).toBe(true);
+    now += RELOAD_GUARD_MS - 1;
+    expect(reloadForNewConsole(deps)).toBe(false);
+    now += 1;
+    expect(reloadForNewConsole(deps)).toBe(true);
+    expect(reloads).toBe(2);
+  });
+
+  it('leaves it to the button without session storage', () => {
+    let reloads = 0;
+    const reload = () => void (reloads += 1);
+    expect(reloadForNewConsole({ storage: undefined, now: Date.now, reload })).toBe(false);
+    const broken = {
+      getItem: () => {
+        throw new Error('blocked');
+      },
+      setItem: () => undefined,
+    };
+    expect(reloadForNewConsole({ storage: broken, now: Date.now, reload })).toBe(false);
+    expect(reloads).toBe(0);
   });
 });
 

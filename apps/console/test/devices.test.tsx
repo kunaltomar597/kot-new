@@ -1,40 +1,33 @@
-import type { DeviceView } from '@rp/contracts';
-import { timeOfDayOf } from '@rp/domain';
 import { act, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DEVICE_REFRESH_MS } from '../src/manage/devices/DevicesScreen.js';
 import {
-  device,
+  BAR,
   deviceList,
-  devices,
-  KDS_1,
-  KDS_2,
-  OFFICE,
+  deviceView,
+  KDS_TANDOOR,
   pairingCode,
-  PHONE_1,
   stationList,
-  TABLET_1,
+  TABLET_T7,
   TANDOOR,
 } from './devices-fixture.js';
 import type { FakeResponse, FakeServer } from './fake-server.js';
 import { expectNoAxeViolations, renderConsole, server, signsInAs, t } from './harness.js';
-import { changed, crewList, H2, sectionsFloor, T7 } from './sections-fixture.js';
+import { changed, crewList, sectionsFloor, T8 } from './sections-fixture.js';
 
 const PATH = '/manage/devices';
-const NEW_TABLET = '0199a0e0-0000-7000-8000-000000000939';
 const DEVICES = '/api/v1/devices';
-const CODES = '/api/v1/devices/pairing-codes';
 
-function devicesServer(...lists: DeviceView[][]): FakeServer {
-  const answers = (lists.length === 0 ? [devices()] : lists).map((list) => (): FakeResponse => ({
+function devicesServer(...lists: ReturnType<typeof deviceList>[]): FakeServer {
+  const answers = (lists.length === 0 ? [deviceList()] : lists).map((body) => (): FakeResponse => ({
     status: 200,
-    body: deviceList(list),
+    body,
   }));
   return signsInAs(server(), 'MANAGER')
-    .on('GET', DEVICES, ...answers)
     .on('GET', '/api/v1/floor', () => ({ status: 200, body: sectionsFloor() }))
     .on('GET', '/api/v1/stations', () => ({ status: 200, body: stationList() }))
-    .on('GET', '/api/v1/staff', () => ({ status: 200, body: crewList() }));
+    .on('GET', '/api/v1/staff', () => ({ status: 200, body: crewList() }))
+    .on('GET', DEVICES, ...answers);
 }
 
 const rowOf = async (name: string) =>
@@ -43,10 +36,6 @@ const rowOf = async (name: string) =>
   ) as HTMLElement;
 const actionsFor = (name: string) =>
   screen.findByRole('group', { name: t('devices.actionsFor', { name }) });
-const buttonsOf = async (name: string) =>
-  within(await actionsFor(name))
-    .getAllByRole('button')
-    .map((button) => button.textContent);
 
 beforeEach(() => {
   vi.stubGlobal('isSecureContext', true);
@@ -57,493 +46,399 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe('[MGR-006] the devices', () => {
-  it('lists every paired device by type with its binding, state in words, details and actions', async () => {
-    // 11:30 in the restaurant (IST) on 28 September, the day the fixtures were last seen.
-    vi.useFakeTimers({ toFake: ['Date'], shouldAdvanceTime: true });
-    vi.setSystemTime(new Date('2026-09-28T06:00:00.000Z'));
-    const fake = devicesServer();
-    const { container } = await renderConsole({ fake, path: PATH, signedIn: 'MANAGER' });
+describe('[MGR-006] the device list', () => {
+  it('shows every device by type with its binding and state in words', async () => {
+    const { container } = await renderConsole({
+      fake: devicesServer(),
+      path: PATH,
+      signedIn: 'MANAGER',
+    });
     expect(
       await screen.findByRole('heading', { level: 2, name: t('devices.title') }),
     ).toBeVisible();
-    // The page heading shows while the list still loads; the groups come with the list.
+    for (const type of ['POS', 'KDS', 'WAITER_PHONE', 'TABLE_TABLET', 'PAGER'] as const) {
+      expect(
+        screen.getByRole('heading', { level: 3, name: t(`devices.type.${type}`) }),
+      ).toBeVisible();
+    }
+
+    const pos = await rowOf('Counter POS');
+    expect(within(pos).getByText(t('devices.thisDevice'))).toBeVisible();
+    // The device in use cannot be unpaired from itself.
     expect(
-      (await screen.findAllByRole('heading', { level: 3 })).map((heading) => heading.textContent),
+      within(await actionsFor('Counter POS'))
+        .getAllByRole('button')
+        .map((button) => button.textContent),
+    ).toEqual([t('devices.rename')]);
+
+    const tablet = await rowOf('Tablet T7');
+    expect(within(tablet).getByText(t('devices.forTable', { table: 'T7' }))).toBeVisible();
+    expect(within(tablet).getByText(t('devices.connected'))).toBeVisible();
+    expect(within(tablet).getByText(t('devices.batteryCharging', { percent: 42 }))).toBeVisible();
+    expect(within(tablet).getByText(t('devices.network.WIFI'), { exact: false })).toBeVisible();
+    expect(
+      within(await actionsFor('Tablet T7'))
+        .getAllByRole('button')
+        .map((button) => button.textContent),
     ).toEqual([
-      t('devices.group.POS'),
-      t('devices.group.MANAGER_BROWSER'),
-      t('devices.group.KDS'),
-      t('devices.group.WAITER_PHONE'),
-      t('devices.group.TABLE_TABLET'),
-      t('devices.group.PAGER'),
-    ]);
-    // The unpaired POS is gone.
-    expect(screen.queryByText('Old POS')).toBeNull();
-
-    // This console: marked, and neither located nor unpaired from itself.
-    const counter = await rowOf('Counter POS');
-    expect(within(counter).getByText(t('devices.thisDevice'))).toBeVisible();
-    expect(within(counter).getByText(t('devices.ownDevice'))).toBeVisible();
-    expect(within(counter).getByText(t('devices.appVersion', { version: '0.1.0' }))).toBeVisible();
-    expect(await buttonsOf('Counter POS')).toEqual([t('devices.rename')]);
-
-    const office = await rowOf('Office laptop');
-    expect(within(office).getByText(t('devices.notConnected'))).toBeVisible();
-    expect(within(office).getByText(t('devices.neverSeen'))).toBeVisible();
-    // Not connected: nothing to locate.
-    expect(await buttonsOf('Office laptop')).toEqual([t('devices.rename'), t('devices.unpair')]);
-
-    const tandoor = await rowOf('Tandoor screen');
-    expect(within(tandoor).getByText(t('devices.station', { station: 'Tandoor' }))).toBeVisible();
-    expect(within(tandoor).getByText(t('devices.connected'))).toBeVisible();
-    expect(await buttonsOf('Tandoor screen')).toEqual([
-      t('devices.locate'),
       t('devices.rename'),
+      t('devices.moveTable'),
+      t('devices.locate'),
       t('devices.unpair'),
     ]);
-    const pass = await rowOf('Pass screen');
-    expect(within(pass).getByText(t('devices.allStations'))).toBeVisible();
-    // 05:15 UTC is 10:45 in the restaurant (IST), today.
+
+    const kds = await rowOf('Tandoor screen');
+    expect(within(kds).getByText(t('devices.forStation', { station: 'Tandoor' }))).toBeVisible();
+    expect(within(kds).getByText(t('devices.notConnected'))).toBeVisible();
+    // 04:30 UTC on 28 September is 10:00 in the restaurant (IST).
     expect(
-      within(pass).getByText(new RegExp(t('devices.lastSeenToday', { time: '10:45' }))),
+      within(kds).getByText(t('devices.lastSeen', { date: '28-09-2026', time: '10:00' })),
     ).toBeVisible();
 
     const phone = await rowOf('Waiter phone 1');
-    expect(within(phone).getByText(t('devices.holder', { name: 'Ravi' }))).toBeVisible();
-
-    const tablet = await rowOf('Table H1 tablet');
-    expect(within(tablet).getByText(t('devices.table', { table: 'H1' }))).toBeVisible();
-    expect(within(tablet).getByText(t('devices.batteryLow', { percent: 18 }))).toBeVisible();
-    // 15:45 UTC on the 27th is 21:15 in the restaurant: yesterday.
+    expect(within(phone).getByText(t('devices.forPerson', { name: 'Ravi' }))).toBeVisible();
     expect(
-      within(tablet).getByText(
-        new RegExp(`^${t('devices.lastSeenEarlier', { date: '27 Sep.*', time: '21:15' })}`),
+      within(phone).getByText(
+        `${t('devices.appVersion', { version: '1.4.0' })} · ${t('devices.neverSeen')}`,
       ),
     ).toBeVisible();
-    expect(await buttonsOf('Table H1 tablet')).toEqual([
-      t('devices.rename'),
-      t('devices.move'),
-      t('devices.unpair'),
-    ]);
 
     const pager = await rowOf('Pager 1');
-    expect(within(pager).getByText(t('devices.wornBy', { name: 'Ravi' }))).toBeVisible();
     expect(within(pager).getByText(t('devices.battery', { percent: 80 }))).toBeVisible();
+
+    // Unpaired devices are kept, folded away, without actions.
+    expect(screen.getByText(t('devices.unpairedCount', { count: 1 }))).toBeVisible();
     expect(
-      within(pager).getByText(
-        `${t('devices.firmware', { version: '1.0.3' })} · ${t('devices.serial', { serial: 'WP-0001' })}`,
-      ),
-    ).toBeVisible();
-    expect(screen.getByText(t('devices.pagersElsewhere'))).toBeVisible();
+      screen.queryByRole('group', { name: t('devices.actionsFor', { name: 'Old phone' }) }),
+    ).toBeNull();
     await expectNoAxeViolations(container);
   });
 
-  it('is linked from the dashboard for managers', async () => {
-    const fake = devicesServer();
-    const { user } = await renderConsole({ fake, path: '/manage', signedIn: 'MANAGER' });
-    const nav = await screen.findByRole('navigation', { name: t('dashboard.navigation') });
-    await user.click(within(nav).getByRole('link', { name: t('dashboard.section.devices') }));
-    expect(
-      await screen.findByRole('heading', { level: 2, name: t('devices.title') }),
-    ).toBeVisible();
+  it('says when there are no devices yet', async () => {
+    const empty = devicesServer({ devices: [] });
+    await renderConsole({ fake: empty, path: PATH, signedIn: 'MANAGER' });
+    expect(await screen.findByText(t('devices.none'))).toBeVisible();
   });
 
-  it('follows device changes from other screens and reads connections every minute', async () => {
+  it('is linked only for people who pair devices', async () => {
+    const fake = signsInAs(server(), 'CASHIER');
+    await renderConsole({ fake, path: PATH, signedIn: 'CASHIER' });
+    await waitFor(() => {
+      expect(screen.queryByRole('link', { name: t('dashboard.section.devices') })).toBeNull();
+    });
+    expect(fake.callsTo('GET', DEVICES)).toHaveLength(0);
+  });
+
+  it('follows device changes from other screens and reads connections again', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true, toFake: ['setInterval', 'clearInterval'] });
-    const renamed = devices().map((entry) =>
-      entry.id === KDS_1 ? { ...entry, name: 'Grill screen' } : entry,
-    );
-    const back = renamed.map((entry) => (entry.id === KDS_2 ? { ...entry, online: true } : entry));
-    const fake = devicesServer(devices(), renamed, back);
+    const renamed = deviceList();
+    renamed.devices[2] = { ...renamed.devices[2]!, name: 'Grill screen' };
+    const reconnected = structuredClone(renamed);
+    reconnected.devices[2] = { ...reconnected.devices[2]!, connected: true };
+    const fake = devicesServer(deviceList(), renamed, reconnected);
     const { sockets } = await renderConsole({ fake, path: PATH, signedIn: 'MANAGER' });
     await rowOf('Tandoor screen');
     act(() => {
       sockets.sync(0);
       sockets.last.fire('event', changed(1, 'DEVICES'));
     });
-    expect(await rowOf('Grill screen')).toBeVisible();
-    expect(within(await rowOf('Pass screen')).getByText(t('devices.notConnected'))).toBeVisible();
+    const row = await rowOf('Grill screen');
+    expect(within(row).getByText(t('devices.notConnected'))).toBeVisible();
     await act(() => vi.advanceTimersByTimeAsync(DEVICE_REFRESH_MS));
     expect(
-      await within(await rowOf('Pass screen')).findByText(t('devices.connected')),
+      await within(await rowOf('Grill screen')).findByText(t('devices.connected')),
     ).toBeVisible();
   });
+});
 
-  it('still lists the devices when the names of their bindings cannot be read', async () => {
-    const fake = devicesServer().on('GET', '/api/v1/staff', () => ({
-      status: 403,
-      body: { code: 'FORBIDDEN', message: 'Not allowed.' },
-    }));
+describe('[UPD-006] apps to update', () => {
+  it('marks an app to update soon, one the server no longer serves, and one ahead of it', async () => {
+    const list = deviceList();
+    const [pos, tablet, kds, ...rest] = list.devices;
+    const fake = devicesServer({
+      devices: [
+        { ...pos!, compatibility: 'UNKNOWN', clientApi: null },
+        { ...tablet!, compatibility: 'PREVIOUS', clientApi: '1.3' },
+        { ...kds!, compatibility: 'TOO_OLD', clientApi: '1.2' },
+        ...rest.map((device, index) =>
+          index === 0 ? { ...device, compatibility: 'NEWER' as const, clientApi: '1.5' } : device,
+        ),
+      ],
+    });
     await renderConsole({ fake, path: PATH, signedIn: 'MANAGER' });
-    const phone = await rowOf('Waiter phone 1');
+    const tabletRow = within(await rowOf('Tablet T7'));
+    expect(tabletRow.getByText(t('devices.compatibility.PREVIOUS'))).toHaveAttribute(
+      'title',
+      t('devices.compatibilityHint.PREVIOUS'),
+    );
     expect(
-      within(phone).getByText(t('devices.holder', { name: t('devices.personGone') })),
+      within(await rowOf('Tandoor screen')).getByText(t('devices.compatibility.TOO_OLD')),
     ).toBeVisible();
+    expect(
+      within(await rowOf(rest[0]!.name)).getByText(t('devices.compatibility.NEWER')),
+    ).toBeVisible();
+    // Current and unknown say nothing.
+    const posRow = within(await rowOf('Counter POS'));
+    for (const compatibility of ['PREVIOUS', 'TOO_OLD', 'NEWER'] as const) {
+      expect(posRow.queryByText(t(`devices.compatibility.${compatibility}`))).toBeNull();
+    }
   });
 });
 
 describe('[AUTH-007] [AUTH-009] pairing a device', () => {
-  it('pairs a table tablet: its table, a suggested name, then the QR code until it pairs', async () => {
-    const tablet = device({
-      id: NEW_TABLET,
-      type: 'TABLE_TABLET',
-      name: 'Table T7 tablet',
-      tableId: T7,
-    });
-    // The code the server issues, so the page's expiry is checked against the very same time.
-    const issued = pairingCode();
-    const fake = devicesServer(devices(), [...devices(), tablet]).on('POST', CODES, () => ({
+  it('asks what the device is, then shows its one-time code, addresses and fingerprint', async () => {
+    const fake = devicesServer().on('POST', '/api/v1/devices/pairing-codes', () => ({
       status: 201,
-      body: issued,
+      body: pairingCode(),
     }));
-    const { user, sockets } = await renderConsole({ fake, path: PATH, signedIn: 'MANAGER' });
+    const { user, container } = await renderConsole({ fake, path: PATH, signedIn: 'MANAGER' });
     await user.click(await screen.findByRole('button', { name: t('devices.pair') }));
-    const dialog = within(
-      await screen.findByRole('dialog', { name: t('devices.pairDialog.title') }),
+    const form = within(await screen.findByRole('dialog', { name: t('devices.pairForm.title') }));
+    // A table tablet is suggested first, with the next free name; it needs its table.
+    expect(form.getByLabelText(t('devices.pairForm.type'))).toHaveValue('TABLE_TABLET');
+    expect(form.getByLabelText(new RegExp(`^${t('devices.pairForm.name')}`))).toHaveValue(
+      'Table tablet 1',
     );
-    const type = dialog.getByLabelText(t('devices.pairDialog.type'));
-    expect(type).toHaveFocus();
-    const name = dialog.getByLabelText(new RegExp(`^${t('devices.pairDialog.name')}`));
-    // The first free number: POS 1 is free, since this console is the Counter POS.
-    expect(name).toHaveValue(t('devices.pairDialog.defaultName.POS', { number: 1 }));
+    await user.click(form.getByRole('button', { name: t('devices.pairForm.create') }));
+    expect(form.getByText(t('devices.pairForm.tableRequired'))).toBeVisible();
+    expect(fake.callsTo('POST', '/api/v1/devices/pairing-codes')).toHaveLength(0);
 
-    await user.selectOptions(type, t('devices.type.TABLE_TABLET'));
-    expect(name).toHaveValue(t('devices.pairDialog.defaultName.TABLE_TABLET', { number: 1 }));
-    const table = dialog.getByLabelText(new RegExp(`^${t('devices.pairDialog.table')}`));
-    // Tables in use only: not H9 (archived) or the rooftop.
-    expect(
-      within(table)
-        .getAllByRole('option')
-        .map((option) => option.textContent),
-    ).toEqual([
-      t('devices.pairDialog.chooseTable'),
-      t('devices.pairDialog.tableIn', { table: 'H1', section: 'Hall' }),
-      t('devices.pairDialog.tableIn', { table: 'H2', section: 'Hall' }),
-      t('devices.pairDialog.tableIn', { table: 'T7', section: 'Terrace' }),
-      t('devices.pairDialog.tableIn', { table: 'T8', section: 'Terrace' }),
-    ]);
-    await user.click(dialog.getByRole('button', { name: t('devices.pairDialog.create') }));
-    expect(dialog.getByText(t('devices.pairDialog.tableRequired'))).toBeVisible();
-    expect(fake.callsTo('POST', CODES)).toHaveLength(0);
-
-    await user.selectOptions(
-      table,
-      t('devices.pairDialog.tableIn', { table: 'T7', section: 'Terrace' }),
+    // Changing the type follows with the name and the binding it needs.
+    await user.selectOptions(form.getByLabelText(t('devices.pairForm.type')), 'KDS');
+    expect(form.getByLabelText(new RegExp(`^${t('devices.pairForm.name')}`))).toHaveValue(
+      'Kitchen screen 1',
     );
-    expect(name).toHaveValue(t('devices.pairDialog.tabletName', { table: 'T7' }));
-    await user.click(dialog.getByRole('button', { name: t('devices.pairDialog.create') }));
+    expect(form.queryByLabelText(new RegExp(`^${t('devices.pairForm.table')}`))).toBeNull();
+    // KDS-002: one or more stations; the archived grill is not offered.
+    const stations = within(form.getByRole('group', { name: t('devices.pairForm.stations') }));
+    expect(stations.queryByLabelText('Grill')).toBeNull();
+    await user.click(stations.getByLabelText('Tandoor'));
+    await user.click(stations.getByLabelText('Bar'));
+    await user.click(form.getByRole('button', { name: t('devices.pairForm.create') }));
 
-    const code = within(
+    const shown = within(
       await screen.findByRole('dialog', {
-        name: t('devices.pairDialog.codeTitle', { name: 'Table T7 tablet' }),
+        name: t('devices.codeDialog.title', { name: 'Kitchen screen 1' }),
       }),
     );
-    expect(fake.callsTo('POST', CODES)[0]?.body).toEqual({
-      type: 'TABLE_TABLET',
-      name: 'Table T7 tablet',
-      tableId: T7,
-    });
-    expect(code.getByText(t('devices.pairDialog.scanApp'))).toBeVisible();
-    expect(
-      code.getByRole('img', {
-        name: t('devices.pairDialog.qrLabel', { name: 'Table T7 tablet' }),
-      }),
-    ).toBeVisible();
-    expect(code.getByText('ABCD-EFGH')).toBeVisible();
-    expect(code.getByText('https://192.168.1.20:8443')).toBeVisible();
-    expect(code.getByText('https://pos.local:8443')).toBeVisible();
-    expect(code.getByText(issued.caSha256 ?? '')).toBeVisible();
-    expect(
-      code.getByText(
-        t('devices.pairDialog.validUntil', { time: timeOfDayOf(new Date(issued.expiresAt)) }),
-      ),
-    ).toBeVisible();
-    expect(code.getByRole('status')).toHaveTextContent(t('devices.pairDialog.waiting'));
-
-    // The tablet pairs: the server announces it, and the list has it.
-    act(() => {
-      sockets.sync(0);
-      sockets.last.fire('event', changed(1, 'DEVICES'));
-    });
-    await waitFor(() => {
-      expect(code.getByRole('status')).toHaveTextContent(
-        t('devices.pairDialog.paired', { name: 'Table T7 tablet' }),
-      );
-    });
-    expect(code.queryByRole('img')).toBeNull();
-    await user.click(code.getByRole('button', { name: t('devices.pairDialog.done') }));
-    await waitFor(() => {
-      expect(screen.queryByRole('dialog')).toBeNull();
-    });
-    expect(
-      within(await rowOf('Table T7 tablet')).getByText(t('devices.table', { table: 'T7' })),
-    ).toBeVisible();
-  });
-
-  it('pairs a kitchen screen for one station, opened in a browser: no QR code', async () => {
-    const fake = devicesServer().on('POST', CODES, () => ({
-      status: 201,
-      body: pairingCode({ caSha256: null, serverUrls: [] }),
-    }));
-    const { user } = await renderConsole({ fake, path: PATH, signedIn: 'MANAGER' });
-    await user.click(await screen.findByRole('button', { name: t('devices.pair') }));
-    const dialog = within(
-      await screen.findByRole('dialog', { name: t('devices.pairDialog.title') }),
-    );
-    await user.selectOptions(
-      dialog.getByLabelText(t('devices.pairDialog.type')),
-      t('devices.type.KDS'),
-    );
-    const name = dialog.getByLabelText(new RegExp(`^${t('devices.pairDialog.name')}`));
-    expect(name).toHaveValue(t('devices.pairDialog.defaultName.KDS', { number: 1 }));
-    const station = dialog.getByLabelText(new RegExp(`^${t('devices.pairDialog.station')}`));
-    // Stations in use only: not the archived grill.
-    expect(
-      within(station)
-        .getAllByRole('option')
-        .map((option) => option.textContent),
-    ).toEqual([t('devices.pairDialog.allStations'), 'Tandoor', 'Curry']);
-    await user.selectOptions(station, 'Tandoor');
-    // A typed name is kept when the type changes.
-    await user.clear(name);
-    await user.type(name, 'Tandoor 2');
-    await user.selectOptions(
-      dialog.getByLabelText(t('devices.pairDialog.type')),
-      t('devices.type.WAITER_PHONE'),
-    );
-    expect(name).toHaveValue('Tandoor 2');
-    await user.selectOptions(
-      dialog.getByLabelText(t('devices.pairDialog.type')),
-      t('devices.type.KDS'),
-    );
-    await user.click(dialog.getByRole('button', { name: t('devices.pairDialog.create') }));
-    const code = within(
-      await screen.findByRole('dialog', {
-        name: t('devices.pairDialog.codeTitle', { name: 'Tandoor 2' }),
-      }),
-    );
-    expect(fake.callsTo('POST', CODES)[0]?.body).toEqual({
+    expect(fake.callsTo('POST', '/api/v1/devices/pairing-codes')[0]?.body).toEqual({
       type: 'KDS',
-      name: 'Tandoor 2',
-      stationId: TANDOOR,
+      name: 'Kitchen screen 1',
+      stationIds: [TANDOOR, BAR],
     });
-    expect(code.getByText(t('devices.pairDialog.openConsole'))).toBeVisible();
-    expect(code.queryByRole('img')).toBeNull();
-    // A development server without TLS: no fingerprint to compare.
-    expect(code.queryByText(t('devices.pairDialog.fingerprint'))).toBeNull();
-  });
-
-  it('pairs a waiter phone that alerts someone until they sign in', async () => {
-    const fake = devicesServer().on('POST', CODES, () => ({ status: 201, body: pairingCode() }));
-    const { user } = await renderConsole({ fake, path: PATH, signedIn: 'MANAGER' });
-    await user.click(await screen.findByRole('button', { name: t('devices.pair') }));
-    const dialog = within(
-      await screen.findByRole('dialog', { name: t('devices.pairDialog.title') }),
-    );
-    await user.selectOptions(
-      dialog.getByLabelText(t('devices.pairDialog.type')),
-      t('devices.type.WAITER_PHONE'),
-    );
-    // Waiter phone 1 exists, so 2 is suggested.
-    expect(dialog.getByLabelText(new RegExp(`^${t('devices.pairDialog.name')}`))).toHaveValue(
-      t('devices.pairDialog.defaultName.WAITER_PHONE', { number: 2 }),
-    );
-    const holder = dialog.getByLabelText(new RegExp(`^${t('devices.pairDialog.holder')}`));
-    // Active people only: not Priya.
-    expect(within(holder).queryByRole('option', { name: 'Priya' })).toBeNull();
-    await user.selectOptions(holder, 'Sunil');
-    await user.click(dialog.getByRole('button', { name: t('devices.pairDialog.create') }));
-    await screen.findByRole('dialog', {
-      name: t('devices.pairDialog.codeTitle', { name: 'Waiter phone 2' }),
-    });
-    expect(fake.callsTo('POST', CODES)[0]?.body).toMatchObject({
-      type: 'WAITER_PHONE',
-      staffId: expect.any(String) as string,
+    expect(shown.getByText('ABCD-EFGH')).toBeVisible();
+    expect(shown.getByText('https://192.168.1.20:8443')).toBeVisible();
+    expect(shown.getByText(pairingCode().caSha256 ?? '')).toBeVisible();
+    expect(
+      shown.getByRole('img', {
+        name: t('devices.codeDialog.qrLabel', { name: 'Kitchen screen 1' }),
+      }),
+    ).toBeVisible();
+    await expectNoAxeViolations(container);
+    await user.click(shown.getByRole('button', { name: t('devices.codeDialog.done') }));
+    await waitFor(() => {
+      expect(screen.queryByText('ABCD-EFGH')).toBeNull();
     });
   });
 
-  it('offers a new code once the code expires, and says why a code could not be made', async () => {
+  it('replaces an expired code in one press', async () => {
     const fake = devicesServer().on(
       'POST',
-      CODES,
-      () => ({
-        status: 201,
-        body: pairingCode({ expiresAt: new Date(Date.now() - 1_000).toISOString() }),
-      }),
-      () => ({ status: 201, body: pairingCode({ code: 'JKLM-NPQR' }) }),
+      '/api/v1/devices/pairing-codes',
+      () => ({ status: 201, body: pairingCode({ expiresAt: '2020-01-01T00:00:00.000Z' }) }),
+      () => ({ status: 201, body: pairingCode({ code: 'WXYZ-2345' }) }),
     );
     const { user } = await renderConsole({ fake, path: PATH, signedIn: 'MANAGER' });
     await user.click(await screen.findByRole('button', { name: t('devices.pair') }));
-    const form = within(await screen.findByRole('dialog', { name: t('devices.pairDialog.title') }));
-    await user.click(form.getByRole('button', { name: t('devices.pairDialog.create') }));
-    const code = within(
-      await screen.findByRole('dialog', {
-        name: t('devices.pairDialog.codeTitle', { name: 'POS 1' }),
-      }),
-    );
-    expect(code.getByRole('status')).toHaveTextContent(t('devices.pairDialog.expired'));
-    await user.click(code.getByRole('button', { name: t('devices.pairDialog.newCode') }));
-    expect(await code.findByText('JKLM-NPQR')).toBeVisible();
-    expect(code.getByRole('status')).toHaveTextContent(t('devices.pairDialog.waiting'));
-    expect(fake.callsTo('POST', CODES).map((call) => call.body)).toEqual([
-      { type: 'POS', name: 'POS 1' },
-      { type: 'POS', name: 'POS 1' },
-    ]);
-
-    await user.click(code.getByRole('button', { name: t('ui.dialog.close') }));
-    await waitFor(() => {
-      expect(screen.queryByRole('dialog')).toBeNull();
-    });
-    fake.on('POST', CODES, () => ({
-      status: 404,
-      body: { code: 'TABLE_NOT_FOUND', message: 'That table is no longer on the floor.' },
-    }));
-    await user.click(await screen.findByRole('button', { name: t('devices.pair') }));
-    const again = within(
-      await screen.findByRole('dialog', { name: t('devices.pairDialog.title') }),
-    );
-    await user.click(again.getByRole('button', { name: t('devices.pairDialog.create') }));
-    expect(await again.findByRole('alert')).toHaveTextContent(
-      'That table is no longer on the floor.',
-    );
+    const form = within(await screen.findByRole('dialog', { name: t('devices.pairForm.title') }));
+    await user.selectOptions(form.getByLabelText(t('devices.pairForm.type')), 'POS');
+    await user.click(form.getByRole('button', { name: t('devices.pairForm.create') }));
+    expect(await screen.findByText(t('devices.codeDialog.expired'))).toBeVisible();
+    await user.click(screen.getByRole('button', { name: t('devices.codeDialog.newCode') }));
+    expect(await screen.findByText('WXYZ-2345')).toBeVisible();
+    expect(fake.callsTo('POST', '/api/v1/devices/pairing-codes')).toHaveLength(2);
   });
 });
 
-describe('[MGR-006] renaming, moving, locating and unpairing', () => {
+describe('[MGR-006] [AUTH-008] [AUTH-009] changing a device', () => {
   it('renames a device', async () => {
-    const fake = devicesServer().on('PATCH', `${DEVICES}/${OFFICE}`, (call) => ({
+    const fake = devicesServer().on('PATCH', `${DEVICES}/${KDS_TANDOOR}`, () => ({
       status: 200,
-      body: { ...device({ id: OFFICE }), name: (call.body as { name: string }).name },
+      body: deviceView({ id: KDS_TANDOOR, type: 'KDS', name: 'Grill screen' }),
     }));
     const { user } = await renderConsole({ fake, path: PATH, signedIn: 'MANAGER' });
     await user.click(
-      within(await actionsFor('Office laptop')).getByRole('button', { name: t('devices.rename') }),
+      within(await actionsFor('Tandoor screen')).getByRole('button', { name: t('devices.rename') }),
     );
     const dialog = within(
       await screen.findByRole('dialog', {
-        name: t('devices.renameDialog.title', { name: 'Office laptop' }),
+        name: t('devices.renameDialog.title', { name: 'Tandoor screen' }),
       }),
     );
-    const name = dialog.getByLabelText(new RegExp(`^${t('devices.renameDialog.name')}`));
-    expect(name).toHaveFocus();
-    await user.clear(name);
-    await user.click(dialog.getByRole('button', { name: t('devices.renameDialog.confirm') }));
-    expect(dialog.getByText(t('devices.renameDialog.nameRequired'))).toBeVisible();
-    await user.type(name, '  Back office  ');
-    await user.click(dialog.getByRole('button', { name: t('devices.renameDialog.confirm') }));
-    expect(await screen.findByText(t('devices.renamed', { name: 'Back office' }))).toBeVisible();
-    expect(fake.callsTo('PATCH', `${DEVICES}/${OFFICE}`).map((call) => call.body)).toEqual([
-      { name: 'Back office' },
-    ]);
+    const field = dialog.getByLabelText(new RegExp(`^${t('devices.renameDialog.name')}`));
+    await user.clear(field);
+    await user.type(field, 'Grill screen');
+    await user.click(dialog.getByRole('button', { name: t('devices.renameDialog.save') }));
+    expect(await screen.findByText(t('devices.renamed', { name: 'Grill screen' }))).toBeVisible();
+    expect(fake.callsTo('PATCH', `${DEVICES}/${KDS_TANDOOR}`)[0]?.body).toEqual({
+      name: 'Grill screen',
+    });
   });
 
-  it('[AUTH-009] [TAB-002] moves a table tablet to another table', async () => {
-    const fake = devicesServer().on('PUT', `${DEVICES}/${TABLET_1}/table`, () => ({
+  it('[KDS-002] gives a kitchen screen more stations', async () => {
+    const fake = devicesServer().on('PUT', `${DEVICES}/${KDS_TANDOOR}/stations`, () => ({
       status: 200,
-      body: device({ id: TABLET_1, type: 'TABLE_TABLET', name: 'Table H1 tablet', tableId: H2 }),
+      body: deviceView({
+        id: KDS_TANDOOR,
+        type: 'KDS',
+        name: 'Tandoor screen',
+        tableId: null,
+        stationId: TANDOOR,
+        stationIds: [TANDOOR, BAR],
+      }),
     }));
     const { user } = await renderConsole({ fake, path: PATH, signedIn: 'MANAGER' });
     await user.click(
-      within(await actionsFor('Table H1 tablet')).getByRole('button', { name: t('devices.move') }),
+      within(await actionsFor('Tandoor screen')).getByRole('button', {
+        name: t('devices.stations'),
+      }),
     );
     const dialog = within(
       await screen.findByRole('dialog', {
-        name: t('devices.moveDialog.title', { name: 'Table H1 tablet' }),
+        name: t('devices.stationsDialog.title', { name: 'Tandoor screen' }),
       }),
     );
-    const table = dialog.getByLabelText(new RegExp(`^${t('devices.moveDialog.table')}`));
-    // Not the table it serves already.
+    expect(dialog.getByLabelText('Tandoor')).toBeChecked();
+    await user.click(dialog.getByLabelText('Bar'));
+    await user.click(dialog.getByRole('button', { name: t('devices.stationsDialog.save') }));
     expect(
-      within(table).queryByRole('option', {
-        name: t('devices.pairDialog.tableIn', { table: 'H1', section: 'Hall' }),
+      await screen.findByText(t('devices.stationsChanged', { name: 'Tandoor screen' })),
+    ).toBeVisible();
+    expect(fake.callsTo('PUT', `${DEVICES}/${KDS_TANDOOR}/stations`)[0]?.body).toEqual({
+      stationIds: [TANDOOR, BAR],
+    });
+  });
+
+  it('[MGR-006] locates a connected table tablet', async () => {
+    const fake = devicesServer().on('POST', `${DEVICES}/${TABLET_T7}/locate`, () => ({
+      status: 200,
+      body: { seconds: 15 },
+    }));
+    const { user } = await renderConsole({ fake, path: PATH, signedIn: 'MANAGER' });
+    await user.click(
+      within(await actionsFor('Tablet T7')).getByRole('button', {
+        name: t('devices.locateNamed', { name: 'Tablet T7' }),
+      }),
+    );
+    expect(
+      await screen.findByText(t('devices.locating', { name: 'Tablet T7', seconds: 15 })),
+    ).toBeVisible();
+    expect(fake.callsTo('POST', `${DEVICES}/${TABLET_T7}/locate`)).toHaveLength(1);
+    // A kitchen screen that is not connected offers no Locate.
+    expect(
+      within(await actionsFor('Tandoor screen')).queryByRole('button', {
+        name: t('devices.locateNamed', { name: 'Tandoor screen' }),
       }),
     ).toBeNull();
-    expect(dialog.getByRole('button', { name: t('devices.moveDialog.confirm') })).toBeDisabled();
-    await user.selectOptions(
-      table,
-      t('devices.pairDialog.tableIn', { table: 'H2', section: 'Hall' }),
-    );
-    await user.click(dialog.getByRole('button', { name: t('devices.moveDialog.confirm') }));
-    expect(
-      await screen.findByText(t('devices.moved', { name: 'Table H1 tablet', table: 'H2' })),
-    ).toBeVisible();
-    expect(fake.callsTo('PUT', `${DEVICES}/${TABLET_1}/table`)[0]?.body).toEqual({ tableId: H2 });
   });
 
-  it('[AUTH-008] unpairs a device only with a reason', async () => {
-    const fake = devicesServer(
-      devices(),
-      devices().filter((entry) => entry.id !== PHONE_1),
-    ).on('POST', `${DEVICES}/${PHONE_1}/revoke`, () => ({
+  it('[PC-S5] shows a device that takes no PINs until when, and lets it take them again', async () => {
+    // 09:00 UTC is 14:30 in India.
+    const locked = deviceList();
+    locked.devices = locked.devices.map((device) =>
+      device.id === TABLET_T7 ? { ...device, pinsLockedUntil: '2026-10-10T09:00:00.000Z' } : device,
+    );
+    const fake = devicesServer(locked, deviceList()).on(
+      'POST',
+      `${DEVICES}/${TABLET_T7}/pins/unlock`,
+      () => ({ status: 200, body: deviceView() }),
+    );
+    const { user } = await renderConsole({ fake, path: PATH, signedIn: 'MANAGER' });
+    expect(
+      within(await rowOf('Tablet T7')).getByText(t('devices.pinsLocked', { time: '14:30' })),
+    ).toBeVisible();
+    // Only the locked device offers it.
+    expect(
+      within(await actionsFor('Tandoor screen')).queryByRole('button', {
+        name: t('devices.unlockPinsNamed', { name: 'Tandoor screen' }),
+      }),
+    ).toBeNull();
+    await user.click(
+      within(await actionsFor('Tablet T7')).getByRole('button', {
+        name: t('devices.unlockPinsNamed', { name: 'Tablet T7' }),
+      }),
+    );
+    expect(await screen.findByText(t('devices.pinsUnlocked', { name: 'Tablet T7' }))).toBeVisible();
+    expect(fake.callsTo('POST', `${DEVICES}/${TABLET_T7}/pins/unlock`)).toHaveLength(1);
+    await waitFor(() => {
+      expect(screen.queryByText(t('devices.pinsLocked', { time: '14:30' }))).toBeNull();
+    });
+  });
+
+  it('moves a table tablet to another table', async () => {
+    const fake = devicesServer().on('PUT', `${DEVICES}/${TABLET_T7}/table`, () => ({
       status: 200,
-      body: device({ id: PHONE_1, type: 'WAITER_PHONE', status: 'REVOKED' }),
+      body: deviceView({ tableId: T8 }),
     }));
     const { user } = await renderConsole({ fake, path: PATH, signedIn: 'MANAGER' });
     await user.click(
-      within(await actionsFor('Waiter phone 1')).getByRole('button', { name: t('devices.unpair') }),
+      within(await actionsFor('Tablet T7')).getByRole('button', { name: t('devices.moveTable') }),
     );
     const dialog = within(
       await screen.findByRole('dialog', {
-        name: t('devices.unpairDialog.title', { name: 'Waiter phone 1' }),
+        name: t('devices.moveDialog.title', { name: 'Tablet T7' }),
       }),
     );
-    expect(dialog.getByText(t('devices.unpairDialog.description'))).toBeVisible();
-    const confirm = dialog.getByRole('button', { name: t('devices.unpairDialog.confirm') });
-    expect(confirm).toBeDisabled();
-    await user.type(dialog.getByLabelText(t('devices.unpairDialog.reason')), 'Lost');
-    await user.click(confirm);
+    const table = dialog.getByLabelText(t('devices.moveDialog.table'));
+    // The table it serves now is not offered.
+    expect(within(table).queryByRole('option', { name: /^T7/ })).toBeNull();
+    await user.selectOptions(table, T8);
+    await user.click(dialog.getByRole('button', { name: t('devices.moveDialog.move') }));
     expect(
-      await screen.findByText(t('devices.unpaired', { name: 'Waiter phone 1' })),
+      await screen.findByText(t('devices.moved', { name: 'Tablet T7', table: 'T8' })),
     ).toBeVisible();
-    expect(fake.callsTo('POST', `${DEVICES}/${PHONE_1}/revoke`)[0]?.body).toEqual({
-      reason: 'Lost',
-    });
-    await waitFor(() => {
-      expect(screen.queryByRole('heading', { level: 4, name: 'Waiter phone 1' })).toBeNull();
-    });
+    expect(fake.callsTo('PUT', `${DEVICES}/${TABLET_T7}/table`)[0]?.body).toEqual({ tableId: T8 });
   });
 
-  it('says that an unpaired pager must be registered again', async () => {
-    const { user } = await renderConsole({
-      fake: devicesServer(),
-      path: PATH,
-      signedIn: 'MANAGER',
-    });
-    await user.click(
-      within(await actionsFor('Pager 1')).getByRole('button', { name: t('devices.unpair') }),
-    );
-    const dialog = within(
-      await screen.findByRole('dialog', {
-        name: t('devices.unpairDialog.title', { name: 'Pager 1' }),
-      }),
-    );
-    expect(dialog.getByText(t('devices.unpairDialog.pagerDescription'))).toBeVisible();
-  });
-
-  it('locates a connected device, and says why when it cannot', async () => {
-    const fake = devicesServer().on(
-      'POST',
-      `${DEVICES}/${KDS_1}/locate`,
-      () => ({ status: 204 }),
-      () => ({
-        status: 409,
-        body: {
-          code: 'DEVICE_NOT_CONNECTED',
-          message: 'Tandoor screen is not connected, so it cannot show itself.',
-        },
-      }),
-    );
+  it('unpairs a device only with a reason, after asking', async () => {
+    const fake = devicesServer().on('POST', `${DEVICES}/${TABLET_T7}/revoke`, () => ({
+      status: 200,
+      body: deviceView({ status: 'REVOKED' }),
+    }));
     const { user } = await renderConsole({ fake, path: PATH, signedIn: 'MANAGER' });
-    const locate = within(await actionsFor('Tandoor screen')).getByRole('button', {
-      name: t('devices.locate'),
+    await user.click(
+      within(await actionsFor('Tablet T7')).getByRole('button', { name: t('devices.unpair') }),
+    );
+    const dialog = within(
+      await screen.findByRole('dialog', {
+        name: t('devices.unpairDialog.title', { name: 'Tablet T7' }),
+      }),
+    );
+    await user.click(dialog.getByRole('button', { name: t('devices.unpairDialog.confirm') }));
+    expect(dialog.getByText(t('devices.unpairDialog.reasonRequired'))).toBeVisible();
+    expect(fake.callsTo('POST', `${DEVICES}/${TABLET_T7}/revoke`)).toHaveLength(0);
+    await user.type(
+      dialog.getByLabelText(new RegExp(`^${t('devices.unpairDialog.reason')}`)),
+      'Screen cracked',
+    );
+    await user.click(dialog.getByRole('button', { name: t('devices.unpairDialog.confirm') }));
+    expect(await screen.findByText(t('devices.unpaired', { name: 'Tablet T7' }))).toBeVisible();
+    expect(fake.callsTo('POST', `${DEVICES}/${TABLET_T7}/revoke`)[0]?.body).toEqual({
+      reason: 'Screen cracked',
     });
-    await user.click(locate);
-    expect(await screen.findByText(t('devices.located', { name: 'Tandoor screen' }))).toBeVisible();
-    await user.click(locate);
-    expect(
-      await screen.findByText('Tandoor screen is not connected, so it cannot show itself.'),
-    ).toBeVisible();
-    expect(fake.callsTo('POST', `${DEVICES}/${KDS_1}/locate`)).toHaveLength(2);
+  });
+
+  it('says why a change was refused', async () => {
+    const fake = devicesServer().on('PATCH', `${DEVICES}/${KDS_TANDOOR}`, () => ({
+      status: 409,
+      body: { code: 'DEVICE_REVOKED', message: 'This device is unpaired. Pair it again first.' },
+    }));
+    const { user } = await renderConsole({ fake, path: PATH, signedIn: 'MANAGER' });
+    await user.click(
+      within(await actionsFor('Tandoor screen')).getByRole('button', { name: t('devices.rename') }),
+    );
+    const dialog = within(await screen.findByRole('dialog'));
+    await user.click(dialog.getByRole('button', { name: t('devices.renameDialog.save') }));
+    expect(await dialog.findByText('This device is unpaired. Pair it again first.')).toBeVisible();
   });
 });

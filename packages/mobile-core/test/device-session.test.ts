@@ -1,3 +1,4 @@
+import { CLIENT_API_VERSION, CLIENT_HEADER } from '@rp/contracts';
 import { describe, expect, it } from 'vitest';
 import {
   DeviceSession,
@@ -353,6 +354,35 @@ describe('[AUTH-001] [AUTH-005] staff on the device', () => {
     await session.keepAlive();
   });
 
+  it('[MOBILE-E3] tells the server how long ago the person last touched the phone', async () => {
+    const fake = server();
+    let now = 1_000_000;
+    const session = new DeviceSession({
+      ...newDevice(),
+      fetch: fake.fetch,
+      connect: new SocketFactory().connect,
+      now: () => now,
+    });
+    await session.start();
+    await session.pair(ADDRESS, 'abcd-efgh');
+    await session.signIn(STAFF.WAITER.staffId, '4444');
+    const idleOf = () => fake.calls.at(-1)?.headers['x-rp-idle-seconds'];
+    expect(idleOf()).toBe('0');
+
+    // Nobody touches it: the reads it makes by itself say so.
+    now += 7 * 60_000;
+    await session.staffTiles();
+    expect(idleOf()).toBe('420');
+    session.touched();
+    now += 5_000;
+    await session.staffTiles();
+    expect(idleOf()).toBe('5');
+    // "The person is still here" is a touch too.
+    now += 60_000;
+    await session.keepAlive();
+    expect(idleOf()).toBe('0');
+  });
+
   it('shows the person signed out when the server ends the session', async () => {
     const fake = server().on('GET', '/api/v1/auth/session', () => ({
       status: 401,
@@ -386,6 +416,67 @@ describe('[AUTH-001] [AUTH-005] staff on the device', () => {
     stop();
     sockets.last.fire('event', itemReadyFrame(2));
     expect(seen).toEqual(['ItemStatusChanged']);
+  });
+});
+
+describe('[UPD-006] an app the server no longer serves', () => {
+  it('says which app and build it is on every request and the live connection', async () => {
+    const fake = server();
+    const sockets = new SocketFactory();
+    const session = new DeviceSession({
+      ...newDevice(),
+      fetch: fake.fetch,
+      connect: sockets.connect,
+      appKind: 'waiter-app',
+      appVersion: '1.4.2',
+    });
+    await session.start();
+    await session.pair(ADDRESS, 'abcd-efgh');
+    const identity = `waiter-app/1.4.2 api/${CLIENT_API_VERSION}`;
+    expect(fake.calls.map((call) => call.headers[CLIENT_HEADER])).toEqual(
+      fake.calls.map(() => identity),
+    );
+    await expect(sockets.last.handshake()).resolves.toMatchObject({ client: identity });
+  });
+
+  it('stops and asks for the app to be updated when the server refuses its build', async () => {
+    const fake = server().on('GET', '/api/v1/auth/staff-tiles', () => ({
+      status: 426,
+      body: { code: 'CLIENT_TOO_OLD', message: 'Update the app.' },
+    }));
+    const { session } = setup(fake);
+    await session.start();
+    await session.pair(ADDRESS, 'abcd-efgh');
+    expect(session.getSnapshot().clientTooOld).toBe(false);
+    await expect(session.staffTiles()).rejects.toMatchObject({ code: 'CLIENT_TOO_OLD' });
+    expect(session.getSnapshot()).toMatchObject({ clientTooOld: true, connection: 'stopped' });
+  });
+
+  it('also when the live connection is refused for it', async () => {
+    const { session, sockets } = await paired();
+    sockets.last.fire(
+      'connect_error',
+      Object.assign(new Error('CLIENT_TOO_OLD'), {
+        data: { code: 'CLIENT_TOO_OLD', message: 'Update the app.' },
+      }),
+    );
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(session.getSnapshot()).toMatchObject({ clientTooOld: true, connection: 'stopped' });
+  });
+});
+
+describe('[WTR-001] a download Android makes for the app (P7-04e2)', () => {
+  it('gives the APK’s address on the paired server with the device’s token', async () => {
+    const { session } = await paired();
+    const request = await session.downloadRequest('downloadCurrentAppBuild');
+    expect(request.url).toMatch(/\/api\/v1\/devices\/current\/app-build\/apk$/);
+    expect(request.headers['x-device-token']).toBeDefined();
+  });
+
+  it('has none before the device is paired', async () => {
+    const { session } = setup();
+    await session.start();
+    await expect(session.downloadRequest('downloadCurrentAppBuild')).rejects.toThrow();
   });
 });
 

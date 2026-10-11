@@ -1,4 +1,4 @@
 {
-  "input": { "type": "string", "enum": ["RESTAURANT_PC"] },
-  "output": { "type": "string", "enum": ["RESTAURANT_PC"] }
+  "input": { "type": "string", "enum": ["RESTAURANT_PC", "PAGER_FIRMWARE"] },
+  "output": { "type": "string", "enum": ["RESTAURANT_PC", "PAGER_FIRMWARE"] }
 }

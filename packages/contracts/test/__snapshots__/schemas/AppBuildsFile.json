@@ -1,0 +1,68 @@
+{
+  "input": {
+    "type": "object",
+    "properties": {
+      "format": { "type": "number", "const": 1 },
+      "release": { "type": "string", "minLength": 1, "maxLength": 64 },
+      "apps": {
+        "maxItems": 2,
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "kind": { "type": "string", "enum": ["waiter-app", "table-tablet"] },
+            "version": {
+              "type": "string",
+              "maxLength": 64,
+              "pattern": "^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)(-[0-9A-Za-z-]+(\\.[0-9A-Za-z-]+)*)?$"
+            },
+            "clientApi": { "type": "string", "pattern": "^(0|[1-9]\\d{0,2})\\.(0|[1-9]\\d{0,2})$" },
+            "file": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9-]{0,39}-[0-9A-Za-z.+-]{1,64}\\.apk$"
+            },
+            "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+            "sizeBytes": { "type": "integer", "exclusiveMinimum": 0, "maximum": 314572800 }
+          },
+          "required": ["kind", "version", "clientApi", "file", "sha256", "sizeBytes"],
+          "additionalProperties": false
+        }
+      }
+    },
+    "required": ["format", "release", "apps"],
+    "additionalProperties": false
+  },
+  "output": {
+    "type": "object",
+    "properties": {
+      "format": { "type": "number", "const": 1 },
+      "release": { "type": "string", "minLength": 1, "maxLength": 64 },
+      "apps": {
+        "maxItems": 2,
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "kind": { "type": "string", "enum": ["waiter-app", "table-tablet"] },
+            "version": {
+              "type": "string",
+              "maxLength": 64,
+              "pattern": "^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)(-[0-9A-Za-z-]+(\\.[0-9A-Za-z-]+)*)?$"
+            },
+            "clientApi": { "type": "string", "pattern": "^(0|[1-9]\\d{0,2})\\.(0|[1-9]\\d{0,2})$" },
+            "file": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9-]{0,39}-[0-9A-Za-z.+-]{1,64}\\.apk$"
+            },
+            "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+            "sizeBytes": { "type": "integer", "exclusiveMinimum": 0, "maximum": 314572800 }
+          },
+          "required": ["kind", "version", "clientApi", "file", "sha256", "sizeBytes"],
+          "additionalProperties": false
+        }
+      }
+    },
+    "required": ["format", "release", "apps"],
+    "additionalProperties": false
+  }
+}

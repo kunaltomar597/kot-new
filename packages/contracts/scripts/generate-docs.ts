@@ -2,6 +2,7 @@
  * Generates the published contract documents (INT-002, NFR-M06):
  *   docs/api/openapi.json                local REST API, from the route registry and every schema
  *   docs/api/control-plane.openapi.json  Vendor Control Plane API (ADR-0012)
+ *   docs/api/relay.openapi.json          QR relay edge functions (ADR-0015)
  *   docs/api/asyncapi.yaml               domain events, from the event catalogue
  *
  * Usage: pnpm contracts:docs            write the files
@@ -12,6 +13,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import * as controlPlane from '../src/control-plane/index.js';
 import * as contracts from '../src/index.js';
+import * as relay from '../src/relay/index.js';
 import { renderDocs } from './lib/render.js';
 
 const outDir = fileURLToPath(new URL('../../../docs/api/', import.meta.url));
@@ -25,6 +27,7 @@ const files = await renderDocs({
   routes: contracts.ROUTES,
   events: contracts.DomainEvent,
   controlPlane: { namespace: controlPlane, routes: controlPlane.CONTROL_PLANE_ROUTES },
+  relay: { namespace: relay, routes: relay.RELAY_ROUTES },
   version: pkg.version,
   outDir,
 });

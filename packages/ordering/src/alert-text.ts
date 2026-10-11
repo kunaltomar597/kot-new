@@ -1,4 +1,5 @@
 import type { AlertView } from '@rp/contracts';
+import { formatDisplayDate, timeOfDayOf } from '@rp/domain';
 import type { Translator } from '@rp/i18n';
 import { minutesSince } from './floor-view.js';
 
@@ -15,6 +16,8 @@ const textOf = (value: unknown): string | null =>
 
 const numberOf = (value: unknown): number | null =>
   typeof value === 'number' && Number.isFinite(value) ? value : null;
+
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 const namesOf = (value: unknown): string[] =>
   Array.isArray(value)
@@ -68,6 +71,36 @@ function detailOf(alert: AlertView, t: Translator): string | null {
       const source = textOf(payload.requestedFrom);
       return source === null ? null : t('alerts.billFrom', { source });
     }
+    case 'SUSPICIOUS_ACTIVITY': {
+      const count = numberOf(payload.flags);
+      const date = textOf(payload.businessDate);
+      if (count === null || date === null || !ISO_DATE.test(date)) return null;
+      return t('alerts.suspicious', { count, date: formatDisplayDate(date) });
+    }
+    case 'SUPPORT_REQUEST': {
+      const name = textOf(payload.requestedBy);
+      const reason = textOf(payload.reason);
+      return name === null || reason === null ? null : t('alerts.supportRequest', { name, reason });
+    }
+    case 'VENDOR_RESTORE_CODE': {
+      const name = textOf(payload.issuedBy);
+      const reason = textOf(payload.reason);
+      return name === null || reason === null
+        ? null
+        : t('alerts.vendorRestoreCode', { name, reason });
+    }
+    case 'SIGN_IN_LOCKED': {
+      const device = textOf(payload.deviceName);
+      const until = textOf(payload.lockedUntil);
+      const at = until === null ? Number.NaN : Date.parse(until);
+      if (device === null || Number.isNaN(at)) return null;
+      const time = timeOfDayOf(new Date(at));
+      if (payload.scope === 'DEVICE') return t('alerts.devicePinsLocked', { device, time });
+      const name = textOf(payload.staffName);
+      if (name === null) return null;
+      const method = textOf(payload.method) ?? 'PIN';
+      return t('alerts.personLocked', { name, time, method, device });
+    }
     case 'DEVICE_LOW_BATTERY_OR_OFFLINE': {
       const device =
         textOf(payload.deviceName) ??
@@ -76,43 +109,9 @@ function detailOf(alert: AlertView, t: Translator): string | null {
       const percent = numberOf(payload.batteryPercent);
       return percent === null ? null : t('alerts.deviceBattery', { device, percent });
     }
-    case 'PRINTER_OFFLINE': {
-      const printer = textOf(payload.printerName);
-      if (printer === null) return null;
-      const error = textOf(payload.error);
-      const queued = numberOf(payload.queued) ?? 0;
-      const why =
-        error === null
-          ? t('alerts.printerDown', { printer })
-          : t('alerts.printerError', { printer, error });
-      return queued > 0 ? `${why} ${t('alerts.printerQueued', { count: queued })}` : why;
-    }
-    case 'DISK_OR_BACKUP': {
-      const percent = numberOf(payload.usedPercent);
-      const free = numberOf(payload.freeBytes);
-      if (percent === null || free === null) return null;
-      return t('alerts.diskFull', { percent, free: sizeText(free, t) });
-    }
     default:
       return null;
   }
-}
-
-const SIZE_UNITS = ['bytes', 'KB', 'MB', 'GB', 'TB'] as const;
-
-/**
- * A size in bytes as Windows Explorer shows it, in units of 1,024: "850 MB", "12.4 GB" (one
- * decimal below 100 of a unit).
- */
-export function sizeText(bytes: number, t: Translator): string {
-  let value = Math.max(0, bytes);
-  let unit = 0;
-  while (value >= 1_024 && unit < SIZE_UNITS.length - 1) {
-    value /= 1_024;
-    unit += 1;
-  }
-  const rounded = unit === 0 || value >= 100 ? Math.round(value) : Math.round(value * 10) / 10;
-  return t('ui.size', { value: String(rounded), unit: SIZE_UNITS[unit] ?? 'TB' });
 }
 
 /** "Just now", "4 min ago", "1 h 05 min ago": how long an alert has waited (clocks drift). */

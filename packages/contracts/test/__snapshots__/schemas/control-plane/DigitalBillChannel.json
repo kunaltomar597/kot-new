@@ -1,0 +1,4 @@
+{
+  "input": { "type": "string", "enum": ["WHATSAPP", "SMS"] },
+  "output": { "type": "string", "enum": ["WHATSAPP", "SMS"] }
+}

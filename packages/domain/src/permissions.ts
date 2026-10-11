@@ -106,7 +106,110 @@ export const OWNER_SECOND_FACTOR_CAPABILITIES: ReadonlySet<Capability> = new Set
 /** Roles whose PIN can approve an OVERRIDE action (AUTH-011). */
 export const OVERRIDE_APPROVER_ROLES: ReadonlySet<Role> = new Set<Role>(['OWNER', 'MANAGER']);
 
+/**
+ * The kind of record each approvable action is about (AUTH-011, PC-T2): a manager's approval names
+ * its record when it is given and is good for that record only, so approving a ₹200 void cannot
+ * void a ₹2,000 dish. Every capability any role needs an approval for has one.
+ */
+export const OVERRIDE_RECORD_TYPES: Readonly<Partial<Record<Capability, string>>> = {
+  ITEM_VOID_AFTER_PREP: 'order_item',
+  DISCOUNT_ABOVE_LIMIT: 'bill',
+  BILL_EDIT_AFTER_PRINT: 'invoice',
+  INVOICE_VOID: 'invoice',
+};
+
+/**
+ * Built-in roles a custom role can build on (AUTH-012). The Owner and managers already have every
+ * grantable capability, so a custom role starts from a cashier, waiter or kitchen role.
+ */
+export const CUSTOM_ROLE_BASES = ['CASHIER', 'WAITER', 'KITCHEN'] as const;
+export type CustomRoleBase = (typeof CUSTOM_ROLE_BASES)[number];
+
+/**
+ * Capabilities a custom role may add on top of its base role (AUTH-012): anything a manager may
+ * do, except managing staff (whose rules follow the built-in roles) and the Owner-only actions.
+ */
+export const CUSTOM_ROLE_GRANTABLE: readonly Capability[] = CAPABILITIES.filter(
+  (capability) =>
+    DEFAULT_PERMISSION_MATRIX[capability].MANAGER === 'ALLOW' &&
+    capability !== 'STAFF_MANAGE' &&
+    !OWNER_SECOND_FACTOR_CAPABILITIES.has(capability),
+);
+
+const GRANTABLE = new Set<string>(CUSTOM_ROLE_GRANTABLE);
+
+/** Someone acting: their built-in role and the extra capabilities of their custom role, if any. */
+export interface Actor {
+  readonly role: Role;
+  readonly extraCapabilities?: readonly Capability[];
+}
+
+/**
+ * The extra capabilities a custom role really adds to `baseRole`: known, grantable, not already
+ * allowed by the base role, each once, in catalogue order. Anything else stored is ignored, so a
+ * stored list can never grant more than the rules allow.
+ */
+export function extraCapabilitiesOf(baseRole: Role, stored: readonly string[]): Capability[] {
+  const wanted = new Set(stored);
+  return CUSTOM_ROLE_GRANTABLE.filter(
+    (capability) => wanted.has(capability) && grantFor(baseRole, capability) !== 'ALLOW',
+  );
+}
+
+/** The grant an actor has: ALLOW when their custom role adds the capability, else their role's. */
+export function actorGrant(
+  actor: Actor,
+  capability: Capability,
+  matrix: PermissionMatrix = DEFAULT_PERMISSION_MATRIX,
+): Grant {
+  if (GRANTABLE.has(capability) && actor.extraCapabilities?.includes(capability) === true) {
+    return 'ALLOW';
+  }
+  return grantFor(actor.role, capability, matrix);
+}
+
+export interface CustomRoleDraft {
+  readonly name: string;
+  readonly baseRole: Role;
+  readonly capabilities: readonly string[];
+}
+
+export type CustomRoleProblem =
+  | 'NAME_REQUIRED'
+  | 'NAME_TAKEN'
+  | 'BASE_ROLE_INVALID'
+  | 'CAPABILITY_NOT_GRANTABLE'
+  | 'NOTHING_ADDED';
+
+/**
+ * Checks a custom role (AUTH-012): a name no other role uses, a cashier, waiter or kitchen base,
+ * only grantable capabilities, and at least one the base role does not already have.
+ */
+export function checkCustomRole(
+  draft: CustomRoleDraft,
+  otherNames: readonly string[],
+): CustomRoleProblem[] {
+  const problems: CustomRoleProblem[] = [];
+  const name = draft.name.trim().toLowerCase();
+  if (name === '') problems.push('NAME_REQUIRED');
+  else if (otherNames.some((other) => other.trim().toLowerCase() === name)) {
+    problems.push('NAME_TAKEN');
+  }
+  if (!(CUSTOM_ROLE_BASES as readonly string[]).includes(draft.baseRole)) {
+    problems.push('BASE_ROLE_INVALID');
+    return problems;
+  }
+  if (draft.capabilities.some((capability) => !GRANTABLE.has(capability))) {
+    problems.push('CAPABILITY_NOT_GRANTABLE');
+  } else if (extraCapabilitiesOf(draft.baseRole, draft.capabilities).length === 0) {
+    problems.push('NOTHING_ADDED');
+  }
+  return problems;
+}
+
 export interface PermissionContext {
+  /** Capabilities the actor's custom role adds (AUTH-012). */
+  readonly extraCapabilities?: readonly Capability[];
   /** True when the target table / shift belongs to the acting person. */
   readonly isOwn?: boolean;
   /** Role of the manager who entered their PIN for this action, if any. */
@@ -131,86 +234,6 @@ export function canApproveOverride(role: Role): boolean {
   return OVERRIDE_APPROVER_ROLES.has(role);
 }
 
-/**
- * What only the Owner may ever do (BRD §4.2): tax and invoice settings, data administration and
- * the licence. No custom role can be given these (AUTH-012).
- */
-export const OWNER_ONLY_CAPABILITIES: ReadonlySet<Capability> = new Set<Capability>(
-  CAPABILITIES.filter((capability) => DEFAULT_PERMISSION_MATRIX[capability].MANAGER === 'DENY'),
-);
-
-/**
- * What a custom role changes on top of its base role (AUTH-012, P4-02e): capabilities it adds,
- * which it may then use outright (no "own tables only", no manager's PIN), and capabilities it
- * takes away.
- */
-export interface RoleCustomisation {
-  readonly added: readonly Capability[];
-  readonly removed: readonly Capability[];
-}
-
-/** Whoever permissions are checked for: a base role and, with a custom role, what it changes. */
-export interface PermissionHolder {
-  readonly role: Role;
-  readonly customRole?: RoleCustomisation | null;
-}
-
-/** The grant `holder` has for `capability`, their custom role applied (AUTH-012). */
-export function grantOf(holder: PermissionHolder, capability: Capability): Grant {
-  const custom = holder.customRole;
-  if (custom !== undefined && custom !== null) {
-    if (custom.removed.includes(capability)) return 'DENY';
-    if (custom.added.includes(capability)) return 'ALLOW';
-  }
-  return grantFor(holder.role, capability);
-}
-
-/**
- * Why a custom role's permissions are refused:
- * - OWNER_ONLY: only the Owner may ever do it;
- * - ALREADY_ALLOWED: the base role already allows it outright, so there is nothing to add;
- * - NOT_GRANTED: the base role cannot do it, so there is nothing to take away;
- * - BOTH: added and taken away at once;
- * - REPEATED: listed twice.
- */
-export type CustomRoleProblem =
-  'OWNER_ONLY' | 'ALREADY_ALLOWED' | 'NOT_GRANTED' | 'BOTH' | 'REPEATED';
-
-export interface CustomRoleIssue {
-  readonly capability: Capability;
-  readonly problem: CustomRoleProblem;
-}
-
-/**
- * Checks what a custom role adds to and takes from its base role (AUTH-012). Anything a manager
- * may do can be added, never what only the Owner may do; anything the base role may do can be
- * taken away. Each capability is listed once, where it changes something.
- */
-export function checkCustomRole(
-  baseRole: Exclude<Role, 'OWNER'>,
-  customisation: RoleCustomisation,
-): readonly CustomRoleIssue[] {
-  const issues: CustomRoleIssue[] = [];
-  const seen = new Set<Capability>();
-  const note = (capability: Capability, problem: CustomRoleProblem) => {
-    issues.push({ capability, problem });
-  };
-  for (const capability of customisation.added) {
-    if (seen.has(capability)) note(capability, 'REPEATED');
-    else if (OWNER_ONLY_CAPABILITIES.has(capability)) note(capability, 'OWNER_ONLY');
-    else if (grantFor(baseRole, capability) === 'ALLOW') note(capability, 'ALREADY_ALLOWED');
-    seen.add(capability);
-  }
-  const removed = new Set<Capability>();
-  for (const capability of customisation.removed) {
-    if (removed.has(capability)) note(capability, 'REPEATED');
-    else if (customisation.added.includes(capability)) note(capability, 'BOTH');
-    else if (grantFor(baseRole, capability) === 'DENY') note(capability, 'NOT_GRANTED');
-    removed.add(capability);
-  }
-  return issues;
-}
-
 /** Decides whether `role` may perform `capability` in `context` (deny by default, SEC-003). */
 export function evaluatePermission(
   role: Role,
@@ -218,7 +241,16 @@ export function evaluatePermission(
   context: PermissionContext = {},
   matrix: PermissionMatrix = DEFAULT_PERMISSION_MATRIX,
 ): PermissionDecision {
-  const grant = grantFor(role, capability, matrix);
+  const grant = actorGrant(
+    {
+      role,
+      ...(context.extraCapabilities !== undefined && {
+        extraCapabilities: context.extraCapabilities,
+      }),
+    },
+    capability,
+    matrix,
+  );
   switch (grant) {
     case 'ALLOW':
       return { allowed: true, viaOverride: false };

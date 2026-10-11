@@ -1,0 +1,78 @@
+{
+  "input": {
+    "type": "object",
+    "properties": {
+      "rejectionReason": { "type": "string", "minLength": 1, "maxLength": 200 },
+      "items": {
+        "maxItems": 200,
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "clientLineId": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "state": {
+              "type": "string",
+              "enum": [
+                "PENDING_APPROVAL",
+                "HELD",
+                "SENT",
+                "PREPARING",
+                "READY",
+                "PICKED_UP",
+                "SERVED",
+                "REJECTED",
+                "CANCELLED",
+                "VOIDED"
+              ]
+            }
+          },
+          "required": ["clientLineId", "state"],
+          "additionalProperties": false
+        }
+      }
+    },
+    "additionalProperties": false
+  },
+  "output": {
+    "type": "object",
+    "properties": {
+      "rejectionReason": { "type": "string", "minLength": 1, "maxLength": 200 },
+      "items": {
+        "maxItems": 200,
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "clientLineId": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "state": {
+              "type": "string",
+              "enum": [
+                "PENDING_APPROVAL",
+                "HELD",
+                "SENT",
+                "PREPARING",
+                "READY",
+                "PICKED_UP",
+                "SERVED",
+                "REJECTED",
+                "CANCELLED",
+                "VOIDED"
+              ]
+            }
+          },
+          "required": ["clientLineId", "state"],
+          "additionalProperties": false
+        }
+      }
+    },
+    "additionalProperties": false
+  }
+}

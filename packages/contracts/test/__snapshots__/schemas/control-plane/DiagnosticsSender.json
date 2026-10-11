@@ -1,0 +1,19 @@
+{
+  "input": {
+    "type": "object",
+    "properties": {
+      "name": { "type": "string", "maxLength": 120 },
+      "role": { "type": "string", "maxLength": 40 }
+    },
+    "required": ["name", "role"]
+  },
+  "output": {
+    "type": "object",
+    "properties": {
+      "name": { "type": "string", "maxLength": 120 },
+      "role": { "type": "string", "maxLength": 40 }
+    },
+    "required": ["name", "role"],
+    "additionalProperties": false
+  }
+}

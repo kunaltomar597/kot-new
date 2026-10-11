@@ -1,13 +1,14 @@
 import type { MenuSnapshot, OrderView } from '@rp/contracts';
 import { fontSize, fontWeight, radius, spacing } from '@rp/design-tokens';
-import type { PermissionHolder } from '@rp/domain';
-import { type LiveData, messageOf, Note, useT } from '@rp/mobile-shell';
+import type { Role } from '@rp/domain';
+import { type LiveData, messageOf, Note, useNow, useT } from '@rp/mobile-shell';
 import {
   displayState,
   kotDelivery,
   kotDeliveryText,
   lineActions,
   servableLines,
+  type UnavailableReason,
   unavailableReason,
 } from '@rp/ordering';
 import { Button, Glyph, StatusChip, toneColors, useTheme, weight } from '@rp/ui-native';
@@ -18,8 +19,7 @@ type SentLine = OrderView['items'][number];
 
 /** What the person may do with the sent items, and what to do when they do it. */
 export interface SentActions {
-  /** Who is signed in: their role and custom role decide what they may do (AUTH-012). */
-  readonly person: PermissionHolder;
+  readonly role: Role;
   /** Whether the person is this table's waiter (own-table grants). */
   readonly ownTable: boolean;
   /** Lines with a step in flight. */
@@ -27,19 +27,22 @@ export interface SentActions {
   readonly onStep: (line: SentLine, event: 'PICK_UP' | 'SERVE') => void;
   readonly onServeAll: (lines: readonly SentLine[]) => void;
   readonly onEnd: (line: SentLine, ending: Ending) => void;
+  /** ORD-016: send an order's held items to the kitchen. */
+  readonly onFire?: (order: OrderView) => void;
 }
 
 /** Why a sent line cannot be ordered again from the phone now, or undefined when it can. */
 function againBlocked(
   menu: MenuSnapshot | null | undefined,
   line: SentLine,
-): 'NO_MENU' | 'OFF_MENU' | 'SOLD_OUT' | 'NOT_AVAILABLE' | undefined {
+  now: number,
+): 'NO_MENU' | 'OFF_MENU' | UnavailableReason | undefined {
   if (menu === null || menu === undefined) return 'NO_MENU';
   const item = menu.items.find((candidate) => candidate.id === line.itemId);
   if (item === undefined || item.archived || !item.channels.includes('WAITER_APP')) {
     return 'OFF_MENU';
   }
-  return unavailableReason(item);
+  return unavailableReason(item, { menu, now });
 }
 
 /** "Full · Cheese, Butter · Dal Makhani, Rasmalai · Less spicy". */
@@ -79,6 +82,8 @@ export function SentOrders({
 }) {
   const t = useT();
   const { colors } = useTheme();
+  // MENU-005: a combo cannot be ordered again outside its hours.
+  const now = useNow(30_000);
   const heading = (
     <Text accessibilityRole="header" style={[styles.heading, { color: colors.text }]}>
       {t('pos.sent.title')}
@@ -103,7 +108,7 @@ export function SentOrders({
       </View>
     );
   }
-  const servable = servableLines(data.value, actions.person, actions.ownTable);
+  const servable = servableLines(data.value, actions.role, actions.ownTable);
   return (
     <View style={styles.section}>
       {heading}
@@ -130,6 +135,17 @@ export function SentOrders({
           <Text style={[styles.orderTitle, { color: colors.text }]}>
             {t('pos.sent.order', { number: order.orderNumber })}
           </Text>
+          {actions.onFire !== undefined &&
+          order.items.some((item) => item.state === 'HELD' && item.parentOrderItemId === null) ? (
+            <Button
+              testID={`fire-${String(order.orderNumber)}`}
+              onPress={() => {
+                actions.onFire?.(order);
+              }}
+            >
+              {t('pos.sent.fire')}
+            </Button>
+          ) : null}
           {order.kots.map((kot) => {
             const delivery = kotDelivery(kot, menu?.stations ?? []);
             const tone = toneColors(
@@ -161,16 +177,16 @@ export function SentOrders({
             .map((line) => {
               const state = displayState(line, order.items);
               const details = lineDetails(line, order);
-              const blocked = againBlocked(menu, line);
+              const blocked = againBlocked(menu, line, now);
               const reason =
                 blocked === 'SOLD_OUT'
                   ? t('pos.menu.soldOut')
-                  : blocked === 'NOT_AVAILABLE'
+                  : blocked === 'NOT_AVAILABLE' || blocked === 'NOT_NOW'
                     ? t('pos.menu.notAvailable')
                     : blocked === 'OFF_MENU'
                       ? t('pos.cart.offMenu')
                       : undefined;
-              const can = lineActions(line, actions.person, actions.ownTable);
+              const can = lineActions(line, actions.role, actions.ownTable);
               const busy = actions.busy.has(line.id);
               return (
                 <View

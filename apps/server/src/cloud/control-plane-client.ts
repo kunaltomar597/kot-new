@@ -1,19 +1,33 @@
 import { createHash, randomBytes, sign } from 'node:crypto';
 import { ApiError } from '@rp/contracts';
 import {
+  CloudBackupView,
+  type CompleteCloudBackupRequest,
+  type EscrowBackupKeyRequest,
+  type StartCloudBackupRequest,
+  StartCloudBackupResponse,
+  type DeclineDiagnosticsRequest,
+  type DiagnosticsUploadRequest,
+  DiagnosticsUploadResponse,
+  type DigitalBillRequest,
+  DigitalBillView,
   CONTROL_PLANE_ERRORS,
   EnrolResponse,
   enrolmentProofMessage,
   type HeartbeatRequest,
   HeartbeatResponse,
   INSTALLATION_HEADERS,
+  type MenuExtractionRequest,
+  MenuExtractionView,
   signedRequestMessage,
   UpdatesResponse,
 } from '@rp/contracts/control-plane';
-import type { z } from 'zod';
+import { z } from 'zod';
 import type { InstallationKey } from './installation-key.js';
 
 const DEFAULT_TIMEOUT_MS = 15_000;
+/** Up to 20 MB of menu photos over a restaurant's connection. */
+const UPLOAD_TIMEOUT_MS = 120_000;
 
 /** A failed call to the Control Plane; `code` is its `ApiError.code` or `UNREACHABLE`. */
 export class ControlPlaneError extends Error {
@@ -80,6 +94,127 @@ export class ControlPlaneClient {
     return this.signed(installationId, 'GET', path, undefined, UpdatesResponse);
   }
 
+  /** ONB-006: photos or PDFs of the printed menu, to be read by the AI provider (P6-04). */
+  createMenuExtraction(
+    installationId: string,
+    request: MenuExtractionRequest,
+  ): Promise<MenuExtractionView> {
+    return this.signed(
+      installationId,
+      'POST',
+      '/v1/menu-extractions',
+      JSON.stringify(request),
+      MenuExtractionView,
+      UPLOAD_TIMEOUT_MS,
+    );
+  }
+
+  /** BILL-012: a settled bill for the diner, sent through the vendor's provider (P7-09b). */
+  sendDigitalBill(installationId: string, bill: DigitalBillRequest): Promise<DigitalBillView> {
+    return this.signed(
+      installationId,
+      'POST',
+      '/v1/digital-bills',
+      JSON.stringify(bill),
+      DigitalBillView,
+    );
+  }
+
+  /** UPD-008: a diagnostics bundle the manager allowed to send (P7-08a). */
+  uploadDiagnostics(
+    installationId: string,
+    upload: DiagnosticsUploadRequest,
+  ): Promise<DiagnosticsUploadResponse> {
+    return this.signed(
+      installationId,
+      'POST',
+      '/v1/diagnostics',
+      JSON.stringify(upload),
+      DiagnosticsUploadResponse,
+      UPLOAD_TIMEOUT_MS,
+    );
+  }
+
+  /** UPD-008: the manager declined support's request (P7-08b). */
+  async declineDiagnosticsRequest(
+    installationId: string,
+    requestId: string,
+    body: DeclineDiagnosticsRequest,
+  ): Promise<void> {
+    await this.signed(
+      installationId,
+      'POST',
+      `/v1/diagnostics-requests/${encodeURIComponent(requestId)}/decline`,
+      JSON.stringify(body),
+      z.undefined(),
+    );
+  }
+
+  /** DATA-003: where to put the night's encrypted backup, part by part (P7-05d). */
+  startCloudBackup(
+    installationId: string,
+    request: StartCloudBackupRequest,
+  ): Promise<StartCloudBackupResponse> {
+    return this.signed(
+      installationId,
+      'POST',
+      '/v1/cloud-backups',
+      JSON.stringify(request),
+      StartCloudBackupResponse,
+    );
+  }
+
+  completeCloudBackup(
+    installationId: string,
+    id: string,
+    request: CompleteCloudBackupRequest,
+  ): Promise<CloudBackupView> {
+    return this.signed(
+      installationId,
+      'POST',
+      `/v1/cloud-backups/${encodeURIComponent(id)}/complete`,
+      JSON.stringify(request),
+      CloudBackupView,
+      UPLOAD_TIMEOUT_MS,
+    );
+  }
+
+  async abortCloudBackup(installationId: string, id: string): Promise<void> {
+    await this.signed(
+      installationId,
+      'POST',
+      `/v1/cloud-backups/${encodeURIComponent(id)}/abort`,
+      undefined,
+      z.undefined(),
+    );
+  }
+
+  /** DATA-003, OI-10: the backup key, wrapped with the vendor's escrow key (P7-05e). */
+  async escrowBackupKey(installationId: string, request: EscrowBackupKeyRequest): Promise<void> {
+    await this.signed(
+      installationId,
+      'PUT',
+      '/v1/backup-key-escrow',
+      JSON.stringify(request),
+      z.undefined(),
+    );
+  }
+
+  /** A part URL the Control Plane gave, absolute (S3) or on its own address (development). */
+  resolveUrl(url: string): string {
+    return new URL(url, `${this.options.baseUrl}/`).toString();
+  }
+
+  getMenuExtraction(installationId: string, extractionId: string): Promise<MenuExtractionView> {
+    return this.signed(
+      installationId,
+      'GET',
+      `/v1/menu-extractions/${encodeURIComponent(extractionId)}`,
+      undefined,
+      MenuExtractionView,
+    );
+  }
+
   /** A signed request; after `CLOCK_SKEW` it corrects the clock offset and tries once more. */
   private async signed<S extends z.ZodType>(
     installationId: string,
@@ -87,6 +222,7 @@ export class ControlPlaneClient {
     path: string,
     body: string | undefined,
     schema: S,
+    timeoutMs?: number,
   ): Promise<z.output<S>> {
     try {
       return await this.send(
@@ -95,6 +231,7 @@ export class ControlPlaneClient {
         body,
         this.headers(installationId, method, path, body),
         schema,
+        timeoutMs,
       );
     } catch (error) {
       const serverTime =
@@ -109,6 +246,7 @@ export class ControlPlaneClient {
         body,
         this.headers(installationId, method, path, body),
         schema,
+        timeoutMs,
       );
     }
   }
@@ -148,6 +286,7 @@ export class ControlPlaneClient {
     body: string | undefined,
     headers: Record<string, string>,
     schema: S,
+    timeoutMs?: number,
   ): Promise<z.output<S>> {
     let response: Response;
     try {
@@ -160,7 +299,7 @@ export class ControlPlaneClient {
         },
         ...(body !== undefined && { body }),
         redirect: 'error',
-        signal: AbortSignal.timeout(this.options.timeoutMs ?? DEFAULT_TIMEOUT_MS),
+        signal: AbortSignal.timeout(timeoutMs ?? this.options.timeoutMs ?? DEFAULT_TIMEOUT_MS),
       });
     } catch (error) {
       throw new ControlPlaneError(

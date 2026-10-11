@@ -17,19 +17,24 @@ import {
   type DeviceChallengeResponse,
   type DeviceListResponse,
   type DeviceSummary,
+  type DeviceView,
   DeviceTokenRequest,
   type DeviceTokenResponse,
+  HTTP_DEVICE_TYPES,
+  type LocateDeviceResponse,
   PairDeviceRequest,
   type PairedDevice,
   type PairingCodeResponse,
+  RenameDeviceRequest,
   RevokeDeviceRequest,
-  UpdateDeviceRequest,
+  SetDeviceStationsRequest,
 } from '@rp/contracts';
 import type { Request } from 'express';
 import { authErrors } from '../auth/auth-errors.js';
 import { Public, RequireCapability, RequireDevice } from '../auth/decorators.js';
 import type { AuthenticatedDevice } from '../auth/device.js';
 import type { AuthenticatedRequest, Principal } from '../auth/principal.js';
+import { clientIdentityOf } from '../http/client-version.js';
 import { ZodValidationPipe } from '../validation/zod-validation.pipe.js';
 import { DevicesService } from './devices.service.js';
 
@@ -79,7 +84,7 @@ export class DevicesController {
     @Req() request: Request,
     @Body(new ZodValidationPipe(PairDeviceRequest)) body: PairDeviceRequest,
   ): Promise<PairedDevice> {
-    return this.devices.pair(body, clientKey(request));
+    return this.devices.pair(body, clientKey(request), clientIdentityOf(request));
   }
 
   // Public: first step of device authentication; a challenge alone grants nothing.
@@ -101,11 +106,11 @@ export class DevicesController {
     @Req() request: Request,
     @Body(new ZodValidationPipe(DeviceTokenRequest)) body: DeviceTokenRequest,
   ): Promise<DeviceTokenResponse> {
-    return this.devices.issueToken(body, clientKey(request));
+    return this.devices.issueToken(body, clientKey(request), clientIdentityOf(request));
   }
 
   @Get('current')
-  @RequireDevice()
+  @RequireDevice(HTTP_DEVICE_TYPES)
   current(@Req() request: AuthenticatedRequest): Promise<DeviceSummary> {
     return this.devices.current(deviceOf(request));
   }
@@ -121,19 +126,19 @@ export class DevicesController {
   rename(
     @Req() request: AuthenticatedRequest,
     @Param('deviceId', new ParseUUIDPipe()) deviceId: string,
-    @Body(new ZodValidationPipe(UpdateDeviceRequest)) body: UpdateDeviceRequest,
+    @Body(new ZodValidationPipe(RenameDeviceRequest)) body: RenameDeviceRequest,
   ): Promise<DeviceSummary> {
     return this.devices.rename(principalOf(request), deviceId, body.name);
   }
 
-  @Post(':deviceId/locate')
-  @HttpCode(204)
+  @Put(':deviceId/stations')
   @RequireCapability('DEVICE_PAIR')
-  locate(
+  setStations(
     @Req() request: AuthenticatedRequest,
     @Param('deviceId', new ParseUUIDPipe()) deviceId: string,
-  ): Promise<void> {
-    return this.devices.locate(principalOf(request), deviceId);
+    @Body(new ZodValidationPipe(SetDeviceStationsRequest)) body: SetDeviceStationsRequest,
+  ): Promise<DeviceSummary> {
+    return this.devices.setStations(principalOf(request), deviceId, body.stationIds);
   }
 
   @Post(':deviceId/revoke')
@@ -145,6 +150,26 @@ export class DevicesController {
     @Body(new ZodValidationPipe(RevokeDeviceRequest)) body: RevokeDeviceRequest,
   ): Promise<DeviceSummary> {
     return this.devices.revoke(principalOf(request), deviceId, body.reason);
+  }
+
+  @Post(':deviceId/pins/unlock')
+  @HttpCode(200)
+  @RequireCapability('DEVICE_PAIR')
+  unlockPins(
+    @Req() request: AuthenticatedRequest,
+    @Param('deviceId', new ParseUUIDPipe()) deviceId: string,
+  ): Promise<DeviceView> {
+    return this.devices.unlockPins(principalOf(request), deviceId);
+  }
+
+  @Post(':deviceId/locate')
+  @HttpCode(200)
+  @RequireCapability('DEVICE_PAIR')
+  locate(
+    @Req() request: AuthenticatedRequest,
+    @Param('deviceId', new ParseUUIDPipe()) deviceId: string,
+  ): Promise<LocateDeviceResponse> {
+    return this.devices.locate(principalOf(request), deviceId);
   }
 
   @Put(':deviceId/table')

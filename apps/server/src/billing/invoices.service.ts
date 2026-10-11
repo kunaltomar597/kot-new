@@ -20,6 +20,7 @@ import type { Invoice, InvoiceLine, Restaurant, TaxLine } from '../generated/pri
 import { SettingsService, type SettingsSnapshot } from '../settings/settings.service.js';
 import { describeItem } from './bill-calculation.js';
 import { type BillContext, BillsService } from './bills.service.js';
+import { withLineShares } from './line-shares.js';
 
 /** Sequence key of a series that runs on across financial years (PROGRESS decision 17). */
 export const CONTINUOUS_SEQUENCE = '0000-00';
@@ -39,15 +40,66 @@ export function particularsOf(
     phone: restaurant.phone,
     headerLines: snapshot.get('bills.headerLines'),
     footerLines: snapshot.get('bills.footerLines'),
+    amountInWords: snapshot.get('bills.amountInWords'),
   };
 }
 
-type InvoiceRow = Invoice & {
+export type InvoiceRow = Invoice & {
   lines: InvoiceLine[];
   taxLines: TaxLine[];
   tableSession: { table: { label: string } } | null;
 };
 
+/** An invoice with its current lines and tax lines as the API shows it (and the invoice books). */
+export function invoiceView(invoice: InvoiceRow): InvoiceView {
+  return {
+    id: invoice.id,
+    billId: invoice.billId,
+    invoiceNumber: invoice.invoiceNumber,
+    status: invoice.status,
+    invoiceDate: isoDateOf(invoice.invoiceDate),
+    financialYear: invoice.financialYear,
+    businessDate: isoDateOf(invoice.businessDate),
+    issuedAt: invoice.issuedAt.toISOString(),
+    issuedById: invoice.issuedById,
+    tableLabel: invoice.tableSession?.table.label ?? null,
+    particulars: toParticulars(invoice.particulars),
+    customer: {
+      name: invoice.customerName,
+      phone: invoice.customerPhone,
+      phoneConsent: invoice.customerPhoneConsent,
+      gstin: invoice.customerGstin,
+    },
+    priceMode: invoice.priceMode,
+    lines: invoice.lines.map((line) => ({
+      description: line.description,
+      quantity: line.quantity,
+      unitPrice: line.unitPrice,
+      lineTotal: line.lineTotal,
+      discount: line.discount,
+      taxableValue: line.taxableValue,
+      sacCode: line.sacCode,
+    })),
+    taxLines: invoice.taxLines.map((line) => ({
+      taxGroupId: line.taxGroupId,
+      code: line.code,
+      rateBp: line.rateBp,
+      taxableValue: line.taxableValue,
+      amount: line.amount,
+    })),
+    subtotal: invoice.subtotal,
+    discountTotal: invoice.discountTotal,
+    serviceCharge: invoice.serviceCharge,
+    taxTotal: invoice.taxTotal,
+    roundOff: invoice.roundOff,
+    grandTotal: invoice.grandTotal,
+    printCount: invoice.printCount,
+    version: invoice.version,
+    voidedAt: invoice.voidedAt?.toISOString() ?? null,
+    voidReason: invoice.voidReason,
+    replacesInvoiceId: invoice.replacesInvoiceId,
+  };
+}
 function toParticulars(value: unknown): InvoiceParticulars {
   const stored = (typeof value === 'object' && value !== null ? value : {}) as Partial<
     Record<keyof InvoiceParticulars, unknown>
@@ -65,6 +117,8 @@ function toParticulars(value: unknown): InvoiceParticulars {
     phone: text(stored.phone),
     headerLines: lines(stored.headerLines),
     footerLines: lines(stored.footerLines),
+    // Invoices issued before BILL-001's words were added have none.
+    amountInWords: stored.amountInWords === true,
   };
 }
 
@@ -127,6 +181,7 @@ export class InvoicesService {
 
       const particulars = particularsOf(restaurant, snapshot);
       const itemsById = new Map(context.items.map((item) => [item.id, item]));
+      const itemIdOf = (orderItemId: string) => itemsById.get(orderItemId)?.itemId;
       const realGroup = (key: string) => calculated.groupIdOf.get(key) ?? key;
       const sacOf = (groupId: string) => context.taxGroups.get(groupId)?.sacCode ?? null;
 
@@ -223,7 +278,7 @@ export class InvoicesService {
                 // Printing is its own step (`print`); the first successful print is the original.
                 printCount: 0,
                 replacesInvoiceId: replaces?.id ?? null,
-                lines: { create: lines },
+                lines: { create: withLineShares(lines, taxLines, itemIdOf) },
                 taxLines: { create: taxLines },
               },
             })
@@ -235,7 +290,7 @@ export class InvoicesService {
                 ...amounts,
                 version,
                 printCount: 0,
-                lines: { create: lines },
+                lines: { create: withLineShares(lines, taxLines, itemIdOf) },
                 taxLines: { create: taxLines },
               },
             });
@@ -381,53 +436,7 @@ export class InvoicesService {
   }
 
   private toView(invoice: InvoiceRow): InvoiceView {
-    return {
-      id: invoice.id,
-      billId: invoice.billId,
-      invoiceNumber: invoice.invoiceNumber,
-      status: invoice.status,
-      invoiceDate: isoDateOf(invoice.invoiceDate),
-      financialYear: invoice.financialYear,
-      businessDate: isoDateOf(invoice.businessDate),
-      issuedAt: invoice.issuedAt.toISOString(),
-      issuedById: invoice.issuedById,
-      tableLabel: invoice.tableSession?.table.label ?? null,
-      particulars: toParticulars(invoice.particulars),
-      customer: {
-        name: invoice.customerName,
-        phone: invoice.customerPhone,
-        phoneConsent: invoice.customerPhoneConsent,
-        gstin: invoice.customerGstin,
-      },
-      priceMode: invoice.priceMode,
-      lines: invoice.lines.map((line) => ({
-        description: line.description,
-        quantity: line.quantity,
-        unitPrice: line.unitPrice,
-        lineTotal: line.lineTotal,
-        discount: line.discount,
-        taxableValue: line.taxableValue,
-        sacCode: line.sacCode,
-      })),
-      taxLines: invoice.taxLines.map((line) => ({
-        taxGroupId: line.taxGroupId,
-        code: line.code,
-        rateBp: line.rateBp,
-        taxableValue: line.taxableValue,
-        amount: line.amount,
-      })),
-      subtotal: invoice.subtotal,
-      discountTotal: invoice.discountTotal,
-      serviceCharge: invoice.serviceCharge,
-      taxTotal: invoice.taxTotal,
-      roundOff: invoice.roundOff,
-      grandTotal: invoice.grandTotal,
-      printCount: invoice.printCount,
-      version: invoice.version,
-      voidedAt: invoice.voidedAt?.toISOString() ?? null,
-      voidReason: invoice.voidReason,
-      replacesInvoiceId: invoice.replacesInvoiceId,
-    };
+    return invoiceView(invoice);
   }
 
   /**
@@ -455,6 +464,14 @@ export class InvoicesService {
         'ITEMS_AWAITING_APPROVAL',
         `${String(context.awaitingApproval)} items are waiting for approval. Approve or reject them first.`,
         { awaitingApproval: context.awaitingApproval },
+      );
+    }
+    if (context.held > 0) {
+      throw new AppError(
+        409,
+        'ITEMS_HELD',
+        `${String(context.held)} items are held back from the kitchen. Fire or cancel them first.`,
+        { held: context.held },
       );
     }
     if (context.calculated.result.lines.length === 0) {

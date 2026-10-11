@@ -1,9 +1,4 @@
-import {
-  effectiveRule,
-  type NotificationEvent,
-  type NotificationRuleOverrides,
-  type VibrationPattern,
-} from './notifications.js';
+import type { NotificationEvent } from './notifications.js';
 
 /**
  * Wrist pagers (P2-04, PGR-005 to PGR-008): the text a pager shows, how it vibrates, the MQTT
@@ -37,25 +32,47 @@ export function pagerLines(text: string): [string, string] {
   ];
 }
 
-/**
- * How a pager buzzes for an alert (PGR-006): the event's rule says, a restaurant's change included;
- * an escalated alert always buzzes three times, since it has come to the manager.
- */
+/** PGR-006: a vibration pattern per alert type ⚙. */
+export const VIBRATION_PATTERNS = ['ONE_LONG', 'TWO_SHORT', 'THREE', 'ONE_SHORT'] as const;
+export type VibrationPattern = (typeof VIBRATION_PATTERNS)[number];
+
+/** PGR-006 defaults: ready = one long, service request = two short, manager/escalation = three. */
+export const DEFAULT_VIBRATION: Readonly<Record<NotificationEvent, VibrationPattern>> = {
+  ORDER_PENDING_APPROVAL: 'TWO_SHORT',
+  ITEM_READY: 'ONE_LONG',
+  WATER_REQUEST: 'TWO_SHORT',
+  WAITER_REQUEST: 'TWO_SHORT',
+  BILL_REQUEST: 'TWO_SHORT',
+  READY_NOT_COLLECTED: 'THREE',
+  MANAGER_NUDGE: 'THREE',
+  ORDER_CHANGED: 'ONE_SHORT',
+  WAITER_UNREACHABLE: 'THREE',
+  DEVICE_LOW_BATTERY_OR_OFFLINE: 'ONE_SHORT',
+  PRINTER_OFFLINE: 'ONE_SHORT',
+  DISK_OR_BACKUP: 'ONE_SHORT',
+  LICENSE_STATE: 'ONE_SHORT',
+  SUSPICIOUS_ACTIVITY: 'ONE_SHORT',
+  SUPPORT_REQUEST: 'ONE_SHORT',
+  VENDOR_RESTORE_CODE: 'ONE_SHORT',
+  SIGN_IN_LOCKED: 'ONE_SHORT',
+};
+
+/** An escalated alert always buzzes three times: it has come to the manager. */
 export function vibrationFor(
   event: NotificationEvent,
   escalated: boolean,
-  rules: NotificationRuleOverrides = {},
+  overrides: Readonly<Partial<Record<NotificationEvent, VibrationPattern>>> = {},
 ): VibrationPattern {
   if (escalated) return 'THREE';
-  return effectiveRule(event, rules).vibration;
+  return overrides[event] ?? DEFAULT_VIBRATION[event];
 }
 
-export type PagerTopicKind = 'alerts' | 'locate' | 'ack' | 'heartbeat';
+export type PagerTopicKind = 'alerts' | 'ack' | 'heartbeat' | 'ota';
 
 /**
- * Topics: `rp/<restaurant>/pagers/<device>/alerts` (server → pager, QoS 1), `.../locate` (server →
- * pager, a manager looking for it, P4-02c), `.../ack` and `.../heartbeat` (pager → server). Nothing
- * else is allowed (PGR-005, SEC-012).
+ * Topics: `rp/<restaurant>/pagers/<device>/alerts` and `.../ota` (server → pager, QoS 1: alerts,
+ * and firmware offers, PGR-011), `.../ack` and `.../heartbeat` (pager → server). Nothing else is
+ * allowed (PGR-005, SEC-012).
  */
 export function pagerTopic(restaurantId: string, deviceId: string, kind: PagerTopicKind): string {
   return `rp/${restaurantId}/pagers/${deviceId}/${kind}`;
@@ -72,7 +89,7 @@ export function pagerMayPublish(topic: string, restaurantId: string, deviceId: s
 export function pagerMaySubscribe(topic: string, restaurantId: string, deviceId: string): boolean {
   return (
     topic === pagerTopic(restaurantId, deviceId, 'alerts') ||
-    topic === pagerTopic(restaurantId, deviceId, 'locate')
+    topic === pagerTopic(restaurantId, deviceId, 'ota')
   );
 }
 
@@ -86,20 +103,21 @@ export function pagerIsOffline(
   return now.getTime() - lastSeenAt.getTime() > 3 * heartbeatSeconds * 1000;
 }
 
+/**
+ * PAGER-D4: a heartbeat less than half the interval ⚙ after the last one the PC took is dropped,
+ * so a pager, or a copy of one, cannot keep the PC writing its state as fast as it can send.
+ */
+export function pagerHeartbeatTooSoon(
+  lastTakenAtMs: number | null,
+  nowMs: number,
+  heartbeatSeconds: number,
+): boolean {
+  return lastTakenAtMs !== null && nowMs - lastTakenAtMs < (heartbeatSeconds * 1000) / 2;
+}
+
 /** PGR-013: at or below the level ⚙ the battery counts as low. */
 export function isLowBattery(batteryPercent: number | null, lowBatteryPercent: number): boolean {
   return batteryPercent !== null && batteryPercent <= lowBatteryPercent;
-}
-
-/**
- * The low-battery level ⚙ of a device type: pagers have their own (`pager.lowBatteryPercent`,
- * PGR-013); tablets and every other device share `devices.lowBatteryAlertPercent` (TAB-015).
- */
-export function lowBatteryLevelFor(
-  deviceType: string,
-  levels: { readonly pager: number; readonly other: number },
-): number {
-  return deviceType === 'PAGER' ? levels.pager : levels.other;
 }
 
 /**

@@ -1,0 +1,54 @@
+{
+  "input": {
+    "type": "object",
+    "properties": {
+      "serverVersion": { "type": "string", "minLength": 1, "maxLength": 40 },
+      "settings": {
+        "type": "object",
+        "properties": {
+          "submissionsPerWindow": { "type": "integer", "minimum": 1, "maximum": 50 },
+          "rateLimitWindowMinutes": { "type": "integer", "minimum": 1, "maximum": 120 },
+          "pickupTimeoutSeconds": { "type": "integer", "minimum": 15, "maximum": 600 },
+          "presenceIntervalSeconds": { "type": "integer", "minimum": 5, "maximum": 300 },
+          "readOnlyAfterSeconds": { "type": "integer", "minimum": 30, "maximum": 1800 }
+        },
+        "required": [
+          "submissionsPerWindow",
+          "rateLimitWindowMinutes",
+          "pickupTimeoutSeconds",
+          "presenceIntervalSeconds",
+          "readOnlyAfterSeconds"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "required": ["serverVersion", "settings"],
+    "additionalProperties": false
+  },
+  "output": {
+    "type": "object",
+    "properties": {
+      "serverVersion": { "type": "string", "minLength": 1, "maxLength": 40 },
+      "settings": {
+        "type": "object",
+        "properties": {
+          "submissionsPerWindow": { "type": "integer", "minimum": 1, "maximum": 50 },
+          "rateLimitWindowMinutes": { "type": "integer", "minimum": 1, "maximum": 120 },
+          "pickupTimeoutSeconds": { "type": "integer", "minimum": 15, "maximum": 600 },
+          "presenceIntervalSeconds": { "type": "integer", "minimum": 5, "maximum": 300 },
+          "readOnlyAfterSeconds": { "type": "integer", "minimum": 30, "maximum": 1800 }
+        },
+        "required": [
+          "submissionsPerWindow",
+          "rateLimitWindowMinutes",
+          "pickupTimeoutSeconds",
+          "presenceIntervalSeconds",
+          "readOnlyAfterSeconds"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "required": ["serverVersion", "settings"],
+    "additionalProperties": false
+  }
+}

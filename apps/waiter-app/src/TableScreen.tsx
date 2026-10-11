@@ -1,19 +1,22 @@
 import { newIdempotencyKey, uuidV4 } from '@rp/api-client';
-import type { MenuItem, OrderView, TableOverviewEntry } from '@rp/contracts';
+import type { MenuItem, OrderView, RecommendationSource, TableOverviewEntry } from '@rp/contracts';
 import { fontSize, fontWeight, spacing } from '@rp/design-tokens';
 import { formatRupees } from '@rp/domain';
-import type { OrderDraft } from '@rp/mobile-core';
+import { type OrderDraft, SuggestionTracker } from '@rp/mobile-core';
 import {
+  ItemSheet,
   messageOf,
   Note,
   OverrideCancelled,
   Screen,
+  SuggestionRow,
   useDeviceSession,
   useLive,
   useMenu,
   useNow,
   useOverride,
   useSessionState,
+  useSuggestions,
   useT,
   useUnsentOrders,
 } from '@rp/mobile-shell';
@@ -39,10 +42,10 @@ import { BackHandler, StyleSheet, Text, View } from 'react-native';
 import { CartList } from './CartList';
 import { useCart } from './carts';
 import { EndItemSheet, type Ending } from './EndItemSheet';
-import { ItemSheet } from './ItemSheet';
 import { MenuBrowser } from './MenuBrowser';
 import { mayMove, MoveSheet } from './MoveSheet';
 import { SentOrders } from './SentOrders';
+import { Approvals } from './Approvals';
 import { ServiceRequests } from './ServiceRequests';
 import { UnsentOrders } from './UnsentOrders';
 
@@ -74,9 +77,39 @@ export function TableScreen({ sessionId, onBack }: { sessionId: string; onBack: 
   const [cart, setCart] = useCart(sessionId);
   const [view, setView] = useState<TableView>('order');
   const [choosing, setChoosing] = useState<MenuItem | undefined>();
+  /** The suggestion the dish being chosen came from (REC-008). */
+  const [choosingSource, setChoosingSource] = useState<RecommendationSource | undefined>();
+  /** What the waiter does with suggestions, sent in batches (REC-008). */
+  const tracker = useMemo(
+    () =>
+      new SuggestionTracker({
+        send: async (events) => {
+          await session.api.recordRecommendationEvents({
+            body: { tableSessionId: sessionId, channel: 'WAITER_APP', events },
+          });
+        },
+      }),
+    [session, sessionId],
+  );
+  useEffect(
+    () => () => {
+      void tracker.stop();
+    },
+    [tracker],
+  );
+  const cartIds = cart.map((line) => line.itemId);
+  const upsell = useSuggestions(
+    () =>
+      session.api.getRecommendations({
+        query: { tableSessionId: sessionId, channel: 'WAITER_APP', cart: cartIds, limit: 4 },
+      }),
+    cartIds.join(','),
+    menu !== null && menu !== undefined,
+  );
   const [moving, setMoving] = useState(false);
   const [notice, setNotice] = useState<string | undefined>();
   const [asking, setAsking] = useState(false);
+  const [printing, setPrinting] = useState(false);
   const [busyLines, setBusyLines] = useState<ReadonlySet<string>>(new Set());
   const [ending, setEnding] = useState<{ line: SentLine; ending: Ending } | undefined>();
   const { withOverride, sheet: approval } = useOverride();
@@ -91,8 +124,8 @@ export function TableScreen({ sessionId, onBack }: { sessionId: string; onBack: 
     () =>
       menu === null || menu === undefined
         ? new Map<string, LineProblem>()
-        : lineProblems(menu, cart, 'WAITER_APP'),
-    [menu, cart],
+        : lineProblems(menu, cart, 'WAITER_APP', now),
+    [menu, cart, now],
   );
 
   // An order for this table reached the kitchen, now or later on reconnect: show it at once.
@@ -123,26 +156,36 @@ export function TableScreen({ sessionId, onBack }: { sessionId: string; onBack: 
   const closed = tables.data.status === 'ready' && table === undefined;
   const label = table?.label ?? drafts[0]?.body.tableLabel ?? '';
 
-  const add = (line: Omit<CartLine, 'clientLineId' | 'error'>) => {
+  const add = (line: Omit<CartLine, 'clientLineId' | 'error'>, source?: RecommendationSource) => {
     setNotice(undefined);
-    setCart((lines) => addLine(lines, line, uuidV4));
+    setCart((lines) =>
+      addLine(lines, source === undefined ? line : { ...line, recommendation: source }, uuidV4),
+    );
+    // WTR-011: a suggestion the waiter put in the order (REC-008).
+    if (source !== undefined) {
+      tracker.record({ kind: 'ADD_TO_CART', itemId: line.itemId, ...source });
+    }
   };
 
-  const choose = (item: MenuItem) => {
+  const choose = (item: MenuItem, source?: RecommendationSource) => {
     if (menu === null || menu === undefined) return;
     if (needsOptions(menu, item)) {
       setChoosing(item);
+      setChoosingSource(source);
       return;
     }
-    add({
-      itemId: item.id,
-      name: item.name,
-      summary: '',
-      quantity: 1,
-      selection: {},
-      instructions: '',
-      unitPrice: item.basePrice,
-    });
+    add(
+      {
+        itemId: item.id,
+        name: item.name,
+        summary: '',
+        quantity: 1,
+        selection: {},
+        instructions: '',
+        unitPrice: item.basePrice,
+      },
+      source,
+    );
   };
 
   const again = (order: OrderView, line: OrderView['items'][number]) => {
@@ -248,6 +291,19 @@ export function TableScreen({ sessionId, onBack }: { sessionId: string; onBack: 
   };
 
   /** Several dishes carried to the table at once, one after another; stops at a refusal. */
+  /** ORD-016: the order's held items go to the kitchen now. */
+  const fire = async (order: { readonly id: string }) => {
+    setNotice(undefined);
+    try {
+      await session.api.fireOrder({ params: { orderId: order.id }, body: {} });
+      toast.show({ title: t('pos.sent.fired'), tone: 'success' });
+    } catch (failure) {
+      setNotice(messageOf(failure, t));
+    } finally {
+      settled();
+    }
+  };
+
   const serveAll = async (lines: readonly SentLine[]) => {
     setNotice(undefined);
     const ids = lines.map((line) => line.id);
@@ -334,10 +390,43 @@ export function TableScreen({ sessionId, onBack }: { sessionId: string; onBack: 
     );
   };
 
+  // WTR-008 (S): print the bill at the bill printer, when the restaurant lets waiters.
+  const printBill = () => {
+    setPrinting(true);
+    setNotice(undefined);
+    session.api.printTableBill({ params: { sessionId } }).then(
+      (result) => {
+        setPrinting(false);
+        if (result.printed) {
+          toast.show({
+            title: t('mobile.tables.billPrinted', {
+              number: result.invoiceNumber,
+              total: formatRupees(result.grandTotal),
+            }),
+            tone: 'success',
+          });
+        } else {
+          setNotice(
+            t('mobile.tables.billNotPrinted', {
+              number: result.invoiceNumber,
+              error: result.error ?? '',
+            }),
+          );
+        }
+        tables.reload();
+      },
+      (failure: unknown) => {
+        setPrinting(false);
+        setNotice(messageOf(failure, t));
+      },
+    );
+  };
+
   const count = cart.reduce((total, line) => total + line.quantity, 0);
   const blocked = problems.size > 0;
   const alert = table === undefined ? undefined : tileAlert(table, t);
   const ownTable = table?.session?.waiterId === person.id;
+  const mayPrint = tables.data.status === 'ready' && tables.data.value.mayPrintBill;
 
   return (
     <Screen
@@ -406,10 +495,22 @@ export function TableScreen({ sessionId, onBack }: { sessionId: string; onBack: 
                 {t('mobile.tables.requestBill')}
               </Button>
             ) : null}
+            {mayPrint && ownTable && table.state !== 'BILL_PRINTED' ? (
+              <Button
+                variant="secondary"
+                style={styles.grow}
+                loading={printing}
+                testID="print-bill"
+                onPress={printBill}
+              >
+                {t('mobile.tables.printBill')}
+              </Button>
+            ) : null}
           </View>
         </>
       )}
       {notice === undefined ? null : <Note tone="danger">{notice}</Note>}
+      <Approvals sessionId={sessionId} />
       <ServiceRequests show={(request) => request.tableSessionId === sessionId} />
       <UnsentOrders entries={drafts} personId={person.id} onChange={putBack} />
       {closed ? null : (
@@ -435,6 +536,16 @@ export function TableScreen({ sessionId, onBack }: { sessionId: string; onBack: 
             )
           ) : (
             <>
+              {menu !== null && menu !== undefined && (
+                <SuggestionRow
+                  title={t('reco.row.upsell')}
+                  suggestions={upsell}
+                  menu={menu}
+                  tracker={tracker}
+                  testID="suggestions-upsell"
+                  onChoose={choose}
+                />
+              )}
               <Text accessibilityRole="header" style={[styles.heading, { color: colors.text }]}>
                 {t('pos.cart.title')}
               </Text>
@@ -463,7 +574,7 @@ export function TableScreen({ sessionId, onBack }: { sessionId: string; onBack: 
                 data={orders.data}
                 menu={menu}
                 actions={{
-                  person,
+                  role: person.role,
                   ownTable,
                   busy: busyLines,
                   onStep: step,
@@ -472,6 +583,9 @@ export function TableScreen({ sessionId, onBack }: { sessionId: string; onBack: 
                   },
                   onEnd: (line, kind) => {
                     setEnding({ line, ending: kind });
+                  },
+                  onFire: (order) => {
+                    void fire(order);
                   },
                 }}
                 onAgain={again}
@@ -487,10 +601,12 @@ export function TableScreen({ sessionId, onBack }: { sessionId: string; onBack: 
           item={choosing}
           onClose={() => {
             setChoosing(undefined);
+            setChoosingSource(undefined);
           }}
           onAdd={(line) => {
-            add(line);
+            add(line, choosingSource);
             setChoosing(undefined);
+            setChoosingSource(undefined);
           }}
         />
       ) : null}
@@ -513,7 +629,7 @@ export function TableScreen({ sessionId, onBack }: { sessionId: string; onBack: 
         <EndItemSheet
           line={ending.line}
           ending={ending.ending}
-          managerNeeded={lineActions(ending.line, person, ownTable).void === 'OVERRIDE'}
+          managerNeeded={lineActions(ending.line, person.role, ownTable).void === 'OVERRIDE'}
           onClose={() => {
             setEnding(undefined);
           }}

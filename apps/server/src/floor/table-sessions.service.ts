@@ -6,26 +6,29 @@ import type {
   TableSessionView,
 } from '@rp/contracts';
 import {
-  grantOf,
+  grantFor,
   isBillable,
   OPEN_SERVICE_REQUEST_STATES,
   ORDER_ITEM_STATES,
   responsibleWaiters,
+  tableAfterGuestsLeft,
   tableMachine,
   type TableEvent,
   type TableState,
   transition,
 } from '@rp/domain';
 import { AuditService } from '../audit/audit.service.js';
-import { authErrors } from '../auth/auth-errors.js';
-import { holderOf, ROLE_GRANTS_SELECT } from '../auth/custom-roles.js';
+import { mayPrintBill } from '../billing/who-prints-bills.js';
 import type { Principal } from '../auth/principal.js';
+import { authErrors } from '../auth/auth-errors.js';
 import { currentBusinessDate, dbDate, isoDateOf } from '../common/business-dates.js';
 import { newId } from '../common/ids.js';
 import { PrismaService, type TransactionClient } from '../database/prisma.service.js';
 import { AppError } from '../errors/app-error.js';
 import { appendEvent, type EventAudience } from '../events/outbox.js';
 import type { DiningTable, TableSession } from '../generated/prisma/client.js';
+import { LicenceAgentService } from '../licensing/licence-agent.service.js';
+import { SettingsService } from '../settings/settings.service.js';
 import { WaiterAssignmentsService } from './waiter-assignments.service.js';
 
 /** Items that keep a table from being closed without a bill: billable or awaiting approval. */
@@ -33,13 +36,13 @@ const OPEN_ITEM_STATES = ORDER_ITEM_STATES.filter(
   (state) => isBillable(state) || state === 'PENDING_APPROVAL',
 );
 
-type SessionRow = TableSession & { table: DiningTable };
+export type SessionRow = TableSession & { table: DiningTable };
 
-type EventInput = {
+export type EventInput = {
   [T in DomainEvent['type']]: { type: T; payload: Extract<DomainEvent, { type: T }>['payload'] };
 }[DomainEvent['type']];
 
-function sessionNotFound(): AppError {
+export function sessionNotFound(): AppError {
   return new AppError(404, 'TABLE_SESSION_NOT_FOUND', 'There is no such open table.');
 }
 
@@ -54,6 +57,8 @@ export class TableSessionsService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly assignments: WaiterAssignmentsService,
+    private readonly settings: SettingsService,
+    private readonly licence: LicenceAgentService,
   ) {}
 
   /**
@@ -135,15 +140,24 @@ export class TableSessionsService {
     });
   }
 
-  open(
+  async open(
     principal: Principal,
     tableId: string,
     request: OpenTableRequest,
   ): Promise<TableSessionView> {
+    // LIC-005: a restricted licence opens no new tables; open ones are finished and billed.
+    await this.licence.assert('openNewTableSessions');
     return this.prisma.transaction(async (tx) => {
       const table = await this.lockTable(tx, principal.restaurantId, tableId);
       if (table === null) {
         throw new AppError(404, 'TABLE_NOT_FOUND', 'There is no such active table.');
+      }
+      if (table.state === 'NEEDS_CLEANING') {
+        throw new AppError(
+          409,
+          'TABLE_NEEDS_CLEANING',
+          `Table ${table.label} needs cleaning. Mark it clean first.`,
+        );
       }
       if (table.state !== 'FREE') {
         throw new AppError(409, 'TABLE_NOT_FREE', `Table ${table.label} is already in use.`);
@@ -208,7 +222,8 @@ export class TableSessionsService {
   ): Promise<TableSessionView> {
     return this.prisma.transaction(async (tx) => {
       const session = await this.lockSession(tx, principal.restaurantId, sessionId);
-      const to = this.next(session.table.state, 'CLOSE_WITHOUT_BILL');
+      this.next(session.table.state, 'CLOSE_WITHOUT_BILL');
+      const to = await this.stateAfterGuestsLeft(principal.restaurantId);
       const items = await tx.orderItem.count({
         where: { order: { tableSessionId: sessionId }, state: { in: [...OPEN_ITEM_STATES] } },
       });
@@ -271,17 +286,25 @@ export class TableSessionsService {
       if (target === null) {
         throw new AppError(404, 'TABLE_NOT_FOUND', 'There is no such active table.');
       }
+      if (target.state === 'NEEDS_CLEANING') {
+        throw new AppError(
+          409,
+          'TABLE_NEEDS_CLEANING',
+          `Table ${target.label} needs cleaning. Mark it clean first.`,
+        );
+      }
       if (target.state !== 'FREE') {
         throw new AppError(409, 'TABLE_NOT_FREE', `Table ${target.label} is already in use.`);
       }
 
       const state = session.table.state;
+      const left = await this.stateAfterGuestsLeft(principal.restaurantId);
       await tx.tableSession.update({ where: { id: sessionId }, data: { tableId: toTableId } });
       await tx.order.updateMany({
         where: { tableSessionId: sessionId },
         data: { tableId: toTableId },
       });
-      await tx.diningTable.update({ where: { id: session.tableId }, data: { state: 'FREE' } });
+      await tx.diningTable.update({ where: { id: session.tableId }, data: { state: left } });
       await tx.diningTable.update({ where: { id: toTableId }, data: { state } });
       const kots = await tx.kot.findMany({
         where: { order: { tableSessionId: sessionId } },
@@ -304,13 +327,72 @@ export class TableSessionsService {
             type: 'TableMoved',
             payload: { tableSessionId: sessionId, fromTableId: session.tableId, toTableId },
           },
-          { type: 'TableStateChanged', payload: { tableId: session.tableId, state: 'FREE' } },
+          { type: 'TableStateChanged', payload: { tableId: session.tableId, state: left } },
           { type: 'TableStateChanged', payload: { tableId: toTableId, state } },
         ],
         { stationIds: kots.map((kot) => kot.stationId) },
       );
       return this.view(tx, { ...session, tableId: toTableId, table: { ...target, state } });
     });
+  }
+
+  /** TBL-004: a table that needed cleaning is clean and free again. */
+  markClean(
+    principal: Principal,
+    tableId: string,
+  ): Promise<{ tableId: string; state: TableState }> {
+    return this.prisma.transaction(async (tx) => {
+      const table = await this.lockTable(tx, principal.restaurantId, tableId);
+      if (table === null) {
+        throw new AppError(404, 'TABLE_NOT_FOUND', 'There is no such active table.');
+      }
+      if (table.state !== 'NEEDS_CLEANING') {
+        throw new AppError(
+          409,
+          'TABLE_NOT_WAITING_FOR_CLEANING',
+          `Table ${table.label} does not need cleaning.`,
+        );
+      }
+      const to = this.next(table.state, 'CLEANED');
+      await tx.diningTable.update({ where: { id: tableId }, data: { state: to } });
+      await this.audit.record(tx, {
+        action: 'TABLE_CLEANED',
+        entityType: 'table',
+        entityId: tableId,
+        actorId: principal.staffId,
+        deviceId: principal.deviceId,
+        restaurantId: principal.restaurantId,
+        before: { state: table.state },
+        after: { state: to },
+        reason: null,
+      });
+      const businessDate = await currentBusinessDate(tx, principal.restaurantId);
+      await appendEvent(
+        tx,
+        {
+          eventId: newId(),
+          version: 1,
+          occurredAt: new Date().toISOString(),
+          restaurantId: principal.restaurantId,
+          businessDate,
+          type: 'TableStateChanged',
+          payload: { tableId, state: to },
+        },
+        { aggregate: { type: 'table', id: tableId } },
+      );
+      return { tableId, state: to };
+    });
+  }
+
+  /** Whether the person may print a table's bill, from the waiter app too (WTR-008). */
+  async mayPrintBill(principal: Principal): Promise<boolean> {
+    return mayPrintBill(principal, await this.settings.snapshot(principal.restaurantId));
+  }
+
+  /** The state of a table its guests have just left: free, or "Needs cleaning" (TBL-004). */
+  async stateAfterGuestsLeft(restaurantId: string): Promise<TableState> {
+    const settings = await this.settings.snapshot(restaurantId);
+    return tableAfterGuestsLeft(settings.get('tables.needsCleaning'));
   }
 
   assignWaiter(
@@ -369,9 +451,9 @@ export class TableSessionsService {
   ): Promise<void> {
     const person = await tx.staff.findFirst({
       where: { id: staffId, restaurantId, active: true, archivedAt: null },
-      select: { role: { select: ROLE_GRANTS_SELECT } },
+      select: { role: { select: { baseRole: true } } },
     });
-    if (person === null || grantOf(holderOf(person.role), 'ORDER_CREATE') === 'DENY') {
+    if (person === null || grantFor(person.role.baseRole, 'ORDER_CREATE') === 'DENY') {
       throw new AppError(
         422,
         'STAFF_NOT_ASSIGNABLE',
@@ -394,7 +476,7 @@ export class TableSessionsService {
   }
 
   /** An open session with its table row locked. */
-  private async lockSession(
+  async lockSession(
     tx: TransactionClient,
     restaurantId: string,
     sessionId: string,
@@ -422,7 +504,7 @@ export class TableSessionsService {
     return new Map(people.map((person) => [person.id, person.displayName]));
   }
 
-  private async view(tx: TransactionClient, session: SessionRow): Promise<TableSessionView> {
+  async view(tx: TransactionClient, session: SessionRow): Promise<TableSessionView> {
     const waiter =
       session.waiterId === null
         ? null
@@ -486,7 +568,7 @@ export class TableSessionsService {
     }
   }
 
-  private async emit(
+  async emit(
     tx: TransactionClient,
     restaurantId: string,
     businessDate: string,
@@ -514,7 +596,7 @@ export class TableSessionsService {
     }
   }
 
-  private async record(
+  async record(
     tx: TransactionClient,
     principal: Principal,
     action: string,

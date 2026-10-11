@@ -1,11 +1,18 @@
 import { createPublicKey, verify } from 'node:crypto';
-import { deviceTokenMessage, type LoginResponse, pairingProofMessage } from '@rp/contracts';
+import {
+  CLIENT_API_VERSION,
+  CLIENT_HEADER,
+  deviceTokenMessage,
+  type LoginResponse,
+  pairingProofMessage,
+} from '@rp/contracts';
 import { describe, expect, it, vi } from 'vitest';
 import {
   ApiClient,
   ApiContractError,
   ApiRequestError,
   ApiUnavailableError,
+  clientIdentityText,
   CORRELATION_HEADER,
   DeviceKeyUnavailableError,
   generateWebCryptoDeviceKey,
@@ -30,7 +37,7 @@ function login(accessToken: string, refreshToken: string, minutes = 15): LoginRe
     accessTokenExpiresAt: inMinutes(minutes),
     refreshToken,
     session: { id: SESSION_ID, expiresAt: inMinutes(600), inactivityTimeoutSeconds: 600 },
-    staff: { id: STAFF_ID, displayName: 'Asha', role: 'CASHIER', customRole: null },
+    staff: { id: STAFF_ID, displayName: 'Asha', role: 'CASHIER' },
     secondFactorValidUntil: null,
   };
 }
@@ -83,6 +90,7 @@ describe('[INT-002] typed REST calls checked against the contracts', () => {
       status: 'REVOKED',
       tableId: null,
       stationId: null,
+      stationIds: [],
       staffId: null,
       pairedAt: null,
       lastSeenAt: null,
@@ -238,6 +246,36 @@ describe('[AUTH-005] access tokens are refreshed, sessions end cleanly', () => {
     expect(saved.at(-1)?.session?.refreshToken).toBe('refresh-token-number-2');
   });
 
+  it('[MOBILE-E3] says on every call, the refresh too, how long the person has been idle', async () => {
+    let idle = 42.7;
+    const server = new FakeServer()
+      .on('POST', '/api/v1/auth/refresh', () => ({
+        status: 200,
+        body: login('access-2', 'refresh-token-number-2'),
+      }))
+      .on('GET', '/api/v1/devices', () => ({ status: 200, body: DEVICES }));
+    const client = new ApiClient({
+      baseUrl: BASE,
+      fetch: server.fetch,
+      credentials: signedIn(login('access-1', 'refresh-token-number-1', 0.2)),
+      idleSeconds: () => idle,
+    });
+    await client.api.listDevices();
+    expect(server.callsTo('POST', '/api/v1/auth/refresh')[0]?.headers['x-rp-idle-seconds']).toBe(
+      '42',
+    );
+    expect(server.callsTo('GET', '/api/v1/devices')[0]?.headers['x-rp-idle-seconds']).toBe('42');
+    idle = -3;
+    await client.api.listDevices();
+    expect(server.callsTo('GET', '/api/v1/devices')[1]?.headers['x-rp-idle-seconds']).toBe('0');
+
+    const silent = new ApiClient({ baseUrl: BASE, fetch: server.fetch, credentials: signedIn() });
+    await silent.api.listDevices();
+    expect(server.callsTo('GET', '/api/v1/devices')[2]?.headers).not.toHaveProperty(
+      'x-rp-idle-seconds',
+    );
+  });
+
   it('refreshes and retries once when the server says the token expired', async () => {
     const server = new FakeServer()
       .on(
@@ -390,6 +428,7 @@ describe('[AUTH-007] device pairing and device tokens', () => {
             name: 'Tandoor screen',
             tableId: null,
             stationId: null,
+            stationIds: [],
             staffId: null,
           },
         };
@@ -594,5 +633,112 @@ describe('[SEC-006] device keys need WebCrypto', () => {
     } finally {
       vi.unstubAllGlobals();
     }
+  });
+});
+
+describe('[UPD-006] the app says which build it is', () => {
+  const app = { kind: 'waiter-app', version: '1.4.2' };
+
+  it('sends its identity and client API with every request and the live connection', async () => {
+    const server = new FakeServer().on('GET', '/api/v1/auth/staff-tiles', () => ({
+      status: 200,
+      body: TILES,
+    }));
+    const client = new ApiClient({
+      baseUrl: BASE,
+      fetch: server.fetch,
+      credentials: PAIRED,
+      client: app,
+    });
+    await client.api.listStaffTiles();
+    const identity = `waiter-app/1.4.2 api/${CLIENT_API_VERSION}`;
+    expect(server.calls[0]?.headers[CLIENT_HEADER]).toBe(identity);
+    await expect(client.handshake()).resolves.toEqual({
+      deviceToken: 'device-1',
+      client: identity,
+    });
+    expect(clientIdentityText(app)).toBe(identity);
+  });
+
+  it('sends nothing it cannot carry, and nothing without being told', async () => {
+    expect(clientIdentityText({ kind: 'Waiter App', version: '1.0.0' })).toBeUndefined();
+    expect(clientIdentityText({ kind: 'waiter-app', version: '1.0 beta' })).toBeUndefined();
+    const server = new FakeServer().on('GET', '/api/v1/version', () => ({ status: 404 }));
+    await new ApiClient({ baseUrl: BASE, fetch: server.fetch }).api.getVersion().catch(() => null);
+    expect(server.calls[0]?.headers).not.toHaveProperty(CLIENT_HEADER);
+  });
+
+  it('tells the app when the server no longer serves it, over REST and the live connection', async () => {
+    const tooOld = vi.fn();
+    const server = new FakeServer().on('GET', '/api/v1/auth/staff-tiles', () => ({
+      status: 426,
+      body: { code: 'CLIENT_TOO_OLD', message: 'Update the app.' },
+    }));
+    const client = new ApiClient({
+      baseUrl: BASE,
+      fetch: server.fetch,
+      credentials: PAIRED,
+      client: app,
+      onClientTooOld: tooOld,
+    });
+    await expect(client.api.listStaffTiles()).rejects.toMatchObject({
+      status: 426,
+      code: 'CLIENT_TOO_OLD',
+    });
+    expect(tooOld).toHaveBeenCalledOnce();
+    // The socket stops instead of retrying.
+    await expect(client.recover('CLIENT_TOO_OLD')).resolves.toBe('stop');
+    expect(tooOld).toHaveBeenCalledTimes(2);
+    expect(tooOld.mock.calls[1]?.[0]).toMatchObject({ status: 426, code: 'CLIENT_TOO_OLD' });
+  });
+});
+
+describe('[WTR-001] a download another HTTP client makes (P7-04e2)', () => {
+  it('gives the address and this device’s credentials, without sending anything', async () => {
+    const server = new FakeServer();
+    const client = new ApiClient({
+      baseUrl: `${BASE}/`,
+      fetch: server.fetch,
+      credentials: PAIRED,
+      client: { kind: 'waiter-app', version: '1.4.2' },
+    });
+    const request = await client.authorizedRequest('downloadCurrentAppBuild');
+    expect(request.url).toBe(`${BASE}/api/v1/devices/current/app-build/apk`);
+    expect(request.method).toBe('GET');
+    expect(request.headers).toMatchObject({
+      'x-device-token': 'device-1',
+      [CLIENT_HEADER]: `waiter-app/1.4.2 api/${CLIENT_API_VERSION}`,
+    });
+    expect(request.headers[CORRELATION_HEADER]).toMatch(UUID);
+    expect(request.headers).not.toHaveProperty('authorization');
+    expect(server.calls).toHaveLength(0);
+  });
+
+  it('renews an expiring device token first, and adds the person for a session route', async () => {
+    const server = new FakeServer()
+      .on('POST', '/api/v1/devices/challenge', () => ({
+        status: 200,
+        body: { challenge: 'c'.repeat(43), expiresAt: inMinutes(5) },
+      }))
+      .on('POST', '/api/v1/devices/token', () => ({
+        status: 200,
+        body: { deviceToken: 'device-2', expiresAt: inMinutes(60) },
+      }));
+    const client = new ApiClient({
+      baseUrl: BASE,
+      fetch: server.fetch,
+      credentials: {
+        device: {
+          deviceId: DEVICE_ID,
+          deviceToken: 'device-1',
+          deviceTokenExpiresAt: inMinutes(0),
+        },
+        session: login('access-1', 'refresh-token-number-1'),
+      },
+      signer: { algorithm: 'Ed25519', sign: () => Promise.resolve('c2ln') },
+    });
+    const request = await client.authorizedRequest('getCurrentSession');
+    expect(request.headers['x-device-token']).toBe('device-2');
+    expect(request.headers.authorization).toBe('Bearer access-1');
   });
 });

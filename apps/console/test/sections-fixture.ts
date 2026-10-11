@@ -41,6 +41,7 @@ function table(id: string, label: string, sectionId: string, archived = false) {
     state: 'FREE' as const,
     displayOrder: 0,
     tabletDeviceIds: [],
+    layout: null,
     archivedAt: archived ? AT : null,
     updatedAt: AT,
   };
@@ -125,6 +126,8 @@ export function pager(overrides: Partial<PagerView> = {}): PagerView {
     rssi: -60,
     firmwareVersion: '1.0.3',
     lastSeenAt: AT,
+    signInFailures: 0,
+    lastSignInFailureAt: null,
     ...overrides,
   };
 }
@@ -141,7 +144,6 @@ export function credential(deviceId: string = PAGER_2): PagerCredentialResponse 
     // Not a real credential: plain and repetitive, so it never passes for one (SEC-002 scan).
     mqttPassword: 'pager-pass-pager-pass-pager-pass',
     alertsTopic: topic('alerts'),
-    locateTopic: topic('locate'),
     ackTopic: topic('ack'),
     heartbeatTopic: topic('heartbeat'),
     mqttPort: 8883,
@@ -149,10 +151,7 @@ export function credential(deviceId: string = PAGER_2): PagerCredentialResponse 
 }
 
 /** `RestaurantChanged` for a part, as the live connection delivers it. */
-export function changed(
-  sequence: number,
-  part: 'WAITER_ASSIGNMENTS' | 'DEVICES' | 'FLOOR' | 'STATIONS' | 'PRINTERS',
-) {
+export function changed(sequence: number, part: 'WAITER_ASSIGNMENTS' | 'DEVICES') {
   return {
     sequence,
     event: {

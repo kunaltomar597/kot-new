@@ -1,7 +1,7 @@
 import { ApiRequestError, ApiUnavailableError } from '@rp/api-client';
-import { InvalidServerAddressError } from '@rp/mobile-core';
+import { InvalidServerAddressError, OtaUpdater, type OtaUpdateSource } from '@rp/mobile-core';
 import { act, fireEvent, screen } from '@testing-library/react-native';
-import { Text } from 'react-native';
+import { AppState, Text } from 'react-native';
 import {
   ConnectionBanner,
   formatPairingCode,
@@ -9,13 +9,16 @@ import {
   messageOf,
   PairingScreen,
   Screen,
+  ShellProvider,
+  UpdateRequiredScreen,
   useLive,
   useMenu,
+  useAppUpdateWhenFree,
   useNow,
   useUnsentOrders,
 } from '../src/index.js';
 import { ADDRESS, fakeServer, newSession, renderShell, translator } from './harness.js';
-import { itemReadyFrame, STAFF } from '@rp/mobile-core/testing';
+import { fakeLocalServer, itemReadyFrame, STAFF } from '@rp/mobile-core/testing';
 import { IDS, MENU } from '@rp/ordering/testing';
 
 async function pressDigits(pin: string) {
@@ -61,6 +64,109 @@ describe('[AUTH-007] pairing screen', () => {
     await fireEvent.changeText(screen.getByLabelText('Server address'), ADDRESS);
     await fireEvent.press(screen.getByTestId('pairing-submit'));
     expect(await screen.findByText('That code has expired. Ask for a new one.')).toBeOnTheScreen();
+  });
+});
+
+describe('[UPD-006] an app the server no longer serves', () => {
+  const tooOld = () => ({
+    status: 426,
+    body: { code: 'CLIENT_TOO_OLD', message: 'Update the app.' },
+  });
+
+  it('asks staff to have the app updated', async () => {
+    const { session } = newSession(fakeServer().on('GET', '/api/v1/auth/staff-tiles', tooOld));
+    await session.start();
+    await session.pair(ADDRESS, 'ABCD-EFGH');
+    await session.staffTiles().catch(() => undefined);
+    expect(session.getSnapshot().clientTooOld).toBe(true);
+    await renderShell(session, <UpdateRequiredScreen />);
+    expect(screen.getByRole('header')).toHaveTextContent(translator('mobile.update.title'));
+    expect(screen.getByTestId('update-required')).toHaveTextContent(
+      translator('mobile.update.staff'),
+    );
+  });
+
+  it('asks a table’s guests to call a waiter', async () => {
+    const server = fakeLocalServer({ type: 'TABLE_TABLET', name: 'Table 4 tablet' });
+    const { session } = newSession(server.on('GET', '/api/v1/auth/staff-tiles', tooOld));
+    await session.start();
+    await session.pair(ADDRESS, 'ABCD-EFGH');
+    await session.staffTiles().catch(() => undefined);
+    await renderShell(session, <UpdateRequiredScreen />);
+    expect(screen.getByTestId('update-required')).toHaveTextContent(
+      translator('mobile.update.guests'),
+    );
+  });
+});
+
+describe('[UPD-001] over-the-air updates on the screens', () => {
+  /** EAS Update with the vendor's rollback on offer: nothing to ask the server. */
+  function rollbackSource() {
+    const reload = jest.fn(() => Promise.resolve());
+    const source: OtaUpdateSource = {
+      enabled: true,
+      emergencyLaunchReason: null,
+      check: () => Promise.resolve({ kind: 'rollback' }),
+      fetch: () => Promise.resolve({ kind: 'rollback' }),
+      reload,
+    };
+    return { source, reload };
+  }
+
+  it('tells staff a refused app fixes itself when an update is on its way', async () => {
+    const { session } = newSession(
+      fakeServer().on('GET', '/api/v1/auth/staff-tiles', () => ({
+        status: 426,
+        body: { code: 'CLIENT_TOO_OLD', message: 'Update the app.' },
+      })),
+    );
+    await session.start();
+    await session.pair(ADDRESS, 'ABCD-EFGH');
+    await session.staffTiles().catch(() => undefined);
+    const { source, reload } = rollbackSource();
+    const updater = new OtaUpdater({ session, source });
+    await renderShell(session, <UpdateRequiredScreen />, updater);
+    expect(screen.getByTestId('update-required')).toHaveTextContent(
+      translator('mobile.update.staff'),
+    );
+    await act(() => updater.check());
+    // Refused as it is, the app restarts at once on the update.
+    expect(reload).toHaveBeenCalledTimes(1);
+    expect(screen.getByTestId('update-required')).toHaveTextContent(
+      translator('mobile.update.onItsWay'),
+    );
+  });
+
+  it('restarts on a downloaded update only while the device is free', async () => {
+    const { session } = newSession();
+    await session.start();
+    await session.pair(ADDRESS, 'ABCD-EFGH');
+    const { source, reload } = rollbackSource();
+    const updater = new OtaUpdater({ session, source });
+    await updater.check();
+    expect(updater.getSnapshot().status).toBe('ready');
+    function Probe({ inUse }: { inUse: boolean }) {
+      useAppUpdateWhenFree(inUse);
+      return <Text>{inUse ? 'in use' : 'free'}</Text>;
+    }
+    // React Native's test double has no state of its own: the app is on screen, then not.
+    Object.assign(AppState, { currentState: 'active' });
+    const listen = jest.spyOn(AppState, 'addEventListener');
+    const view = await renderShell(session, <Probe inUse />, updater);
+    expect(reload).not.toHaveBeenCalled();
+    const onChange = listen.mock.calls.at(-1)?.[1];
+    await act(() => onChange?.('background'));
+    const free = (
+      <ShellProvider session={session} translator={translator} updater={updater}>
+        <Probe inUse={false} />
+      </ShellProvider>
+    );
+    await view.rerender(free);
+    expect(reload).not.toHaveBeenCalled();
+    await act(() => onChange?.('active'));
+    expect(reload).toHaveBeenCalledTimes(1);
+    listen.mockRestore();
+    Object.assign(AppState, { currentState: undefined });
   });
 });
 
@@ -244,6 +350,17 @@ describe('[MENU-013] [WTR-012] the menu and unsent orders on the device', () => 
     );
     expect(screen.getByRole('header', { name: 'Table T2' })).toBeOnTheScreen();
     expect(screen.getByText('Send KOT')).toBeOnTheScreen();
+  });
+});
+
+describe('[AUTH-005] [MOBILE-E3] the person’s own use of the app', () => {
+  it('counts a touch anywhere in the app, and nothing else, as the person being there', async () => {
+    const { session } = newSession();
+    const touched = jest.spyOn(session, 'touched');
+    await renderShell(session, <Text>Table 5</Text>);
+    expect(touched).not.toHaveBeenCalled();
+    await fireEvent(screen.getByText('Table 5'), 'touchStart');
+    expect(touched).toHaveBeenCalledTimes(1);
   });
 });
 

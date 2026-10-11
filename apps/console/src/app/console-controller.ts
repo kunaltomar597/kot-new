@@ -11,14 +11,7 @@ import {
   type TypedApi,
   webCryptoDeviceKey,
 } from '@rp/api-client';
-import {
-  type DeviceSummary,
-  type DomainEvent,
-  type LoginResponse,
-  photoUrl,
-  type PhotoWidth,
-  type StaffTile,
-} from '@rp/contracts';
+import type { DeviceSummary, DomainEvent, LoginResponse, StaffTile } from '@rp/contracts';
 import type { ConsoleStorage } from './storage.js';
 
 /** A message for the next screen, e.g. why the person is back on the login screen. */
@@ -33,6 +26,11 @@ export interface ConsoleSnapshot {
   /** For the connection banner. */
   readonly connection: ConnectionStatus;
   readonly notice: Notice | undefined;
+  /**
+   * The server was updated past this console (UPD-006, 426 `CLIENT_TOO_OLD`): the page must be
+   * loaded again to get the server's own console.
+   */
+  readonly clientTooOld: boolean;
 }
 
 export interface ConsoleControllerOptions {
@@ -45,6 +43,8 @@ export interface ConsoleControllerOptions {
   readonly generateKey?: () => Promise<{ keyPair: CryptoKeyPair; key: DeviceKey }>;
   readonly keyFromPair?: (keyPair: CryptoKeyPair) => Promise<DeviceKey>;
   readonly appVersion?: string;
+  /** The server no longer serves this console: reload the page (UPD-006). */
+  readonly onClientTooOld?: () => void;
   /** Where background failures (saving to storage) are reported. */
   readonly onError?: (error: unknown) => void;
 }
@@ -56,6 +56,7 @@ const INITIAL: ConsoleSnapshot = {
   session: undefined,
   connection: 'stopped',
   notice: undefined,
+  clientTooOld: false,
 };
 
 /**
@@ -69,8 +70,6 @@ export class ConsoleController {
   private readonly listeners = new Set<() => void>();
   private readonly eventListeners = new Set<(event: DomainEvent) => void>();
   private client: ApiClient;
-  /** The device key of the paired client, to store its record again when the device changes. */
-  private keyPair: CryptoKeyPair | undefined;
   private connection: RealtimeConnection | undefined;
 
   constructor(private readonly options: ConsoleControllerOptions) {
@@ -85,11 +84,6 @@ export class ConsoleController {
   };
 
   readonly getSnapshot = (): ConsoleSnapshot => this.snapshot;
-
-  /** Where an `<img>` loads one rendition of a photo from the local server (MENU-008). */
-  photoSrc(id: string, width: PhotoWidth): string {
-    return `${this.options.baseUrl}${photoUrl(id, width)}`;
-  }
 
   /** The typed REST API with this device's and person's credentials, for the screens. */
   get api(): TypedApi {
@@ -109,7 +103,6 @@ export class ConsoleController {
       await this.keyFromPair(record.keyPair),
       record.keyPair,
     );
-    this.keyPair = record.keyPair;
     let device = record.summary;
     let person = session?.staff;
     let current = session?.session;
@@ -149,7 +142,6 @@ export class ConsoleController {
     this.options.storage.saveSession(undefined);
     this.options.storage.saveResume(undefined);
     this.client = client;
-    this.keyPair = keyPair;
     this.update({
       phase: 'paired',
       device: summary,
@@ -213,6 +205,10 @@ export class ConsoleController {
   ): ApiClient {
     return new ApiClient({
       baseUrl: this.options.baseUrl,
+      client: { kind: 'console', version: this.options.appVersion ?? '0.0.0' },
+      onClientTooOld: () => {
+        this.clientTooOld();
+      },
       ...(this.options.fetch !== undefined && { fetch: this.options.fetch }),
       ...(credentials !== undefined && { credentials }),
       ...(key !== undefined && { signer: key }),
@@ -226,6 +222,13 @@ export class ConsoleController {
         void this.forget();
       },
     });
+  }
+
+  private clientTooOld(): void {
+    if (this.snapshot.clientTooOld) return;
+    this.stop();
+    this.update({ clientTooOld: true, connection: 'stopped' });
+    this.options.onClientTooOld?.();
   }
 
   private persist(credentials: StoredCredentials, keyPair: CryptoKeyPair | undefined): void {
@@ -250,7 +253,6 @@ export class ConsoleController {
   private async forget(): Promise<void> {
     this.stop();
     this.client = this.createClient(undefined, undefined, undefined);
-    this.keyPair = undefined;
     this.options.storage.saveSession(undefined);
     this.options.storage.saveResume(undefined);
     this.update({
@@ -271,9 +273,6 @@ export class ConsoleController {
       ...(resume !== undefined && { resume }),
       ...(this.options.connect !== undefined && { connect: this.options.connect }),
       onEvent: (event) => {
-        if (event.type === 'RestaurantChanged' && event.payload.part === 'DEVICES') {
-          void this.refreshDevice();
-        }
         for (const listener of this.eventListeners) listener(event);
       },
       onStatus: (status) => {
@@ -287,29 +286,6 @@ export class ConsoleController {
     connection.start();
   }
 
-  /**
-   * Reads this device again after a manager changed the restaurant's devices (P4-02c), so a
-   * renamed console shows its new name at once. Unpairing is handled by `onDeviceRevoked`.
-   */
-  private async refreshDevice(): Promise<void> {
-    const current = this.snapshot.device;
-    if (this.snapshot.phase !== 'paired' || current === undefined) return;
-    let device: DeviceSummary;
-    try {
-      device = await this.client.api.getCurrentDevice();
-    } catch {
-      return; // Offline: the banner says so, and the next change reads it again.
-    }
-    const latest = this.snapshot.device;
-    if (latest?.id !== device.id || sameDevice(latest, device)) return;
-    this.update({ device });
-    const credentials = this.client.device;
-    if (this.keyPair === undefined || credentials === undefined) return;
-    this.options.storage
-      .saveDevice({ keyPair: this.keyPair, device: credentials, summary: device })
-      .catch((error: unknown) => this.options.onError?.(error));
-  }
-
   private async keyFromPair(keyPair: CryptoKeyPair): Promise<DeviceKey> {
     return (this.options.keyFromPair ?? webCryptoDeviceKey)(keyPair);
   }
@@ -318,16 +294,4 @@ export class ConsoleController {
     this.snapshot = { ...this.snapshot, ...changes };
     for (const listener of this.listeners) listener();
   }
-}
-
-/** What the console shows of its own device: its name and binding (not when it was last seen). */
-function sameDevice(a: DeviceSummary, b: DeviceSummary): boolean {
-  return (
-    a.name === b.name &&
-    a.type === b.type &&
-    a.status === b.status &&
-    a.tableId === b.tableId &&
-    a.stationId === b.stationId &&
-    a.staffId === b.staffId
-  );
 }

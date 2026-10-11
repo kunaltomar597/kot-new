@@ -13,6 +13,7 @@ import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { AuthSettingsService } from '../../src/auth/auth-settings.js';
 import { PrismaService } from '../../src/database/prisma.service.js';
+import { KdsEscalationService } from '../../src/kitchen/kds-escalation.service.js';
 import { SettingsService } from '../../src/settings/settings.service.js';
 import {
   addDevice,
@@ -84,6 +85,11 @@ beforeAll(async () => {
   ids.kitchenScreen = await addDevice(app, kit, 'KDS', { stationId: id('Kitchen') });
   ids.barScreen = await addDevice(app, kit, 'KDS', { stationId: id('Bar') });
   ids.allScreen = await addDevice(app, kit, 'KDS');
+  // KDS-002: one screen for the kitchen and the bar together.
+  ids.bothScreen = await addDevice(app, kit, 'KDS', {
+    stationId: id('Kitchen'),
+    extraStationIds: [id('Bar')],
+  });
 
   ids.session = TableSessionView.parse(
     (
@@ -184,6 +190,53 @@ describe('[KDS-001] [KDS-002] [KDS-003] a station screen in station mode', () =>
     expect(other.status).toBe(403);
   });
 
+  it('[KDS-002] shows every station a screen is given, and lets it narrow to one', async () => {
+    const both = await tickets(screen('bothScreen'));
+    expect(both.station).toBeNull();
+    expect(both.stations).toEqual([
+      { id: id('Kitchen'), name: 'Kitchen' },
+      { id: id('Bar'), name: 'Bar' },
+    ]);
+    expect(both.tickets.map((ticket) => ticket.stationName).sort()).toEqual(['Bar', 'Kitchen']);
+    const bar = await tickets(screen('bothScreen'), { stationId: id('Bar') });
+    expect(bar.stations).toEqual([{ id: id('Bar'), name: 'Bar' }]);
+    expect(bar.tickets.map((ticket) => ticket.stationName)).toEqual(['Bar']);
+    const elsewhere = await server()
+      .get('/api/v1/kds/tickets')
+      .query({ stationId: randomUUID() })
+      .set(screen('bothScreen'));
+    expect(elsewhere.status).toBe(403);
+    expect((await tickets(screen('allScreen'))).stations).toEqual([]);
+  });
+
+  it('[KDS-002] lets a manager change a screen’s stations, audited', async () => {
+    const change = (stationIds: string[], deviceId = id('barScreen')) =>
+      server().put(`/api/v1/devices/${deviceId}/stations`).set(as(manager)).send({ stationIds });
+    const changed = await change([id('Bar'), id('Kitchen')]);
+    expect(changed.status, JSON.stringify(changed.body)).toBe(200);
+    expect((changed.body as { stationIds: string[] }).stationIds).toEqual([
+      id('Bar'),
+      id('Kitchen'),
+    ]);
+    expect((await tickets(screen('barScreen'))).tickets).toHaveLength(2);
+    const audit = await prisma.auditLog.findFirstOrThrow({
+      where: { action: 'DEVICE_STATIONS_CHANGED', entityId: id('barScreen') },
+    });
+    expect(audit.after).toEqual({ stationIds: [id('Bar'), id('Kitchen')] });
+    // Only kitchen screens, only this restaurant's stations, only for those who pair devices.
+    expect((await change([id('Bar')], kit.deviceId)).status).toBe(409);
+    expect((await change([randomUUID()])).status).toBe(422);
+    expect(
+      (
+        await server()
+          .put(`/api/v1/devices/${id('barScreen')}/stations`)
+          .set(as(waiter))
+          .send({ stationIds: [] })
+      ).status,
+    ).toBe(403);
+    expect((await change([id('Bar')])).status).toBe(200);
+  });
+
   it('lets people granted the kitchen steps choose a station, and keeps others out', async () => {
     expect((await tickets(as(manager), { stationId: id('Bar') })).tickets).toHaveLength(1);
     expect((await tickets(as(manager))).tickets).toHaveLength(2);
@@ -266,6 +319,30 @@ describe('[KDS-005] [KDS-006] [KDS-007] kitchen steps, bump, recall and notify m
     expect((await kitchenTicket()).managerNotified).toBe(true);
   });
 
+  it('[KDS-006] alerts the managers by itself when the restaurant wants it, once per ticket', async () => {
+    const escalation = app.get(KdsEscalationService);
+    const bar = (await tickets(screen('barScreen'))).tickets[0];
+    const lassi = bar?.lines[0]?.orderItemId ?? '';
+    expect((await step(lassi, 'MARK_READY', screen('barScreen'))).status).toBe(200);
+    const later = new Date(Date.now() + 4 * 60_000);
+    // Off by default: the kitchen presses "Notify manager".
+    expect(await escalation.sweep(later)).toBe(0);
+    await prisma.setting.create({
+      data: { restaurantId: kit.restaurantId, key: 'kds.autoEscalateNotCollected', value: true },
+    });
+    app.get(SettingsService).invalidate();
+    // Not yet three minutes.
+    expect(await escalation.sweep(new Date())).toBe(0);
+    // The kitchen's ticket was escalated by hand already; the bar's is now.
+    expect(await escalation.sweep(later)).toBe(1);
+    const alert = await prisma.alert.findFirstOrThrow({
+      where: { type: 'READY_NOT_COLLECTED', kotId: bar?.kotId },
+    });
+    expect(alert).toMatchObject({ status: 'OPEN', raisedById: null, raisedByDeviceId: null });
+    expect(alert.payload).toMatchObject({ items: ['Lassi'], automatic: true });
+    expect(await escalation.sweep(new Date(Date.now() + 10 * 60_000))).toBe(0);
+  });
+
   it('bumps a ready ticket off the screen and recalls it', async () => {
     const ticket = await kitchenTicket();
     const bumped = await server()
@@ -296,7 +373,10 @@ describe('[KDS-005] [KDS-006] [KDS-007] kitchen steps, bump, recall and notify m
     expect((await tickets(screen('kitchenScreen'))).tickets.map((entry) => entry.kotId)).toEqual([
       ticket.kotId,
     ]);
-    const bumps = await prisma.outboxEvent.findMany({ where: { eventType: 'KotBumped' } });
+    const bumps = await prisma.outboxEvent.findMany({
+      where: { eventType: 'KotBumped' },
+      orderBy: { writeOrder: 'asc' },
+    });
     expect(
       bumps.map((event) => (event.payload as { payload: { bumped: boolean } }).payload.bumped),
     ).toEqual([true, false]);
@@ -320,6 +400,28 @@ describe('[TBL-005] [KDS-003] moved tables', () => {
     expect(moved.status, JSON.stringify(moved.body)).toBe(200);
     const [ticket] = (await tickets(screen('barScreen'))).tickets;
     expect(ticket).toMatchObject({ tableLabel: 'T2', movedFrom: 'T1' });
+  });
+});
+
+describe('[KDS-001] [NFR-P01] a kitchen that never bumps its tickets', () => {
+  it('shows only what is still at the station, however many old tickets were left', async () => {
+    // Found by the load run (P8-01a): a station whose tickets were served from the pass and
+    // never bumped. Read from every unbumped ticket, a year of them broke the query.
+    const base = { restaurantId: kit.restaurantId };
+    const grill = await prisma.station.create({ data: { ...base, name: 'Grill', mode: 'SCREEN' } });
+    const grillScreen = await addDevice(app, kit, 'KDS', { stationId: grill.id });
+    await prisma.$executeRaw`
+      INSERT INTO kots (id, restaurant_id, business_date, kot_number, order_id, station_id)
+      SELECT gen_random_uuid(), ${kit.restaurantId}::uuid, DATE '2025-01-01' + n / 1000,
+             100000 + n, ${id('order')}::uuid, ${grill.id}::uuid
+      FROM generate_series(1, 40000) AS n`;
+    const started = performance.now();
+    const shown = await tickets(authHeaders(grillScreen));
+    expect(performance.now() - started).toBeLessThan(1_000);
+    expect(shown.tickets).toEqual([]);
+    expect(
+      (await tickets(screen('allScreen'))).tickets.every((t) => t.stationName !== 'Grill'),
+    ).toBe(true);
   });
 });
 

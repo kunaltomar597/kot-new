@@ -1,0 +1,29 @@
+{
+  "input": {
+    "type": "object",
+    "properties": {
+      "key": { "type": "string" },
+      "description": { "type": "string" },
+      "defaultValue": {},
+      "kind": { "type": "string", "enum": ["BOOLEAN", "INTEGER"] },
+      "min": { "type": ["number", "null"] },
+      "max": { "type": ["number", "null"] },
+      "unit": { "type": ["string", "null"] }
+    },
+    "required": ["key", "description", "defaultValue", "kind", "min", "max", "unit"]
+  },
+  "output": {
+    "type": "object",
+    "properties": {
+      "key": { "type": "string" },
+      "description": { "type": "string" },
+      "defaultValue": {},
+      "kind": { "type": "string", "enum": ["BOOLEAN", "INTEGER"] },
+      "min": { "type": ["number", "null"] },
+      "max": { "type": ["number", "null"] },
+      "unit": { "type": ["string", "null"] }
+    },
+    "required": ["key", "description", "defaultValue", "kind", "min", "max", "unit"],
+    "additionalProperties": false
+  }
+}

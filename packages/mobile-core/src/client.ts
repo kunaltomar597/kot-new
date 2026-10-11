@@ -1,4 +1,10 @@
-import { ApiClient, type DeviceSigner, type StoredCredentials } from '@rp/api-client';
+import {
+  ApiClient,
+  type ApiRequestError,
+  type ClientApp,
+  type DeviceSigner,
+  type StoredCredentials,
+} from '@rp/api-client';
 import { type KeyValueStore, readJson } from './storage.js';
 
 export const CREDENTIALS_KEY = 'rp.credentials.v1';
@@ -23,6 +29,12 @@ export async function createMobileClient(options: {
   signer?: DeviceSigner;
   onSessionEnded?: (code: string) => void;
   onDeviceRevoked?: () => void;
+  /** The app and its version, sent with every request (UPD-006). */
+  client?: ClientApp;
+  /** The server no longer serves this build (426 `CLIENT_TOO_OLD`). */
+  onClientTooOld?: (error: ApiRequestError) => void;
+  /** Seconds since the person last touched the app (MOBILE-E3), sent with every call. */
+  idleSeconds?: () => number;
   fetch?: typeof fetch;
 }): Promise<ApiClient> {
   const credentials = (await loadCredentials(options.secureStore)) ?? {};
@@ -33,6 +45,9 @@ export async function createMobileClient(options: {
     ...(options.signer !== undefined && { signer: options.signer }),
     ...(options.fetch !== undefined && { fetch: options.fetch }),
     ...(options.onSessionEnded !== undefined && { onSessionEnded: options.onSessionEnded }),
+    ...(options.client !== undefined && { client: options.client }),
+    ...(options.onClientTooOld !== undefined && { onClientTooOld: options.onClientTooOld }),
+    ...(options.idleSeconds !== undefined && { idleSeconds: options.idleSeconds }),
     onDeviceRevoked: () => {
       writing = writing.then(() => options.secureStore.removeItem(CREDENTIALS_KEY));
       options.onDeviceRevoked?.();

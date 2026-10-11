@@ -29,6 +29,12 @@ RP_TLS=on                      # serve HTTPS/WSS on PORT (TLS 1.2 or newer)
 RP_TLS_HOSTNAMES=pos.local     # optional extra names, comma-separated; restart to apply
 ```
 
+The CA is name-constrained: it signs only for private IPv4 addresses (10/8, 172.16/12, 192.168/16,
+169.254/16, loopback) and for `localhost`, `.local`, `.lan`, `.home.arpa` and the PC's own names. A
+host name outside those that is added to `RP_TLS_HOSTNAMES` after the first start is not put in the
+certificate (set it before the first start). A CA made before this was added has no constraints and
+is kept, so devices do not need pairing again.
+
 ## The fingerprint: how people know it is the right CA
 
 The fingerprint is a SHA-256 checksum of the CA, 32 pairs of characters like `3A:7F:…:C2`. Before a

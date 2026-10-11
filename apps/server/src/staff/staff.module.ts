@@ -6,10 +6,7 @@ import { RolesService } from './roles.service.js';
 import { StaffController } from './staff.controller.js';
 import { StaffService } from './staff.service.js';
 
-/**
- * Staff administration: people, roles, PINs, deactivation (P4-02a, MGR-004) and custom roles
- * (P4-02e, AUTH-012).
- */
+/** Staff administration: people, roles, PINs, deactivation (P4-02a, MGR-004), custom roles (P4-02e). */
 @Module({
   imports: [AuthModule, PagersModule],
   controllers: [StaffController, RolesController],

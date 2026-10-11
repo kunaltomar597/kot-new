@@ -1,9 +1,8 @@
-import { overrideProblems } from '@rp/domain';
+import { ITEM_PREFERENCES } from '@rp/domain';
 import { z } from 'zod';
 import { NotificationEventType, NUDGE_MESSAGE_MAX } from './alerts.js';
 import { Capability } from './auth.js';
-import { Timestamp } from './common.js';
-import { VibrationPattern } from './pagers.js';
+import { Id, Timestamp } from './common.js';
 
 /**
  * The settings catalogue (P1-01a, MGR-007, UPD-010): every configurable value the BRD marks with
@@ -18,6 +17,9 @@ import { VibrationPattern } from './pagers.js';
  * thresholds (the Control Plane, P7-03) and the whole-financial-year archive period (fixed by
  * law, DATA-008).
  */
+
+/** The most dishes `reco.itemPreferences` may name (REC-009). */
+export const ITEM_PREFERENCES_MAX = 500;
 
 /** RESTAURANT: changed on the dashboard (MGR-007). VENDOR: set by the vendor through the Control Plane and read-only here (UPD-010). */
 export const SETTING_SCOPES = ['RESTAURANT', 'VENDOR'] as const;
@@ -65,64 +67,51 @@ function setting<Schema extends z.ZodType, const Key extends string>(
 
 const int = (min: number, max: number) => z.int().min(min).max(max);
 
-/**
- * NTF-002: a manager's changes to the Appendix C rules, with each event's pager vibration
- * (PGR-006); anything left out keeps the default. A change that cannot work for its event (someone
- * it cannot reach, nothing to show it on, a pager with no text, an Appendix C row that is not an
- * alert to shape) is refused (`ruleProblems` in `@rp/domain`).
- */
-const NotificationRuleOverrides = z
-  .partialRecord(
-    NotificationEventType,
-    z.strictObject({
-      recipients: z
-        .array(
-          z.enum([
-            'RESPONSIBLE_WAITER',
-            'SECTION_WAITERS',
-            'ALL_WAITERS',
-            'MANAGERS_ON_DUTY',
-            'CASHIER',
-            'STATION',
-            'OWNER',
-            'WEARER',
-            'SELECTED',
-          ]),
-        )
-        .min(1)
-        .optional(),
-      channels: z
-        .array(
-          z.enum([
-            'PAGER',
-            'WAITER_APP',
-            'POS',
-            'DASHBOARD',
-            'KDS',
-            'TABLET',
-            'PRINTED_SLIP',
-            'CONTROL_PLANE',
-          ]),
-        )
-        .min(1)
-        .optional(),
-      pagerText: z.string().trim().min(1).max(20).nullable().optional(),
-      vibration: VibrationPattern.optional(),
-      escalate: z.boolean().optional(),
-      repeat: z
-        .enum(['UNTIL_ACKED', 'NONE', 'ONCE_PER_STATE', 'UNTIL_RESOLVED', 'DAILY'])
-        .optional(),
-    }),
-  )
-  .superRefine((overrides, context) => {
-    for (const { event, problem } of overrideProblems(overrides)) {
-      context.addIssue({ code: 'custom', path: [event], message: problem });
-    }
-  });
+/** NTF-002: a manager's changes to the Appendix C rules; anything left out keeps the default. */
+const NotificationRuleOverrides = z.partialRecord(
+  NotificationEventType,
+  z.strictObject({
+    recipients: z
+      .array(
+        z.enum([
+          'RESPONSIBLE_WAITER',
+          'SECTION_WAITERS',
+          'ALL_WAITERS',
+          'MANAGERS_ON_DUTY',
+          'CASHIER',
+          'STATION',
+          'OWNER',
+          'WEARER',
+          'SELECTED',
+        ]),
+      )
+      .min(1)
+      .optional(),
+    channels: z
+      .array(
+        z.enum([
+          'PAGER',
+          'WAITER_APP',
+          'POS',
+          'DASHBOARD',
+          'KDS',
+          'TABLET',
+          'PRINTED_SLIP',
+          'CONTROL_PLANE',
+        ]),
+      )
+      .min(1)
+      .optional(),
+    pagerText: z.string().trim().min(1).max(20).nullable().optional(),
+    escalate: z.boolean().optional(),
+    repeat: z.enum(['UNTIL_ACKED', 'NONE', 'ONCE_PER_STATE', 'UNTIL_RESOLVED', 'DAILY']).optional(),
+  }),
+);
 /** `HH:MM`, 24-hour clock. */
 export const TimeOfDay = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/);
 /** A daily window; `end` before `start` means it runs past midnight. */
 export const TimeWindow = z.strictObject({ start: TimeOfDay, end: TimeOfDay });
+const PAGER_PATTERNS = ['ONE_LONG', 'TWO_SHORT', 'THREE_SHORT', 'LONG_SHORT'] as const;
 
 export const SETTINGS = [
   // Authentication and devices (§4, AUTH, SEC-009)
@@ -172,6 +161,36 @@ export const SETTINGS = [
     capability: 'STAFF_MANAGE',
     description: 'Login and override attempts allowed per device per minute.',
     requirements: ['AUTH-003', 'SEC-009'],
+  }),
+  setting({
+    key: 'auth.deviceLockoutMaxFailures',
+    schema: int(3, 100),
+    defaultValue: 10,
+    scope: 'RESTAURANT',
+    capability: 'STAFF_MANAGE',
+    description:
+      'Wrong PINs or passwords on one device, for anyone, within the window that stop it taking any for the lockout time (our default).',
+    requirements: ['AUTH-003', 'SEC-009'],
+  }),
+  setting({
+    key: 'auth.tabletLockoutMaxFailures',
+    schema: int(3, 50),
+    defaultValue: 5,
+    scope: 'RESTAURANT',
+    capability: 'STAFF_MANAGE',
+    description:
+      'Wrong PINs on a table tablet within the window that stop it taking any for the lockout time; they never lock the person (our default).',
+    requirements: ['AUTH-003', 'TAB-001'],
+  }),
+  setting({
+    key: 'auth.refuseEasyPins',
+    schema: z.boolean(),
+    defaultValue: true,
+    scope: 'RESTAURANT',
+    capability: 'STAFF_MANAGE',
+    description:
+      'Refuse PINs that are guessed first, such as 1234, 1111, 1212 or a year, when a PIN is set (our default).',
+    requirements: ['AUTH-001', 'AUTH-002'],
   }),
   setting({
     key: 'auth.accessTokenMinutes',
@@ -284,14 +303,14 @@ export const SETTINGS = [
     unit: 'percent',
   }),
   setting({
-    key: 'devices.offlineAfterSeconds',
-    schema: int(10, 3_600),
-    defaultValue: 60,
+    key: 'devices.offlineAlertSeconds',
+    schema: int(0, 3_600),
+    defaultValue: 120,
     scope: 'RESTAURANT',
     capability: 'OPERATIONS_CONFIGURE',
     description:
-      'A table tablet or kitchen screen without a live connection this long raises an offline alert; a quick reload raises none.',
-    requirements: ['NTF-003', 'MGR-006'],
+      'A table tablet or kitchen screen not connected for this long alerts the managers (0: never; our default).',
+    requirements: ['TAB-015', 'NTF-003'],
     unit: 'seconds',
   }),
 
@@ -305,6 +324,25 @@ export const SETTINGS = [
     description: 'Longest special instruction a guest or waiter may write on an item.',
     requirements: ['ORD-015'],
     unit: 'characters',
+  }),
+  setting({
+    key: 'orders.holdAndFire',
+    schema: z.boolean(),
+    defaultValue: true,
+    scope: 'RESTAURANT',
+    capability: 'OPERATIONS_CONFIGURE',
+    description: 'Waiters may hold items (mains, say) and fire them to the kitchen later.',
+    requirements: ['ORD-016'],
+  }),
+  setting({
+    key: 'tables.needsCleaning',
+    schema: z.boolean(),
+    defaultValue: false,
+    scope: 'RESTAURANT',
+    capability: 'OPERATIONS_CONFIGURE',
+    description:
+      'A table the guests have left shows "Needs cleaning" until someone marks it clean.',
+    requirements: ['TBL-004'],
   }),
   setting({
     key: 'billing.priceMode',
@@ -377,6 +415,35 @@ export const SETTINGS = [
     requirements: ['ONB-004', 'BILL-002'],
   }),
   setting({
+    key: 'bills.amountInWords',
+    schema: z.boolean(),
+    defaultValue: true,
+    scope: 'RESTAURANT',
+    capability: 'TAX_AND_INVOICE_SETTINGS',
+    description: 'Bills also write the total in words ("Rupees Six Hundred Seventy-Two Only").',
+    requirements: ['BILL-001'],
+  }),
+  setting({
+    key: 'bills.waiterMayPrint',
+    schema: z.boolean(),
+    defaultValue: false,
+    scope: 'RESTAURANT',
+    capability: 'STAFF_MANAGE',
+    description:
+      'Waiters may print the bill of their own tables from the app (the BRD default: they only ask for it).',
+    requirements: ['WTR-008'],
+  }),
+  setting({
+    key: 'printers.discoveryPorts',
+    schema: z.array(z.int().min(1).max(65_535)).min(1).max(4),
+    defaultValue: [9100],
+    scope: 'RESTAURANT',
+    capability: 'OPERATIONS_CONFIGURE',
+    description:
+      'Ports a network receipt printer answers on, looked for when finding printers (9100 for most).',
+    requirements: ['ONB-004'],
+  }),
+  setting({
     key: 'bills.printerId',
     schema: z.uuid().nullable(),
     defaultValue: null,
@@ -387,6 +454,16 @@ export const SETTINGS = [
     requirements: ['BILL-014'],
   }),
   setting({
+    key: 'bills.cashDrawerKick',
+    schema: z.boolean(),
+    defaultValue: true,
+    scope: 'RESTAURANT',
+    capability: 'OPERATIONS_CONFIGURE',
+    description:
+      'Open the cash drawer on the bill printer when cash is taken (a printer without one ignores it).',
+    requirements: ['BILL-016'],
+  }),
+  setting({
     key: 'payments.otherModes',
     schema: z.array(z.string().trim().min(1).max(30)).min(1).max(5),
     defaultValue: ['Other'],
@@ -394,6 +471,16 @@ export const SETTINGS = [
     capability: 'OPERATIONS_CONFIGURE',
     description: 'Names of payment modes offered besides cash, card and UPI.',
     requirements: ['BILL-008'],
+  }),
+  setting({
+    key: 'bills.digitalBillChannel',
+    schema: z.enum(['OFF', 'WHATSAPP', 'SMS']),
+    defaultValue: 'OFF',
+    scope: 'RESTAURANT',
+    capability: 'OPERATIONS_CONFIGURE',
+    description:
+      'Send a settled bill to the diner on WhatsApp or SMS when they gave their number with consent.',
+    requirements: ['BILL-012', 'BILL-011'],
   }),
   setting({
     key: 'bills.hostedCopyDays',
@@ -434,8 +521,8 @@ export const SETTINGS = [
     scope: 'RESTAURANT',
     capability: 'OPERATIONS_CONFIGURE',
     description:
-      'Changes to the factory notification rules (Appendix C), per event: recipients, channels, pager text and vibration, escalation and repeat.',
-    requirements: ['NTF-002', 'NTF-003', 'PGR-006'],
+      'Changes to the factory notification rules (Appendix C), per event: recipients, channels, pager text, escalation and repeat.',
+    requirements: ['NTF-002', 'NTF-003'],
   }),
   setting({
     key: 'notifications.nudgePresets',
@@ -452,16 +539,37 @@ export const SETTINGS = [
     requirements: ['NTF-008'],
   }),
   setting({
-    key: 'pagers.heartbeatSeconds',
-    schema: int(10, 300),
-    defaultValue: 30,
-    // Tuned with the pager's battery life (PGR-002), so the vendor's (UPD-010).
-    scope: 'VENDOR',
+    key: 'notifications.diskAlertPercent',
+    schema: int(50, 99),
+    defaultValue: 80,
+    scope: 'RESTAURANT',
     capability: 'OPERATIONS_CONFIGURE',
-    description:
-      'How often a pager reports its battery and signal; three missed heartbeats and it counts as offline.',
+    description: 'The data drive this full raises a disk alert for the Owner and managers.',
+    requirements: ['NTF-003', 'DATA-005'],
+    unit: 'percent',
+  }),
+  setting({
+    key: 'pagers.heartbeatSeconds',
+    schema: int(10, 120),
+    defaultValue: 30,
+    scope: 'RESTAURANT',
+    capability: 'OPERATIONS_CONFIGURE',
+    description: 'How often a pager reports in; three missed heartbeats and it counts as offline.',
     requirements: ['PGR-007'],
     unit: 'seconds',
+  }),
+  setting({
+    key: 'pagers.vibration',
+    schema: z.partialRecord(
+      NotificationEventType,
+      z.enum(['ONE_LONG', 'TWO_SHORT', 'THREE', 'ONE_SHORT']),
+    ),
+    defaultValue: {},
+    scope: 'RESTAURANT',
+    capability: 'OPERATIONS_CONFIGURE',
+    description:
+      'Changes to the pager vibration per alert type (ready: one long; requests: two short; manager: three).',
+    requirements: ['PGR-006'],
   }),
   setting({
     key: 'kds.ageAmberMinutes',
@@ -535,6 +643,19 @@ export const SETTINGS = [
     requirements: ['SEC-009', 'TAB-004'],
   }),
   setting({
+    key: 'pager.vibrationPatterns',
+    schema: z.strictObject({
+      READY: z.enum(PAGER_PATTERNS),
+      SERVICE_REQUEST: z.enum(PAGER_PATTERNS),
+      MANAGER: z.enum(PAGER_PATTERNS),
+    }),
+    defaultValue: { READY: 'ONE_LONG', SERVICE_REQUEST: 'TWO_SHORT', MANAGER: 'THREE_SHORT' },
+    scope: 'RESTAURANT',
+    capability: 'OPERATIONS_CONFIGURE',
+    description: 'How the pager vibrates for each kind of alert.',
+    requirements: ['PGR-006'],
+  }),
+  setting({
     key: 'pager.lowBatteryPercent',
     schema: int(5, 50),
     defaultValue: 15,
@@ -544,6 +665,16 @@ export const SETTINGS = [
       'Battery level at or below which a pager alerts its wearer and the manager, and the waiter app warns.',
     requirements: ['PGR-013', 'WTR-014', 'NTF-003'],
     unit: 'percent',
+  }),
+  setting({
+    key: 'pager.heartbeatSeconds',
+    schema: int(10, 300),
+    defaultValue: 30,
+    scope: 'VENDOR',
+    capability: 'OPERATIONS_CONFIGURE',
+    description: 'How often a pager reports battery and signal; tuned with battery life (PGR-002).',
+    requirements: ['PGR-007'],
+    unit: 'seconds',
   }),
   setting({
     key: 'qr.submissionsPerWindow',
@@ -584,6 +715,15 @@ export const SETTINGS = [
     description: 'How often the local server tells the QR relay it is present.',
     requirements: ['QR-008'],
     unit: 'seconds',
+  }),
+  setting({
+    key: 'qr.serviceRequests',
+    schema: z.boolean(),
+    defaultValue: true,
+    scope: 'RESTAURANT',
+    capability: 'OPERATIONS_CONFIGURE',
+    description: 'The QR page offers Call waiter and Request bill (for tables without a tablet).',
+    requirements: ['QR-011'],
   }),
   setting({
     key: 'qr.readOnlyAfterSeconds',
@@ -649,6 +789,16 @@ export const SETTINGS = [
     unit: 'orders',
   }),
   setting({
+    key: 'menu.bestSellerCount',
+    schema: int(0, 50),
+    defaultValue: 10,
+    scope: 'RESTAURANT',
+    capability: 'OPERATIONS_CONFIGURE',
+    description:
+      'How many of the most ordered dishes carry the bestseller badge on the tablet and QR menu (0: none; our default).',
+    requirements: ['TAB-005'],
+  }),
+  setting({
     key: 'reco.bestSellerDays',
     schema: int(1, 365),
     defaultValue: 30,
@@ -687,6 +837,20 @@ export const SETTINGS = [
       'Course order recommendations favour next (menu categories are tagged with a course).',
     requirements: ['REC-005'],
   }),
+  setting({
+    key: 'reco.itemPreferences',
+    schema: z
+      .record(Id, z.enum(ITEM_PREFERENCES))
+      .refine((preferences) => Object.keys(preferences).length <= ITEM_PREFERENCES_MAX, {
+        message: `At most ${String(ITEM_PREFERENCES_MAX)} dishes.`,
+      }),
+    defaultValue: {},
+    scope: 'RESTAURANT',
+    capability: 'OPERATIONS_CONFIGURE',
+    description:
+      'Dishes the restaurant pins (shown first), boosts (ranked higher) or blocks (never suggested).',
+    requirements: ['REC-009'],
+  }),
 
   // Audit, storage, backups and retention (AUD, DATA, §9.3)
   setting({
@@ -719,12 +883,42 @@ export const SETTINGS = [
     unit: 'paise',
   }),
   setting({
+    key: 'audit.reprintFlagCount',
+    schema: int(1, 100),
+    defaultValue: 2,
+    scope: 'RESTAURANT',
+    capability: 'DATA_ADMIN',
+    description:
+      'A kitchen ticket or bill printed again this many times or more appears in the daily report.',
+    requirements: ['AUD-006'],
+  }),
+  setting({
     key: 'backups.walMode',
     schema: z.enum(['CONTINUOUS', 'HOURLY']),
     defaultValue: 'CONTINUOUS',
     scope: 'RESTAURANT',
     capability: 'DATA_ADMIN',
     description: 'Incremental backup of the database log: continuous or hourly.',
+    requirements: ['DATA-002'],
+  }),
+  setting({
+    key: 'backups.pointInTimeDays',
+    schema: int(1, 14),
+    defaultValue: 2,
+    scope: 'RESTAURANT',
+    capability: 'DATA_ADMIN',
+    description:
+      'How many days back the database can be restored to any minute (continuous backup); older days use the nightly backups.',
+    requirements: ['DATA-002', 'DATA-004'],
+  }),
+  setting({
+    key: 'backups.nightlyAt',
+    schema: TimeOfDay,
+    defaultValue: '04:30',
+    scope: 'RESTAURANT',
+    capability: 'DATA_ADMIN',
+    description:
+      'The nightly full backup starts at this time; a PC that was off then backs up when it starts.',
     requirements: ['DATA-002'],
   }),
   setting({
@@ -769,9 +963,8 @@ export const SETTINGS = [
     defaultValue: 80,
     scope: 'RESTAURANT',
     capability: 'OPERATIONS_CONFIGURE',
-    description:
-      'Data-drive use that raises a disk alert for the Owner and managers, daily until space is freed.',
-    requirements: ['DATA-006', 'NTF-003'],
+    description: 'Data-drive use that raises a warning.',
+    requirements: ['DATA-006'],
     unit: 'percent',
   }),
   setting({
@@ -878,6 +1071,18 @@ export const SETTINGS = [
     unit: 'GB',
   }),
 
+  // Feature flags (UPD-010): switched by the vendor for the fleet or one restaurant (P7-08c).
+  setting({
+    key: 'features.aiMenuImport',
+    schema: z.boolean(),
+    defaultValue: true,
+    scope: 'VENDOR',
+    capability: 'MENU_MANAGE',
+    description:
+      'Menus can be read from photos by the vendor’s AI service (ONB-006); the vendor may switch it off, for example while the service is down.',
+    requirements: ['UPD-010', 'ONB-006'],
+  }),
+
   // Formats (NFR-L03)
   setting({
     key: 'ui.timeFormat',
@@ -902,6 +1107,18 @@ export const SETTING_KEYS = SETTINGS.map((definition) => definition.key) as read
 const BY_KEY = new Map<string, SettingDefinition>(
   SETTINGS.map((definition) => [definition.key, definition as SettingDefinition]),
 );
+
+/**
+ * The vendor settings the Control Plane pushes (UPD-010, P7-08c): every VENDOR setting except
+ * those with a source of their own (the signed licence, the heartbeat answer, the installer).
+ */
+export const REMOTE_SETTING_KEYS: readonly string[] = SETTINGS.filter(
+  (definition) =>
+    definition.scope === 'VENDOR' &&
+    !['licence.', 'controlPlane.', 'onboarding.'].some((prefix) =>
+      definition.key.startsWith(prefix),
+    ),
+).map((definition) => definition.key);
 
 /** The definition of a setting, or undefined for an unknown key. */
 export function settingDefinition(key: string): SettingDefinition | undefined {

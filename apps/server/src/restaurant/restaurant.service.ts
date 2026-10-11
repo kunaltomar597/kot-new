@@ -27,6 +27,7 @@ function profilePart(row: Restaurant) {
     email: row.email,
     businessHours: row.businessHours,
     logoPhotoId: row.logoPhotoId,
+    accentColor: row.accentColor,
     businessDayCutoff: row.businessDayCutoff,
   };
 }
@@ -62,6 +63,7 @@ export function toRestaurantProfile(row: Restaurant): RestaurantProfile {
     contact: { phone: row.phone, email: row.email },
     businessHours: hours.success ? hours.data : [],
     logoPhotoId: row.logoPhotoId,
+    accentColor: row.accentColor,
     timeZone: row.timeZone,
     businessDayCutoff: row.businessDayCutoff,
     updatedAt: row.updatedAt.toISOString(),
@@ -116,6 +118,10 @@ export class RestaurantService {
         email: request.contact.email,
         businessHours: request.businessHours,
         logoPhotoId: request.logoPhotoId,
+        accentColor:
+          request.accentColor === undefined
+            ? before.accentColor
+            : (request.accentColor?.toUpperCase() ?? null),
         businessDayCutoff: request.businessDayCutoff,
       } satisfies Prisma.RestaurantUncheckedUpdateInput;
       if (same(profilePart(before), data)) return toRestaurantProfile(before);

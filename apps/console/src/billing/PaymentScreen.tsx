@@ -164,10 +164,24 @@ function PaymentForm({
         },
       });
       const settled = result.remaining === 0;
+      // BILL-012: a settled bill with a consented number goes to the diner by itself.
+      const digital = settled
+        ? await controller.api
+            .listInvoiceDigitalBills({ params: { id: view.invoiceId } })
+            .catch(() => undefined)
+        : undefined;
       toast.show({
         title: settled
           ? t('payment.settled', { number: result.invoiceNumber })
           : t('payment.recorded', { amount: formatRupees(result.remaining) }),
+        ...(digital !== undefined &&
+          digital.channel !== 'OFF' &&
+          digital.phone !== null && {
+            description: t('billing.digitalBill.queuedToast', {
+              phone: digital.phone,
+              channel: t(`billing.digitalBill.channel.${digital.channel}`),
+            }),
+          }),
         tone: 'success',
       });
       setPlanned([]);

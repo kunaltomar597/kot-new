@@ -1,40 +1,34 @@
 import type { DeviceView } from '@rp/contracts';
+import { displayDateTime, timeOfDayOf } from '@rp/domain';
 import { Badge, Button, EmptyState, ErrorState, Icon, LoadingState, useToast } from '@rp/ui-web';
 import { type ReactNode, useCallback, useEffect, useState } from 'react';
 import { useConsole, useConsoleState } from '../../app/console-context.js';
 import { useT } from '../../app/i18n.js';
 import { messageOf } from '../../app/messages.js';
 import { useLive } from '../../app/use-live.js';
-import { ReasonDialog } from '../../billing/ReasonDialog.js';
-import { MoveTabletDialog, PairDeviceDialog, RenameDeviceDialog } from './DeviceDialogs.js';
 import {
-  type Binding,
-  type BindingNames,
-  bindingNamesOf,
-  bindingOf,
-  deviceBatteryOf,
-  deviceGroups,
-  lastSeenOf,
-  shortDateOf,
-} from './devices-view.js';
+  DeviceStationsDialog,
+  MoveTabletDialog,
+  PairDeviceDialog,
+  RenameDeviceDialog,
+  UnpairDeviceDialog,
+} from './DeviceDialogs.js';
+import { type Binding, bindingOf, groupDevices, type Names, namesOf } from './devices-view.js';
 
-/**
- * Screens, phones and tablets do not announce each connection and disconnection, and battery
- * levels are not announced (only a change to low or offline is), so read them again this often.
- */
-export const DEVICE_REFRESH_MS = 60_000;
+/** Connections and battery levels are not announced, so read them again. */
+export const DEVICE_REFRESH_MS = 30_000;
 
 type Open =
   | { readonly kind: 'PAIR' }
-  | { readonly kind: 'RENAME' | 'MOVE' | 'UNPAIR'; readonly device: DeviceView };
+  | { readonly kind: 'RENAME' | 'MOVE' | 'STATIONS' | 'UNPAIR'; readonly device: DeviceView };
 
 /**
- * The Devices page (P4-02c, MGR-006): every paired device by type, with what it is bound to
- * (table, station or person), whether it is connected now, its battery, app or firmware version
- * and when it was last seen. A manager pairs a device (a one-time code and QR code), renames it,
- * moves a table tablet to another table (AUTH-009), asks it to show itself ("Locate") and unpairs
- * it with a reason (AUTH-008: it stops working at once). The list follows device changes made on
- * any screen and reads connection and battery states again every minute.
+ * The paired devices (P4-02c, MGR-006): each screen, phone, tablet and pager with what it is bound
+ * to, whether it is connected, its battery and versions and when it was last seen. A manager pairs
+ * a new device, renames one, moves a table tablet to another table (AUTH-009) or unpairs one
+ * (AUTH-008: it stops working at once). A device that stopped taking PINs after too many wrong
+ * ones says until when, and a manager can let it take them again (PC-S5). The list follows
+ * changes made on any screen and reads connections again every half minute.
  */
 export function DevicesScreen() {
   const t = useT();
@@ -43,20 +37,13 @@ export function DevicesScreen() {
   const toast = useToast();
   const { data, reload } = useLive(
     async () => {
-      // Names only label the bindings: the list still shows when one of them cannot be read.
-      const [list, floor, stations, people] = await Promise.all([
+      const [list, floor, stations, staff] = await Promise.all([
         controller.api.listDevices(),
-        controller.api.getFloor().catch(() => undefined),
-        controller.api.listStations().then(
-          (response) => response.stations,
-          () => [],
-        ),
-        controller.api.listStaff().then(
-          (response) => response.staff,
-          () => [],
-        ),
+        controller.api.getFloor(),
+        controller.api.listStations(),
+        controller.api.listStaff(),
       ]);
-      return { devices: list.devices, floor, stations, people };
+      return { devices: list.devices, floor, stations: stations.stations, people: staff.staff };
     },
     (type) =>
       type === 'RestaurantChanged' || type === 'DeviceStatusChanged' || type === 'DeviceRevoked',
@@ -70,7 +57,6 @@ export function DevicesScreen() {
   const [open, setOpen] = useState<Open | undefined>();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | undefined>();
-  const [locating, setLocating] = useState<string | undefined>();
 
   const close = useCallback(() => {
     setOpen(undefined);
@@ -78,32 +64,18 @@ export function DevicesScreen() {
     setError(undefined);
   }, []);
 
-  /** Runs a change from a dialog: says so, reads the list again and closes the dialog. */
-  const run = async (action: () => Promise<unknown>, message: string) => {
+  /** Runs one change, says what happened, and reads the list again. */
+  const change = async (action: () => Promise<unknown>, done: string) => {
     setBusy(true);
     setError(undefined);
     try {
       await action();
-      toast.show({ title: message, tone: 'success' });
+      toast.show({ title: done, tone: 'success' });
       close();
       reload();
     } catch (failure) {
       setError(messageOf(failure, t));
       setBusy(false);
-    }
-  };
-
-  /** Asks the device to show itself (MGR-006 "Locate"); only a connected device can. */
-  const locate = async (device: DeviceView) => {
-    setLocating(device.id);
-    try {
-      await controller.api.locateDevice({ params: { deviceId: device.id } });
-      toast.show({ title: t('devices.located', { name: device.name }), tone: 'success' });
-    } catch (failure) {
-      toast.show({ title: messageOf(failure, t), tone: 'danger' });
-      reload();
-    } finally {
-      setLocating(undefined);
     }
   };
 
@@ -120,40 +92,64 @@ export function DevicesScreen() {
       />
     );
   } else {
-    const groups = deviceGroups(data.value.devices);
-    const names = bindingNamesOf(data.value.floor, data.value.stations, data.value.people);
-    const now = new Date();
+    const { groups, unpaired } = groupDevices(data.value.devices);
+    const names = namesOf(data.value.floor, data.value.stations, data.value.people);
     content =
-      groups.length === 0 ? (
+      groups.length === 0 && unpaired.length === 0 ? (
         <EmptyState title={t('devices.none')} />
       ) : (
-        groups.map((group) => {
-          const headingId = `devices-${group.type}`;
-          return (
-            <section key={group.type} className="device-group" aria-labelledby={headingId}>
-              <h3 id={headingId} className="device-group__heading">
-                {t(`devices.group.${group.type}`)}
+        <>
+          {groups.map((group) => (
+            <section
+              key={group.type}
+              className="device-group"
+              aria-labelledby={`devices-${group.type}`}
+            >
+              <h3 id={`devices-${group.type}`} className="device-group__heading">
+                {t(`devices.type.${group.type}`)}
               </h3>
-              {group.type === 'PAGER' ? (
-                <p className="dashboard-section__hint">{t('devices.pagersElsewhere')}</p>
-              ) : null}
-              <ul className="staff-list" aria-labelledby={headingId}>
+              <ul className="staff-list" aria-labelledby={`devices-${group.type}`}>
                 {group.devices.map((device) => (
                   <DeviceRow
                     key={device.id}
                     device={device}
                     names={names}
-                    now={now}
-                    self={device.id === thisDevice?.id}
-                    locating={locating === device.id}
-                    onLocate={() => {
-                      void locate(device);
-                    }}
+                    isThisDevice={device.id === thisDevice?.id}
                     onRename={() => {
                       setOpen({ kind: 'RENAME', device });
                     }}
                     onMove={() => {
                       setOpen({ kind: 'MOVE', device });
+                    }}
+                    onStations={() => {
+                      setOpen({ kind: 'STATIONS', device });
+                    }}
+                    onLocate={() => {
+                      controller.api.locateDevice({ params: { deviceId: device.id } }).then(
+                        ({ seconds }) => {
+                          toast.show({
+                            title: t('devices.locating', { name: device.name, seconds }),
+                            tone: 'success',
+                          });
+                        },
+                        (failure: unknown) => {
+                          toast.show({ title: messageOf(failure, t), tone: 'danger' });
+                        },
+                      );
+                    }}
+                    onUnlockPins={() => {
+                      controller.api.unlockDevicePins({ params: { deviceId: device.id } }).then(
+                        () => {
+                          toast.show({
+                            title: t('devices.pinsUnlocked', { name: device.name }),
+                            tone: 'success',
+                          });
+                          reload();
+                        },
+                        (failure: unknown) => {
+                          toast.show({ title: messageOf(failure, t), tone: 'danger' });
+                        },
+                      );
                     }}
                     onUnpair={() => {
                       setOpen({ kind: 'UNPAIR', device });
@@ -162,8 +158,21 @@ export function DevicesScreen() {
                 ))}
               </ul>
             </section>
-          );
-        })
+          ))}
+          {unpaired.length === 0 ? null : (
+            <details className="device-group device-group--unpaired">
+              <summary className="device-group__heading">
+                {t('devices.unpairedCount', { count: unpaired.length })}
+              </summary>
+              <p className="dashboard-section__hint">{t('devices.unpairedHint')}</p>
+              <ul className="staff-list" aria-label={t('devices.unpairedTitle')}>
+                {unpaired.map((device) => (
+                  <DeviceRow key={device.id} device={device} names={names} isThisDevice={false} />
+                ))}
+              </ul>
+            </details>
+          )}
+        </>
       );
   }
 
@@ -191,7 +200,10 @@ export function DevicesScreen() {
           floor={data.value.floor}
           stations={data.value.stations}
           people={data.value.people}
-          onClose={close}
+          onClose={() => {
+            close();
+            reload();
+          }}
         />
       ) : null}
       {open?.kind === 'RENAME' ? (
@@ -200,10 +212,12 @@ export function DevicesScreen() {
           busy={busy}
           error={error}
           onRename={(name) => {
-            const { device } = open;
-            void run(
+            void change(
               () =>
-                controller.api.renameDevice({ params: { deviceId: device.id }, body: { name } }),
+                controller.api.renameDevice({
+                  params: { deviceId: open.device.id },
+                  body: { name },
+                }),
               t('devices.renamed', { name }),
             );
           }}
@@ -216,39 +230,52 @@ export function DevicesScreen() {
           floor={data.value.floor}
           busy={busy}
           error={error}
-          onMove={(table) => {
-            const { device } = open;
-            void run(
+          onMove={(tableId) => {
+            const label = namesOf(data.value.floor, [], []).tables.get(tableId) ?? '';
+            void change(
               () =>
                 controller.api.bindTabletTable({
-                  params: { deviceId: device.id },
-                  body: { tableId: table.id },
+                  params: { deviceId: open.device.id },
+                  body: { tableId },
                 }),
-              t('devices.moved', { name: device.name, table: table.label }),
+              t('devices.moved', { name: open.device.name, table: label }),
+            );
+          }}
+          onClose={close}
+        />
+      ) : null}
+      {open?.kind === 'STATIONS' && data.status === 'ready' ? (
+        <DeviceStationsDialog
+          device={open.device}
+          stations={data.value.stations}
+          busy={busy}
+          error={error}
+          onSave={(stationIds) => {
+            void change(
+              () =>
+                controller.api.setDeviceStations({
+                  params: { deviceId: open.device.id },
+                  body: { stationIds },
+                }),
+              t('devices.stationsChanged', { name: open.device.name }),
             );
           }}
           onClose={close}
         />
       ) : null}
       {open?.kind === 'UNPAIR' ? (
-        <ReasonDialog
-          title={t('devices.unpairDialog.title', { name: open.device.name })}
-          description={
-            open.device.type === 'PAGER'
-              ? t('devices.unpairDialog.pagerDescription')
-              : t('devices.unpairDialog.description')
-          }
-          label={t('devices.unpairDialog.reason')}
-          confirmLabel={t('devices.unpairDialog.confirm')}
-          tone="danger"
+        <UnpairDeviceDialog
+          device={open.device}
           busy={busy}
           error={error}
-          onConfirm={(reason) => {
-            const { device } = open;
-            void run(
+          onUnpair={(reason) => {
+            void change(
               () =>
-                controller.api.revokeDevice({ params: { deviceId: device.id }, body: { reason } }),
-              t('devices.unpaired', { name: device.name }),
+                controller.api.revokeDevice({
+                  params: { deviceId: open.device.id },
+                  body: { reason },
+                }),
+              t('devices.unpaired', { name: open.device.name }),
             );
           }}
           onClose={close}
@@ -258,130 +285,163 @@ export function DevicesScreen() {
   );
 }
 
-/** One device: its name, binding and state in words, its details, and its actions. */
+function bindingText(binding: Binding, t: ReturnType<typeof useT>): string | undefined {
+  switch (binding.kind) {
+    case 'TABLE':
+      return t('devices.forTable', { table: binding.label });
+    case 'STATION':
+      return t('devices.forStation', { station: binding.name });
+    case 'ALL_STATIONS':
+      return t('devices.allStations');
+    case 'PERSON':
+      return t('devices.forPerson', { name: binding.name });
+    case 'NONE':
+      return undefined;
+  }
+}
+
+const COMPATIBILITY_TONES = { PREVIOUS: 'warning', TOO_OLD: 'danger', NEWER: 'info' } as const;
+
+/** UPD-006: an app to update soon, one the server no longer serves, or one ahead of the server. */
+function CompatibilityBadge({ compatibility }: { compatibility: DeviceView['compatibility'] }) {
+  const t = useT();
+  if (compatibility === 'CURRENT' || compatibility === 'UNKNOWN') return null;
+  return (
+    <Badge
+      tone={COMPATIBILITY_TONES[compatibility]}
+      icon={<Icon name={compatibility === 'NEWER' ? 'info' : 'warning'} />}
+      title={t(`devices.compatibilityHint.${compatibility}`)}
+    >
+      {t(`devices.compatibility.${compatibility}`)}
+    </Badge>
+  );
+}
+
+/** One device: its name and type, its binding and state in words, and what can be done with it. */
 function DeviceRow({
   device,
   names,
-  now,
-  self,
-  locating,
-  onLocate,
+  isThisDevice,
   onRename,
   onMove,
+  onStations,
+  onLocate,
+  onUnlockPins,
   onUnpair,
 }: {
   device: DeviceView;
-  names: BindingNames;
-  now: Date;
-  /** The device this console runs on: it is not located or unpaired from itself. */
-  self: boolean;
-  locating: boolean;
-  onLocate: () => void;
-  onRename: () => void;
-  onMove: () => void;
-  onUnpair: () => void;
+  names: Names;
+  isThisDevice: boolean;
+  onRename?: () => void;
+  onMove?: () => void;
+  onStations?: () => void;
+  onLocate?: () => void;
+  onUnlockPins?: () => void;
+  onUnpair?: () => void;
 }) {
   const t = useT();
-  const binding = bindingLine(bindingOf(device, names), t);
-  const battery = deviceBatteryOf(device);
-  const seen = lastSeenOf(device.lastSeenAt, now);
+  const active = device.status === 'ACTIVE';
+  const binding = bindingText(bindingOf(device, names), t);
   const details = [
-    device.online
-      ? undefined
-      : seen.kind === 'NEVER'
-        ? t('devices.neverSeen')
-        : seen.kind === 'TODAY'
-          ? t('devices.lastSeenToday', { time: seen.time })
-          : t('devices.lastSeenEarlier', {
-              date: shortDateOf(seen.date, t.locale),
-              time: seen.time,
-            }),
+    device.serial === null ? undefined : t('devices.serial', { serial: device.serial }),
+    !active || device.network === null ? undefined : t(`devices.network.${device.network}`),
     device.appVersion === null
       ? undefined
       : t('devices.appVersion', { version: device.appVersion }),
     device.firmwareVersion === null
       ? undefined
       : t('devices.firmware', { version: device.firmwareVersion }),
-    device.serial === null ? undefined : t('devices.serial', { serial: device.serial }),
+    !active && device.revokedAt !== null
+      ? t('devices.unpairedAt', displayDateTime(new Date(device.revokedAt)))
+      : device.connected
+        ? undefined
+        : device.lastSeenAt === null
+          ? t('devices.neverSeen')
+          : t('devices.lastSeen', displayDateTime(new Date(device.lastSeenAt))),
   ].filter((detail) => detail !== undefined);
   return (
-    <li className="staff-row">
+    <li className="staff-row" data-inactive={active ? undefined : ''}>
       <div className="staff-row__who">
         <h4 className="staff-row__name">
           {device.name}
-          {self ? <Badge tone="info">{t('devices.thisDevice')}</Badge> : null}
+          {isThisDevice ? <Badge tone="info">{t('devices.thisDevice')}</Badge> : null}
         </h4>
-        <p className="staff-row__role">{t(`devices.type.${device.type}`)}</p>
+        <p className="staff-row__role">{t(`devices.typeOne.${device.type}`)}</p>
         {binding === undefined ? null : <p className="pager-row__wearer">{binding}</p>}
         <p className="staff-row__states">
-          {device.online ? (
-            <Badge tone="success">{t('devices.connected')}</Badge>
+          {!active ? (
+            <Badge tone="neutral" icon={<Icon name="ban" />}>
+              {t('devices.unpairedBadge')}
+            </Badge>
+          ) : device.connected ? (
+            <Badge tone="success" icon={<Icon name="check" />}>
+              {t('devices.connected')}
+            </Badge>
           ) : (
             <Badge tone="warning" icon={<Icon name="offline" />}>
               {t('devices.notConnected')}
             </Badge>
           )}
-          {battery.kind === 'UNKNOWN' ? null : battery.kind === 'LOW' ? (
-            <Badge tone="danger" icon={<Icon name="warning" />}>
-              {t('devices.batteryLow', { percent: battery.percent })}
+          {active && device.batteryPercent !== null ? (
+            <Badge tone="neutral">
+              {device.charging === true
+                ? t('devices.batteryCharging', { percent: device.batteryPercent })
+                : t('devices.battery', { percent: device.batteryPercent })}
             </Badge>
-          ) : (
-            <Badge tone="neutral">{t('devices.battery', { percent: battery.percent })}</Badge>
-          )}
+          ) : null}
+          {active ? <CompatibilityBadge compatibility={device.compatibility} /> : null}
+          {active && device.pinsLockedUntil !== null ? (
+            <Badge tone="danger" icon={<Icon name="warning" />}>
+              {t('devices.pinsLocked', { time: timeOfDayOf(new Date(device.pinsLockedUntil)) })}
+            </Badge>
+          ) : null}
         </p>
         {details.length === 0 ? null : <p className="staff-row__contact">{details.join(' · ')}</p>}
-        {self ? <p className="staff-row__contact">{t('devices.ownDevice')}</p> : null}
       </div>
-      <div
-        className="staff-row__actions"
-        role="group"
-        aria-label={t('devices.actionsFor', { name: device.name })}
-      >
-        {device.online && !self ? (
-          <Button variant="secondary" loading={locating} onClick={onLocate}>
-            {t('devices.locate')}
+      {active ? (
+        <div
+          className="staff-row__actions"
+          role="group"
+          aria-label={t('devices.actionsFor', { name: device.name })}
+        >
+          <Button variant="secondary" onClick={onRename}>
+            {t('devices.rename')}
           </Button>
-        ) : null}
-        <Button variant="secondary" onClick={onRename}>
-          {t('devices.rename')}
-        </Button>
-        {device.type === 'TABLE_TABLET' ? (
-          <Button variant="secondary" onClick={onMove}>
-            {t('devices.move')}
-          </Button>
-        ) : null}
-        {self ? null : (
-          <Button variant="secondary" onClick={onUnpair}>
-            {t('devices.unpair')}
-          </Button>
-        )}
-      </div>
+          {device.type === 'TABLE_TABLET' ? (
+            <Button variant="secondary" onClick={onMove}>
+              {t('devices.moveTable')}
+            </Button>
+          ) : null}
+          {device.type === 'KDS' ? (
+            <Button variant="secondary" onClick={onStations}>
+              {t('devices.stations')}
+            </Button>
+          ) : null}
+          {device.pinsLockedUntil !== null ? (
+            <Button
+              variant="secondary"
+              onClick={onUnlockPins}
+              aria-label={t('devices.unlockPinsNamed', { name: device.name })}
+            >
+              {t('devices.unlockPins')}
+            </Button>
+          ) : null}
+          {device.type === 'TABLE_TABLET' && device.connected ? (
+            <Button
+              variant="secondary"
+              onClick={onLocate}
+              aria-label={t('devices.locateNamed', { name: device.name })}
+            >
+              {t('devices.locate')}
+            </Button>
+          ) : null}
+          {isThisDevice ? null : (
+            <Button variant="danger" onClick={onUnpair}>
+              {t('devices.unpair')}
+            </Button>
+          )}
+        </div>
+      ) : null}
     </li>
   );
-}
-
-function bindingLine(binding: Binding, t: ReturnType<typeof useT>): string | undefined {
-  const person = (name: string | undefined) => name ?? t('devices.personGone');
-  switch (binding.kind) {
-    case 'NONE':
-      return undefined;
-    case 'TABLE':
-      return binding.table === undefined
-        ? t('devices.tableGone')
-        : t('devices.table', { table: binding.table });
-    case 'STATION':
-      return binding.station === undefined
-        ? t('devices.stationGone')
-        : t('devices.station', { station: binding.station });
-    case 'ALL_STATIONS':
-      return t('devices.allStations');
-    case 'HOLDER':
-      return t('devices.holder', { name: person(binding.name) });
-    case 'NO_HOLDER':
-      return t('devices.noHolder');
-    case 'WEARER':
-      return t('devices.wornBy', { name: person(binding.name) });
-    case 'NOT_WORN':
-      return t('devices.notWorn');
-  }
 }

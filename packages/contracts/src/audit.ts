@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { Id, Timestamp } from './common.js';
+import { DeviceType, Id, IsoDate, Timestamp } from './common.js';
 
 /** Why the audit hash chain stopped being valid (AUD-003). */
 export const AuditChainBreak = z.enum([
@@ -35,3 +35,71 @@ export const AuditVerifyResponse = z.object({
   verifiedAt: Timestamp,
 });
 export type AuditVerifyResponse = z.infer<typeof AuditVerifyResponse>;
+
+// ---------------------------------------------------------------- the audit viewer (P4-07a)
+
+/** An action name as the audit log stores it, e.g. INVOICE_VOIDED. */
+export const AuditAction = z.string().regex(/^[A-Z][A-Z_]{1,59}$/);
+
+/** The longest period the audit viewer reads at once, like the reports. */
+const MAX_AUDIT_DAYS = 366;
+
+/**
+ * AUD-005: audit entries of a range of business dates, newest first, a page at a time, filtered
+ * by action, person or the record they are about.
+ */
+export const AuditListQuery = z
+  .strictObject({
+    from: IsoDate,
+    to: IsoDate,
+    action: AuditAction.optional(),
+    actorId: Id.optional(),
+    entityType: z
+      .string()
+      .regex(/^[a-z][a-z_]{1,39}$/)
+      .optional(),
+    entityId: Id.optional(),
+    offset: z.coerce.number().int().min(0).default(0),
+    limit: z.coerce.number().int().min(1).max(500).default(100),
+  })
+  .refine((query) => query.from <= query.to, { message: 'from must not be after to' })
+  .refine(
+    (query) => Date.parse(query.to) - Date.parse(query.from) <= (MAX_AUDIT_DAYS - 1) * 86_400_000,
+    { message: `The audit viewer covers at most ${String(MAX_AUDIT_DAYS)} days` },
+  );
+export type AuditListQuery = z.infer<typeof AuditListQuery>;
+
+const AuditPerson = z.object({ id: Id, name: z.string() }).nullable();
+
+export const AuditEntryView = z.object({
+  id: Id,
+  /** Position in the hash chain. */
+  seq: z.int().positive(),
+  at: Timestamp,
+  businessDate: IsoDate,
+  action: z.string(),
+  entityType: z.string(),
+  entityId: Id.nullable(),
+  actor: AuditPerson,
+  approver: AuditPerson,
+  device: z.object({ id: Id, name: z.string(), type: DeviceType }).nullable(),
+  reason: z.string().nullable(),
+  /** What changed, as recorded (JSON). */
+  before: z.unknown(),
+  after: z.unknown(),
+});
+export type AuditEntryView = z.infer<typeof AuditEntryView>;
+
+export const AuditListResponse = z.object({
+  from: IsoDate,
+  to: IsoDate,
+  /** Entries matching the filters in the whole range, and where the next page starts. */
+  total: z.int().min(0),
+  offset: z.int().min(0),
+  nextOffset: z.int().min(0).nullable(),
+  entries: z.array(AuditEntryView),
+  /** The actions in the range (for the filter), and the restaurant's people. */
+  actions: z.array(z.string()),
+  people: z.array(z.object({ id: Id, name: z.string() })),
+});
+export type AuditListResponse = z.infer<typeof AuditListResponse>;

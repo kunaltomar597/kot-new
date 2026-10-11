@@ -3,7 +3,17 @@
 Screens and hooks shared by the waiter app and the table tablet (P2-01c), on top of
 `@rp/mobile-core`'s `DeviceSession`:
 
-- `ShellProvider`: the device session, the i18n catalogue (NFR-L02) and the `@rp/ui-native` theme.
+- `ShellProvider`: the device session, the i18n catalogue (NFR-L02), the app's over-the-air
+  updates (`updater`, P7-04e1), its APK updater (`apkUpdater`, P7-04e2) and the `@rp/ui-native`
+  theme.
+- `useAppUpdate` and `useAppUpdateWhenFree` (P7-04e1): what the updates are doing, and telling them
+  (and the APK updater) whether the device is in use (the app's own reason, or the app off the
+  screen).
+- `ApkOffer`, `useApkUpdate` (P7-04e2): a new version of the app on the restaurant PC, with
+  Install, Android's setting when installs are not allowed yet, and what happened. On the sign-in
+  screen, on "Update this app" and on the tablet's staff panel.
+- `UpdateRequiredScreen` (UPD-006): the app the server refuses; it says when an update is on its
+  way, and offers the PC's new APK to staff.
 - `PairingScreen` (AUTH-007, P2-01d): scanning the manager's QR code (`QrScanner`, `expo-camera`,
   loaded only when a person taps Scan) gives the code, the server's addresses and its CA
   fingerprint, so the device finds the server and pins its CA without anything typed. A QR code

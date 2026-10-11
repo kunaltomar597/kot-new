@@ -33,6 +33,15 @@
           { "type": "null" }
         ]
       },
+      "stationIds": {
+        "default": [],
+        "type": "array",
+        "items": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      },
       "staffId": {
         "anyOf": [
           {
@@ -64,13 +73,50 @@
         ]
       },
       "appVersion": { "type": ["string", "null"] },
-      "online": { "type": "boolean" },
+      "connected": { "type": "boolean" },
       "batteryPercent": {
         "anyOf": [{ "type": "integer", "minimum": 0, "maximum": 100 }, { "type": "null" }]
       },
-      "batteryLow": { "type": "boolean" },
+      "charging": { "type": ["boolean", "null"] },
+      "network": {
+        "anyOf": [
+          { "type": "string", "enum": ["WIFI", "ETHERNET", "CELLULAR", "NONE", "OTHER"] },
+          { "type": "null" }
+        ]
+      },
+      "rssi": {
+        "anyOf": [
+          { "type": "integer", "minimum": -9007199254740991, "maximum": 9007199254740991 },
+          { "type": "null" }
+        ]
+      },
       "firmwareVersion": { "type": ["string", "null"] },
-      "serial": { "type": ["string", "null"] }
+      "serial": { "type": ["string", "null"] },
+      "revokedAt": {
+        "anyOf": [
+          {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+          },
+          { "type": "null" }
+        ]
+      },
+      "clientApi": { "type": ["string", "null"] },
+      "compatibility": {
+        "type": "string",
+        "enum": ["CURRENT", "PREVIOUS", "TOO_OLD", "NEWER", "UNKNOWN"]
+      },
+      "pinsLockedUntil": {
+        "anyOf": [
+          {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+          },
+          { "type": "null" }
+        ]
+      }
     },
     "required": [
       "id",
@@ -83,11 +129,17 @@
       "pairedAt",
       "lastSeenAt",
       "appVersion",
-      "online",
+      "connected",
       "batteryPercent",
-      "batteryLow",
+      "charging",
+      "network",
+      "rssi",
       "firmwareVersion",
-      "serial"
+      "serial",
+      "revokedAt",
+      "clientApi",
+      "compatibility",
+      "pinsLockedUntil"
     ]
   },
   "output": {
@@ -124,6 +176,15 @@
           { "type": "null" }
         ]
       },
+      "stationIds": {
+        "default": [],
+        "type": "array",
+        "items": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      },
       "staffId": {
         "anyOf": [
           {
@@ -155,13 +216,50 @@
         ]
       },
       "appVersion": { "type": ["string", "null"] },
-      "online": { "type": "boolean" },
+      "connected": { "type": "boolean" },
       "batteryPercent": {
         "anyOf": [{ "type": "integer", "minimum": 0, "maximum": 100 }, { "type": "null" }]
       },
-      "batteryLow": { "type": "boolean" },
+      "charging": { "type": ["boolean", "null"] },
+      "network": {
+        "anyOf": [
+          { "type": "string", "enum": ["WIFI", "ETHERNET", "CELLULAR", "NONE", "OTHER"] },
+          { "type": "null" }
+        ]
+      },
+      "rssi": {
+        "anyOf": [
+          { "type": "integer", "minimum": -9007199254740991, "maximum": 9007199254740991 },
+          { "type": "null" }
+        ]
+      },
       "firmwareVersion": { "type": ["string", "null"] },
-      "serial": { "type": ["string", "null"] }
+      "serial": { "type": ["string", "null"] },
+      "revokedAt": {
+        "anyOf": [
+          {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+          },
+          { "type": "null" }
+        ]
+      },
+      "clientApi": { "type": ["string", "null"] },
+      "compatibility": {
+        "type": "string",
+        "enum": ["CURRENT", "PREVIOUS", "TOO_OLD", "NEWER", "UNKNOWN"]
+      },
+      "pinsLockedUntil": {
+        "anyOf": [
+          {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+          },
+          { "type": "null" }
+        ]
+      }
     },
     "required": [
       "id",
@@ -170,15 +268,22 @@
       "status",
       "tableId",
       "stationId",
+      "stationIds",
       "staffId",
       "pairedAt",
       "lastSeenAt",
       "appVersion",
-      "online",
+      "connected",
       "batteryPercent",
-      "batteryLow",
+      "charging",
+      "network",
+      "rssi",
       "firmwareVersion",
-      "serial"
+      "serial",
+      "revokedAt",
+      "clientApi",
+      "compatibility",
+      "pinsLockedUntil"
     ],
     "additionalProperties": false
   }

@@ -1,20 +1,17 @@
 import type { TableOverviewEntry } from '@rp/contracts';
 import { spacing } from '@rp/design-tokens';
-import { grantOf, type PermissionHolder } from '@rp/domain';
+import { grantFor, type Role } from '@rp/domain';
 import { messageOf, Note, useDeviceSession, useT } from '@rp/mobile-shell';
 import { Button, Sheet, TableTile } from '@rp/ui-native';
 import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
-/**
- * Whether this person may move this table: managers any, waiters their own (TBL-005), a custom
- * role as it says (AUTH-012).
- */
+/** Whether this person may move this table: managers any, waiters their own (TBL-005). */
 export function mayMove(
   table: TableOverviewEntry,
-  person: PermissionHolder & { readonly id: string },
+  person: { readonly id: string; readonly role: Role },
 ): boolean {
-  const grant = grantOf(person, 'TABLE_MOVE_MERGE');
+  const grant = grantFor(person.role, 'TABLE_MOVE_MERGE');
   return grant === 'ALLOW' || (grant === 'OWN' && table.session?.waiterId === person.id);
 }
 

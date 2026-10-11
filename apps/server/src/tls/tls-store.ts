@@ -11,6 +11,7 @@ import {
   issueServerCertificate,
   type KeyedCertificate,
   namesOf,
+  namesWithinConstraints,
   needsRenewal,
   type ServerNames,
 } from './certificates.js';
@@ -139,15 +140,19 @@ export class TlsStore {
   }
 
   private async ensureNow(
-    names: ServerNames,
+    wanted: ServerNames,
     now: Date,
   ): Promise<{ material: TlsMaterial; renewed: boolean }> {
     await mkdir(this.directory, { recursive: true, mode: 0o700 });
     let ca = await this.read(FILES.ca);
     if (ca === undefined) {
-      ca = await createCertificateAuthority(now);
+      // The CA may sign for the PC's own names too (single-label names need an exact entry).
+      ca = await createCertificateAuthority(now, undefined, wanted.dnsNames);
       await this.write(FILES.ca, ca);
     }
+    // A CA from before name constraints signs for everything; a constrained one only for the LAN,
+    // so an address outside it (a public one) is left off rather than stopping the server (PC-S4).
+    const names = namesWithinConstraints(ca.certificatePem, wanted);
     // Rewritten when it differs, so people always copy the CA the server really uses.
     const published = await readFile(join(this.directory, FILES.caCertificate), 'utf8').catch(
       missing,

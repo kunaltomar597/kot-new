@@ -1,30 +1,46 @@
+import { grantOf } from '../app/modes.js';
 import type { TableOverviewEntry } from '@rp/contracts';
-import { grantOf } from '@rp/domain';
-import { Button, Dialog, EmptyState, ErrorState, LoadingState, Money, TableTile } from '@rp/ui-web';
+import { formatRupees } from '@rp/domain';
+import {
+  Button,
+  Dialog,
+  EmptyState,
+  ErrorState,
+  LoadingState,
+  Money,
+  TABLE_STATE_STYLES,
+  TableTile,
+  useToast,
+} from '@rp/ui-web';
 import { useState } from 'react';
 import { useNavigate } from 'react-router';
-import { useConsoleState } from '../app/console-context.js';
+import { useConsole, useConsoleState } from '../app/console-context.js';
 import { useT } from '../app/i18n.js';
 import { messageOf } from '../app/messages.js';
 import { useNow } from '../app/use-now.js';
 import { useOpenBill } from '../billing/use-open-bill.js';
+import { PlanBoard } from '../manage/floor/FloorPlan.js';
+import { planOf } from '../manage/floor/floor-view.js';
 import { floorSections, tileAlert, tileDetails } from '@rp/ordering';
-import { FreeTableDialog } from './FreeTableDialog.js';
+import { Approvals } from './Approvals.js';
+import { MergeTablesDialog } from './MergeTablesDialog.js';
 import { MoveTableDialog } from './MoveTableDialog.js';
 import { OpenTableDialog } from './OpenTableDialog.js';
+import { TransferItemsDialog } from './TransferItemsDialog.js';
 import { useFloor } from './use-floor.js';
 
 type Panel =
   | { readonly kind: 'open'; readonly tableId: string }
   | { readonly kind: 'details'; readonly tableId: string }
   | { readonly kind: 'move'; readonly tableId: string }
-  | { readonly kind: 'free'; readonly tableId: string };
+  | { readonly kind: 'merge'; readonly tableId: string }
+  | { readonly kind: 'transfer'; readonly tableId: string };
 
 /**
  * The POS floor (TBL-007): every table by section with its state, guests, time seated, waiter and
  * amount so far, kept live by events. A free table opens (TBL-003); an occupied one shows its
- * details and can move to a free table (TBL-005), or be freed again while nothing has been
- * ordered (opened by mistake, TBL-004).
+ * details and can move to a free table (TBL-005), merge into another open table or move some of
+ * its dishes to one (TBL-006); one waiting to be cleaned can be marked clean (TBL-004).
  */
 export function TableOverview() {
   const t = useT();
@@ -32,6 +48,7 @@ export function TableOverview() {
   const { data, reload } = useFloor();
   const now = useNow(30_000);
   const [panel, setPanel] = useState<Panel | undefined>();
+  const [plan, setPlan] = useState(false);
   const navigate = useNavigate();
 
   if (data.status === 'loading') return <LoadingState title={t('states.loading')} />;
@@ -48,8 +65,14 @@ export function TableOverview() {
   const tables = sections.flatMap((section) => section.tables);
   const free = tables.filter((table) => table.state === 'FREE');
   const selected = tables.find((table) => table.tableId === panel?.tableId);
+  // Tables a merge or a dish can go to: open, without a printed bill, not this one.
+  const others = tables.filter(
+    (table) =>
+      table.session !== null &&
+      table.state !== 'BILL_PRINTED' &&
+      table.tableId !== selected?.tableId,
+  );
   const canMove = person !== undefined && grantOf(person, 'TABLE_MOVE_MERGE') !== 'DENY';
-  const canFree = person !== undefined && grantOf(person, 'ORDER_CREATE') !== 'DENY';
   const canCloseDay = person !== undefined && grantOf(person, 'DAY_END_CLOSE') !== 'DENY';
   const close = () => {
     setPanel(undefined);
@@ -60,6 +83,17 @@ export function TableOverview() {
   };
 
   if (tables.length === 0) return <EmptyState title={t('pos.noTables')} />;
+  // The plan is offered once a manager has placed tables on it (ONB-004 step 5).
+  const hasPlan = data.value.floor.sections.some((section) =>
+    section.tables.some((table) => table.archivedAt === null && table.layout !== null),
+  );
+  const showPlan = plan && hasPlan;
+  const select = (table: TableOverviewEntry) => {
+    setPanel({
+      kind: table.state === 'FREE' ? 'open' : 'details',
+      tableId: table.tableId,
+    });
+  };
 
   return (
     <div className="pos-floor">
@@ -94,8 +128,20 @@ export function TableOverview() {
           >
             {t('pos.takeaway')}
           </Button>
+          {hasPlan ? (
+            <Button
+              variant="secondary"
+              aria-pressed={showPlan}
+              onClick={() => {
+                setPlan(!showPlan);
+              }}
+            >
+              {t('floorPage.plan')}
+            </Button>
+          ) : null}
         </div>
       </div>
+      <Approvals />
       {sections.map((section) => (
         <section
           key={section.id}
@@ -103,25 +149,67 @@ export function TableOverview() {
           aria-label={section.name === '' ? t('pos.tables') : section.name}
         >
           {section.name === '' ? null : <h2 className="pos-floor__heading">{section.name}</h2>}
-          <div className="pos-floor__tables">
-            {section.tables.map((table) => (
-              <TableTile
-                key={table.tableId}
-                label={table.label}
-                state={table.state}
-                stateLabel={t(`pos.tableState.${table.state}`)}
-                details={tileDetails(table, now, t)}
-                {...(table.session !== null && { amountSoFar: table.session.amountSoFar })}
-                {...(tileAlert(table, t) !== undefined && { alert: tileAlert(table, t) })}
-                onSelect={() => {
-                  setPanel({
-                    kind: table.state === 'FREE' ? 'open' : 'details',
-                    tableId: table.tableId,
-                  });
-                }}
-              />
-            ))}
-          </div>
+          {showPlan ? (
+            <PlanBoard
+              label={section.name === '' ? t('pos.tables') : section.name}
+              tables={
+                data.value.floor.sections.find((entry) => entry.id === section.id)?.tables ?? []
+              }
+              places={(() => {
+                const view = data.value.floor.sections.find((entry) => entry.id === section.id);
+                return view === undefined ? new Map() : planOf(view).places;
+              })()}
+              render={(view, place, style) => {
+                const table = section.tables.find((entry) => entry.tableId === view.id);
+                if (table === undefined) return null;
+                const alert = tileAlert(table, t);
+                const spoken = [
+                  table.label,
+                  t(`pos.tableState.${table.state}`),
+                  ...tileDetails(table, now, t),
+                  ...(table.session === null ? [] : [formatRupees(table.session.amountSoFar)]),
+                  ...(alert === undefined ? [] : [alert]),
+                ];
+                return (
+                  <button
+                    key={table.tableId}
+                    type="button"
+                    className={
+                      place.shape === 'ROUND'
+                        ? 'floor-plan__table floor-plan__table--round'
+                        : 'floor-plan__table'
+                    }
+                    data-tone={TABLE_STATE_STYLES[table.state].tone}
+                    style={style}
+                    aria-label={spoken.join(', ')}
+                    onClick={() => {
+                      select(table);
+                    }}
+                  >
+                    {table.label}
+                    <span className="floor-plan__state">{t(`pos.tableState.${table.state}`)}</span>
+                  </button>
+                );
+              }}
+            />
+          ) : (
+            <div className="pos-floor__tables">
+              {section.tables.map((table) => (
+                <TableTile
+                  key={table.tableId}
+                  label={table.label}
+                  state={table.state}
+                  stateLabel={t(`pos.tableState.${table.state}`)}
+                  details={tileDetails(table, now, t)}
+                  {...(table.session !== null && { amountSoFar: table.session.amountSoFar })}
+                  {...(tileAlert(table, t) !== undefined && { alert: tileAlert(table, t) })}
+                  onSelect={() => {
+                    select(table);
+                  }}
+                />
+              ))}
+            </div>
+          )}
         </section>
       ))}
       {selected !== undefined && panel?.kind === 'open' && selected.state === 'FREE' ? (
@@ -132,14 +220,17 @@ export function TableOverview() {
           table={selected}
           now={now}
           canMove={canMove}
-          canFree={canFree}
           onClose={close}
           onMove={() => {
             setPanel({ kind: 'move', tableId: selected.tableId });
           }}
-          onFree={() => {
-            setPanel({ kind: 'free', tableId: selected.tableId });
+          onMerge={() => {
+            setPanel({ kind: 'merge', tableId: selected.tableId });
           }}
+          onTransfer={() => {
+            setPanel({ kind: 'transfer', tableId: selected.tableId });
+          }}
+          onCleaned={done}
           onTakeOrder={(sessionId) => {
             void navigate(`table/${sessionId}?label=${encodeURIComponent(selected.label)}`);
           }}
@@ -148,13 +239,11 @@ export function TableOverview() {
       {selected !== undefined && panel?.kind === 'move' ? (
         <MoveTableDialog table={selected} freeTables={free} onClose={close} onMoved={done} />
       ) : null}
-      {selected !== undefined && selected.session !== null && panel?.kind === 'free' ? (
-        <FreeTableDialog
-          table={selected}
-          sessionId={selected.session.id}
-          onClose={close}
-          onFreed={done}
-        />
+      {selected !== undefined && panel?.kind === 'merge' ? (
+        <MergeTablesDialog table={selected} openTables={others} onClose={close} onMerged={done} />
+      ) : null}
+      {selected !== undefined && panel?.kind === 'transfer' ? (
+        <TransferItemsDialog table={selected} openTables={others} onClose={close} onMoved={done} />
       ) : null}
     </div>
   );
@@ -164,31 +253,91 @@ function TableDetails({
   table,
   now,
   canMove,
-  canFree,
   onClose,
   onMove,
-  onFree,
+  onMerge,
+  onTransfer,
+  onCleaned,
   onTakeOrder,
 }: {
   table: TableOverviewEntry;
   now: number;
   canMove: boolean;
-  canFree: boolean;
   onClose: () => void;
   onMove: () => void;
-  onFree: () => void;
+  onMerge: () => void;
+  onTransfer: () => void;
+  onCleaned: () => void;
   onTakeOrder: (sessionId: string) => void;
 }) {
   const t = useT();
+  const controller = useConsole();
+  const toast = useToast();
   const session = table.session;
   const { openBill, opening } = useOpenBill();
-  // Opened by mistake: nothing billable ordered and nothing waiting for approval (the server checks).
-  const freeable =
-    canFree &&
-    session !== null &&
-    table.state === 'OCCUPIED' &&
-    session.amountSoFar === 0 &&
-    session.pendingApprovals === 0;
+  const [cleaning, setCleaning] = useState(false);
+  const [error, setError] = useState<string | undefined>();
+
+  const clean = async () => {
+    setCleaning(true);
+    setError(undefined);
+    try {
+      await controller.api.markTableClean({ params: { tableId: table.tableId } });
+      toast.show({ title: t('pos.table.cleaned', { table: table.label }), tone: 'success' });
+      onCleaned();
+    } catch (failure) {
+      setError(messageOf(failure, t));
+      setCleaning(false);
+    }
+  };
+
+  let footer = null;
+  if (session === null && table.state === 'NEEDS_CLEANING') {
+    footer = (
+      <Button
+        loading={cleaning}
+        onClick={() => {
+          void clean();
+        }}
+      >
+        {t('pos.table.clean')}
+      </Button>
+    );
+  } else if (session !== null) {
+    footer = (
+      <>
+        {canMove ? (
+          <>
+            <Button variant="secondary" onClick={onMove}>
+              {t('pos.table.move')}
+            </Button>
+            <Button variant="secondary" onClick={onMerge}>
+              {t('pos.table.merge')}
+            </Button>
+            <Button variant="secondary" onClick={onTransfer}>
+              {t('pos.table.transfer')}
+            </Button>
+          </>
+        ) : null}
+        <Button
+          variant="secondary"
+          loading={opening}
+          onClick={() => {
+            openBill({ tableSessionId: session.id });
+          }}
+        >
+          {t('pos.billTable')}
+        </Button>
+        <Button
+          onClick={() => {
+            onTakeOrder(session.id);
+          }}
+        >
+          {t('pos.table.takeOrder')}
+        </Button>
+      </>
+    );
+  }
   return (
     <Dialog
       open
@@ -196,40 +345,15 @@ function TableDetails({
       side="end"
       onClose={onClose}
       title={t('pos.table.title', { table: table.label })}
-      footer={
-        session === null ? null : (
-          <>
-            {freeable ? (
-              <Button variant="secondary" onClick={onFree}>
-                {t('pos.table.free')}
-              </Button>
-            ) : null}
-            {canMove ? (
-              <Button variant="secondary" onClick={onMove}>
-                {t('pos.table.move')}
-              </Button>
-            ) : null}
-            <Button
-              variant="secondary"
-              loading={opening}
-              onClick={() => {
-                openBill({ tableSessionId: session.id });
-              }}
-            >
-              {t('pos.billTable')}
-            </Button>
-            <Button
-              onClick={() => {
-                onTakeOrder(session.id);
-              }}
-            >
-              {t('pos.table.takeOrder')}
-            </Button>
-          </>
-        )
-      }
+      footer={footer}
     >
+      {error === undefined ? null : (
+        <p role="alert" className="console-notice console-notice--danger">
+          {error}
+        </p>
+      )}
       <p>{t(`pos.tableState.${table.state}`)}</p>
+      {table.state === 'NEEDS_CLEANING' ? <p>{t('pos.table.needsCleaning')}</p> : null}
       {session === null ? null : (
         <>
           <p>{tileDetails(table, now, t).slice(0, 2).join(' · ')}</p>

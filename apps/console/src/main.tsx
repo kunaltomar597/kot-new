@@ -1,3 +1,5 @@
+// First: before any module builds a Zod schema.
+import './app/zod-jitless.js';
 import '@rp/design-tokens/tokens.css';
 import '@rp/ui-web/styles.css';
 import './console.css';
@@ -8,10 +10,15 @@ import { createRoot } from 'react-dom/client';
 import { BrowserRouter } from 'react-router';
 import { App } from './App.js';
 import { ConsoleController } from './app/console-controller.js';
+import { createErrorReporting, watchPageErrors } from './app/error-reporting.js';
+import { reloadForNewConsole } from './app/reload.js';
 import { BrowserStorage } from './app/storage.js';
 
+const appVersion = import.meta.env.VITE_APP_VERSION ?? '0.1.0';
+let sendError: (error: unknown) => void = () => undefined;
 const report = (error: unknown): void => {
   globalThis.reportError(error);
+  sendError(error);
 };
 
 // Missing text is a bug: loud in development, reported (not fatal) in production.
@@ -20,9 +27,28 @@ const controller = new ConsoleController({
   // The local server serves the console, so the API is on the same origin.
   baseUrl: '',
   storage: new BrowserStorage(),
-  appVersion: import.meta.env.VITE_APP_VERSION ?? '0.1.0',
+  appVersion,
   onError: report,
+  // The server was updated past this console: load its own (UPD-006).
+  onClientTooOld: () => {
+    let storage: Storage | undefined;
+    try {
+      storage = globalThis.sessionStorage;
+    } catch {
+      storage = undefined;
+    }
+    reloadForNewConsole({
+      storage,
+      now: Date.now,
+      reload: () => {
+        globalThis.location.reload();
+      },
+    });
+  },
 });
+// NFR-O02: errors go to the local server, which reports them to the vendor, scrubbed.
+sendError = createErrorReporting(controller, appVersion);
+watchPageErrors(sendError);
 void controller.start();
 
 const root = document.getElementById('root');

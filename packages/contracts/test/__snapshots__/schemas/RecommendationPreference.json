@@ -1,4 +1,0 @@
-{
-  "input": { "type": "string", "enum": ["NORMAL", "PIN", "BOOST", "BLOCK"] },
-  "output": { "type": "string", "enum": ["NORMAL", "PIN", "BOOST", "BLOCK"] }
-}

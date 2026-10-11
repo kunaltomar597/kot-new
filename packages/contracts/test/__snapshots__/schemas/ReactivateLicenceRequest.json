@@ -1,0 +1,18 @@
+{
+  "input": {
+    "type": "object",
+    "properties": {
+      "code": { "type": "string", "pattern": "^[0-9A-HJKMNP-TV-Z]{4}(-?[0-9A-HJKMNP-TV-Z]{4}){3}$" }
+    },
+    "required": ["code"],
+    "additionalProperties": false
+  },
+  "output": {
+    "type": "object",
+    "properties": {
+      "code": { "type": "string", "pattern": "^[0-9A-HJKMNP-TV-Z]{4}(-?[0-9A-HJKMNP-TV-Z]{4}){3}$" }
+    },
+    "required": ["code"],
+    "additionalProperties": false
+  }
+}

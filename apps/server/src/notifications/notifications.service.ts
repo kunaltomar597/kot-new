@@ -67,6 +67,12 @@ export interface RaiseAlert {
 
 const MANAGER_ROLES = new Set(['OWNER', 'MANAGER']);
 
+/** Who acknowledged an alert, and on which device: a pager, a phone or a screen (PAGER-R2). */
+export interface AcknowledgedBy {
+  readonly staffId: string;
+  readonly deviceId: string | null;
+}
+
 const alertNotFound = () => new AppError(404, 'ALERT_NOT_FOUND', 'There is no such alert for you.');
 
 function iso(value: Date | null): string | null {
@@ -348,6 +354,19 @@ export class NotificationsService implements OnApplicationBootstrap, OnModuleDes
   }
 
   /** NTF-009: while on break, the person's alerts go to the managers on duty. */
+  /** NTF-009: whether the signed-in person is on break, and since when. */
+  async breakOf(principal: Principal): Promise<BreakView> {
+    const current = await this.prisma.staff.findFirstOrThrow({
+      where: { id: principal.staffId, restaurantId: principal.restaurantId },
+      select: { onBreakSince: true },
+    });
+    return {
+      staffId: principal.staffId,
+      onBreak: current.onBreakSince !== null,
+      since: iso(current.onBreakSince),
+    };
+  }
+
   async setBreak(principal: Principal, onBreak: boolean): Promise<BreakView> {
     const current = await this.prisma.staff.findFirstOrThrow({
       where: { id: principal.staffId, restaurantId: principal.restaurantId },
@@ -366,14 +385,31 @@ export class NotificationsService implements OnApplicationBootstrap, OnModuleDes
 
   /** NTF-004: acknowledged by a recipient, a manager or the Owner, on any device. */
   acknowledge(
-    principal: Pick<Principal, 'restaurantId' | 'staffId' | 'role'>,
+    principal: Pick<Principal, 'restaurantId' | 'staffId' | 'role' | 'deviceId'>,
     alertId: string,
   ): Promise<AlertView> {
     return this.acknowledgeAs(
       principal.restaurantId,
-      principal.staffId,
+      { staffId: principal.staffId, deviceId: principal.deviceId },
       alertId,
       (row) => MANAGER_ROLES.has(principal.role) || row.recipientIds.includes(principal.staffId),
+    );
+  }
+
+  /**
+   * The button on a pager acknowledges in its wearer's name (NTF-004), like the waiter phone: only
+   * an alert sent to that pager, whoever wears it, so a manager's pager cannot acknowledge another
+   * person's alert by its id (PAGER-T1). The pager is recorded with the acknowledgement (PAGER-R2).
+   */
+  acknowledgeForPager(
+    pager: { restaurantId: string; deviceId: string; staffId: string },
+    alertId: string,
+  ): Promise<AlertView> {
+    return this.acknowledgeAs(
+      pager.restaurantId,
+      { staffId: pager.staffId, deviceId: pager.deviceId },
+      alertId,
+      (row) => reachesPagerAndApp(row, pager.staffId),
     );
   }
 
@@ -409,8 +445,11 @@ export class NotificationsService implements OnApplicationBootstrap, OnModuleDes
   async acknowledgeForDevice(device: AuthenticatedDevice, alertId: string): Promise<AlertView> {
     const holder = await this.holderOf(device);
     if (holder === null) throw alertNotFound();
-    return this.acknowledgeAs(device.restaurantId, holder.id, alertId, (row) =>
-      reachesPagerAndApp(row, holder.id),
+    return this.acknowledgeAs(
+      device.restaurantId,
+      { staffId: holder.id, deviceId: device.deviceId },
+      alertId,
+      (row) => reachesPagerAndApp(row, holder.id),
     );
   }
 
@@ -435,14 +474,14 @@ export class NotificationsService implements OnApplicationBootstrap, OnModuleDes
 
   private acknowledgeAs(
     restaurantId: string,
-    staffId: string,
+    by: AcknowledgedBy,
     alertId: string,
     allowed: (row: Alert) => boolean,
   ): Promise<AlertView> {
     return this.prisma.transaction(async (tx) => {
       const row = await this.lockAlert(tx, restaurantId, alertId);
       if (row === null || !allowed(row)) throw alertNotFound();
-      return this.viewOf(tx, await this.acknowledgeRow(tx, row, staffId));
+      return this.viewOf(tx, await this.acknowledgeRow(tx, row, by));
     });
   }
 
@@ -454,10 +493,10 @@ export class NotificationsService implements OnApplicationBootstrap, OnModuleDes
     tx: TransactionClient,
     restaurantId: string,
     alertId: string,
-    staffId: string,
+    by: AcknowledgedBy,
   ): Promise<void> {
     const row = await this.lockAlert(tx, restaurantId, alertId);
-    if (row !== null) await this.acknowledgeRow(tx, row, staffId);
+    if (row !== null) await this.acknowledgeRow(tx, row, by);
   }
 
   private async lockAlert(
@@ -472,7 +511,11 @@ export class NotificationsService implements OnApplicationBootstrap, OnModuleDes
   }
 
   /** NTF-004: stops the repeats and the escalation; every device of every recipient hears it. */
-  private async acknowledgeRow(tx: TransactionClient, row: Alert, staffId: string): Promise<Alert> {
+  private async acknowledgeRow(
+    tx: TransactionClient,
+    row: Alert,
+    { staffId, deviceId }: AcknowledgedBy,
+  ): Promise<Alert> {
     if (row.status !== 'OPEN') return row;
     const now = this.clock.now();
     const acknowledged = await tx.alert.update({
@@ -481,6 +524,7 @@ export class NotificationsService implements OnApplicationBootstrap, OnModuleDes
         status: 'ACKNOWLEDGED',
         acknowledgedAt: now,
         acknowledgedById: staffId,
+        acknowledgedByDeviceId: deviceId,
         escalateAt: null,
         nextRepeatAt: null,
       },

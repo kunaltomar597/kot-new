@@ -1,0 +1,28 @@
+{
+  "input": {
+    "type": "object",
+    "properties": {
+      "financialYear": { "type": "string", "pattern": "^\\d{4}-\\d{2}$" },
+      "folder": {
+        "anyOf": [{ "type": "string", "minLength": 1, "maxLength": 260 }, { "type": "null" }]
+      },
+      "acknowledgeStatutory": { "type": "boolean" },
+      "reason": { "type": "string", "minLength": 3, "maxLength": 200 }
+    },
+    "required": ["financialYear", "folder", "acknowledgeStatutory", "reason"],
+    "additionalProperties": false
+  },
+  "output": {
+    "type": "object",
+    "properties": {
+      "financialYear": { "type": "string", "pattern": "^\\d{4}-\\d{2}$" },
+      "folder": {
+        "anyOf": [{ "type": "string", "minLength": 1, "maxLength": 260 }, { "type": "null" }]
+      },
+      "acknowledgeStatutory": { "type": "boolean" },
+      "reason": { "type": "string", "minLength": 3, "maxLength": 200 }
+    },
+    "required": ["financialYear", "folder", "acknowledgeStatutory", "reason"],
+    "additionalProperties": false
+  }
+}

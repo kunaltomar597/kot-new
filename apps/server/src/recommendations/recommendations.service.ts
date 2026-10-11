@@ -1,18 +1,22 @@
 import { Inject, Injectable } from '@nestjs/common';
-import type { RecommendationEventInput, RecommendationsResponse } from '@rp/contracts';
+import type {
+  BestSellersResponse,
+  RecommendationEventInput,
+  RecommendationsResponse,
+} from '@rp/contracts';
 import { daypartAt, type RecoChannel, type RecoItem, recommend, timeOfDayOf } from '@rp/domain';
+import { itemsOffNow } from '@rp/ordering';
 import type { AuthenticatedDevice } from '../auth/device.js';
 import type { Principal } from '../auth/principal.js';
 import { currentBusinessDate, dbDate } from '../common/business-dates.js';
 import { newId } from '../common/ids.js';
 import { PrismaService } from '../database/prisma.service.js';
 import { AppError } from '../errors/app-error.js';
-import { comboOnNow } from '../menu/menu-content.js';
 import { MenuPublishService } from '../menu/menu-publish.service.js';
 import { SettingsService } from '../settings/settings.service.js';
 import { BestSellers } from './best-sellers.js';
 import { RECOMMENDATION_CLOCK, type RecommendationClock } from './clock.js';
-import { RecommendationPreferencesService } from './recommendation-preferences.service.js';
+import { LearnedAssociations } from './learned-associations.service.js';
 import { RecommendationRulesService } from './recommendation-rules.service.js';
 
 const errors = {
@@ -60,10 +64,9 @@ interface Tracked {
 
 /**
  * Serves recommendations (P3-04, REC-001, REC-011): loads what `@rp/domain` `recommend` needs (the
- * published menu with live availability, the active rules, the manager's pinned, boosted and
- * blocked dishes, the best sellers of the time of day, the table's order and cart) and returns its
- * suggestions with their reasons. Table-level only (REC-007): nothing about a person is read. Also
- * records what was done with them (REC-008).
+ * published menu with live availability, the active rules, the learned pairings (P6-02), the best
+ * sellers of the time of day, the table's order and cart) and returns its suggestions with their reasons. Table-level only
+ * (REC-007): nothing about a person is read. Also records what was done with them (REC-008).
  */
 @Injectable()
 export class RecommendationsService {
@@ -72,10 +75,44 @@ export class RecommendationsService {
     private readonly menu: MenuPublishService,
     private readonly settings: SettingsService,
     private readonly rules: RecommendationRulesService,
-    private readonly preferences: RecommendationPreferencesService,
     private readonly bestSellers: BestSellers,
+    private readonly learned: LearnedAssociations,
     @Inject(RECOMMENDATION_CLOCK) private readonly clock: RecommendationClock,
   ) {}
+
+  /**
+   * The bestseller badge and filter (TAB-005, P3-03a): the most ordered dishes over the whole day
+   * for the last `reco.bestSellerDays`, the top `menu.bestSellerCount`, still on the menu.
+   */
+  async bestSellerIds(restaurantId: string): Promise<BestSellersResponse> {
+    const now = this.clock.now();
+    const [menu, settings, restaurant, businessDate] = await Promise.all([
+      this.menu.current(restaurantId),
+      this.settings.snapshot(restaurantId),
+      this.prisma.restaurant.findUniqueOrThrow({
+        where: { id: restaurantId },
+        select: { timeZone: true },
+      }),
+      currentBusinessDate(this.prisma, restaurantId, now),
+    ]);
+    const count = settings.get('menu.bestSellerCount');
+    if (count === 0) return { itemIds: [] };
+    const counts = await this.bestSellers.get({
+      restaurantId,
+      businessDate,
+      days: settings.get('reco.bestSellerDays'),
+      hours: null,
+      timeZone: restaurant.timeZone,
+    });
+    const onMenu = new Set(menu.items.filter((item) => !item.archived).map((item) => item.id));
+    return {
+      itemIds: [...counts]
+        .filter((entry) => onMenu.has(entry.itemId) && entry.quantity > 0)
+        .sort((a, b) => b.quantity - a.quantity || a.itemId.localeCompare(b.itemId))
+        .slice(0, count)
+        .map((entry) => entry.itemId),
+    };
+  }
 
   /** The waiter app and the POS: a table's suggestions, or a takeaway cart's (WTR-011). */
   async forStaff(
@@ -159,19 +196,18 @@ export class RecommendationsService {
   private async suggest(ask: Ask): Promise<RecommendationsResponse> {
     const now = this.clock.now();
     const { restaurantId } = ask;
-    const [menu, settings, restaurant, businessDate, ordered, rules, preferences] =
-      await Promise.all([
-        this.menu.current(restaurantId),
-        this.settings.snapshot(restaurantId),
-        this.prisma.restaurant.findUniqueOrThrow({
-          where: { id: restaurantId },
-          select: { timeZone: true },
-        }),
-        currentBusinessDate(this.prisma, restaurantId, now),
-        ask.tableSessionId === null ? [] : this.orderedAt(ask.tableSessionId),
-        this.rules.active(restaurantId),
-        this.preferences.active(restaurantId),
-      ]);
+    const [menu, settings, restaurant, businessDate, ordered, rules, learned] = await Promise.all([
+      this.menu.current(restaurantId),
+      this.settings.snapshot(restaurantId),
+      this.prisma.restaurant.findUniqueOrThrow({
+        where: { id: restaurantId },
+        select: { timeZone: true },
+      }),
+      currentBusinessDate(this.prisma, restaurantId, now),
+      ask.tableSessionId === null ? [] : this.orderedAt(ask.tableSessionId),
+      this.rules.active(restaurantId),
+      this.learned.pairs(restaurantId),
+    ]);
     const { timeZone } = restaurant;
     const time = timeOfDayOf(now, timeZone);
     const dayparts = settings.get('reco.dayparts');
@@ -183,16 +219,15 @@ export class RecommendationsService {
       hours: daypart === null ? null : dayparts[daypart],
       timeZone,
     });
-    // A combo outside its dates or hours cannot be ordered now, so it is not suggested either.
-    const combosOff = new Set(
-      menu.combos.filter((combo) => !comboOnNow(combo, now, timeZone)).map((combo) => combo.itemId),
-    );
+    // A dish outside its hours (MENU-007) or a combo outside its dates or hours cannot be ordered
+    // now, so it is not suggested either.
+    const offNow = itemsOffNow(menu, now, timeZone);
     const items: RecoItem[] = menu.items.map((item) => ({
       id: item.id,
       name: item.name,
       categoryId: item.categoryId,
       foodType: item.foodType,
-      available: item.available && !combosOff.has(item.id),
+      available: item.available && !offNow.has(item.id),
       stockCount: item.stockCount,
       channels: item.channels,
       repeatable: item.repeatable,
@@ -202,7 +237,7 @@ export class RecommendationsService {
       items,
       categories: menu.categories,
       rules,
-      preferences,
+      learned,
       bestSellers,
       daypart,
       channel: ask.channel,
@@ -212,6 +247,7 @@ export class RecommendationsService {
       businessDate,
       courseSequence: settings.get('reco.courseSequence'),
       limit: ask.limit,
+      preferences: settings.get('reco.itemPreferences'),
     });
     return { recommendations, daypart, menuVersion: menu.version };
   }

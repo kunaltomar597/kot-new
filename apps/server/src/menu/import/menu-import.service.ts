@@ -79,14 +79,23 @@ export class MenuImportService {
   async commit(principal: Principal, request: MenuImportRequest): Promise<MenuImportReport> {
     const read = await this.sheetsOf(request);
     if (!read.ok) return read.report;
+    return this.commitSheets(principal, read.sheets, { format: request.file.format });
+  }
+
+  /**
+   * Imports sheets already read (a file, or a checked AI draft, P6-04b): planned again inside the
+   * lock, written, audited with `source` and published; or every problem, with nothing written.
+   */
+  async commitSheets(
+    principal: Principal,
+    sheets: MenuImportSheets,
+    source: Readonly<Record<string, string>>,
+  ): Promise<MenuImportReport> {
     return this.prisma.transaction(
       async (tx) => {
         await lockSetup(tx);
         // Planned inside the lock, so nobody changes the menu between the check and the write.
-        const result = planMenuImport(
-          read.sheets,
-          await this.contextOf(tx, principal.restaurantId),
-        );
+        const result = planMenuImport(sheets, await this.contextOf(tx, principal.restaurantId));
         if (!result.ok) {
           return {
             ok: false,
@@ -105,7 +114,7 @@ export class MenuImportService {
           deviceId: principal.deviceId,
           restaurantId: principal.restaurantId,
           before: null,
-          after: { ...result.summary, format: request.file.format },
+          after: { ...result.summary, ...source },
           reason: null,
         });
         const published = await this.publisher.publishIn(tx, principal);

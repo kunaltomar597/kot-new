@@ -1,0 +1,25 @@
+{
+  "input": {
+    "type": "object",
+    "properties": {
+      "filename": { "type": "string" },
+      "contentType": { "type": "string", "const": "application/pdf" },
+      "encoding": { "type": "string", "const": "base64" },
+      "content": { "type": "string" },
+      "pages": { "type": "integer", "exclusiveMinimum": 0, "maximum": 9007199254740991 }
+    },
+    "required": ["filename", "contentType", "encoding", "content", "pages"]
+  },
+  "output": {
+    "type": "object",
+    "properties": {
+      "filename": { "type": "string" },
+      "contentType": { "type": "string", "const": "application/pdf" },
+      "encoding": { "type": "string", "const": "base64" },
+      "content": { "type": "string" },
+      "pages": { "type": "integer", "exclusiveMinimum": 0, "maximum": 9007199254740991 }
+    },
+    "required": ["filename", "contentType", "encoding", "content", "pages"],
+    "additionalProperties": false
+  }
+}

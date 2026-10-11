@@ -1,0 +1,4 @@
+{
+  "input": { "type": "string", "enum": ["PENDING", "FULFILLED", "DECLINED", "EXPIRED"] },
+  "output": { "type": "string", "enum": ["PENDING", "FULFILLED", "DECLINED", "EXPIRED"] }
+}

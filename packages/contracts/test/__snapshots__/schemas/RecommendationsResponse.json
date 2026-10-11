@@ -12,10 +12,7 @@
               "format": "uuid",
               "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
             },
-            "layer": {
-              "type": "string",
-              "enum": ["PINNED", "RULE", "LEARNED", "BOOSTED", "BEST_SELLER"]
-            },
+            "layer": { "type": "string", "enum": ["RULE", "LEARNED", "BEST_SELLER"] },
             "reason": {
               "oneOf": [
                 {
@@ -55,19 +52,8 @@
                 },
                 {
                   "type": "object",
-                  "properties": {
-                    "kind": { "type": "string", "const": "PINNED" },
-                    "label": { "type": ["string", "null"] }
-                  },
-                  "required": ["kind", "label"]
-                },
-                {
-                  "type": "object",
-                  "properties": {
-                    "kind": { "type": "string", "const": "BOOSTED" },
-                    "label": { "type": ["string", "null"] }
-                  },
-                  "required": ["kind", "label"]
+                  "properties": { "kind": { "type": "string", "const": "FEATURED" } },
+                  "required": ["kind"]
                 }
               ]
             }
@@ -98,10 +84,7 @@
               "format": "uuid",
               "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
             },
-            "layer": {
-              "type": "string",
-              "enum": ["PINNED", "RULE", "LEARNED", "BOOSTED", "BEST_SELLER"]
-            },
+            "layer": { "type": "string", "enum": ["RULE", "LEARNED", "BEST_SELLER"] },
             "reason": {
               "oneOf": [
                 {
@@ -144,20 +127,8 @@
                 },
                 {
                   "type": "object",
-                  "properties": {
-                    "kind": { "type": "string", "const": "PINNED" },
-                    "label": { "type": ["string", "null"] }
-                  },
-                  "required": ["kind", "label"],
-                  "additionalProperties": false
-                },
-                {
-                  "type": "object",
-                  "properties": {
-                    "kind": { "type": "string", "const": "BOOSTED" },
-                    "label": { "type": ["string", "null"] }
-                  },
-                  "required": ["kind", "label"],
+                  "properties": { "kind": { "type": "string", "const": "FEATURED" } },
+                  "required": ["kind"],
                   "additionalProperties": false
                 }
               ]

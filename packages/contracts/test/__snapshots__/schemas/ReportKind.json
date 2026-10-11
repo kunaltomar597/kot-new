@@ -1,10 +1,46 @@
 {
   "input": {
     "type": "string",
-    "enum": ["SALES", "ITEMS", "PAYMENTS", "SHIFTS", "GST", "INVOICE_REGISTER"]
+    "enum": [
+      "SALES",
+      "ITEMS",
+      "PAYMENTS",
+      "SHIFTS",
+      "GST",
+      "INVOICE_REGISTER",
+      "SOURCES",
+      "STAFF",
+      "DISCOUNTS",
+      "CANCELLATIONS",
+      "REPRINTS",
+      "KITCHEN",
+      "TABLES",
+      "RECOMMENDATIONS",
+      "AUDIT",
+      "SUSPICIOUS",
+      "FEEDBACK"
+    ]
   },
   "output": {
     "type": "string",
-    "enum": ["SALES", "ITEMS", "PAYMENTS", "SHIFTS", "GST", "INVOICE_REGISTER"]
+    "enum": [
+      "SALES",
+      "ITEMS",
+      "PAYMENTS",
+      "SHIFTS",
+      "GST",
+      "INVOICE_REGISTER",
+      "SOURCES",
+      "STAFF",
+      "DISCOUNTS",
+      "CANCELLATIONS",
+      "REPRINTS",
+      "KITCHEN",
+      "TABLES",
+      "RECOMMENDATIONS",
+      "AUDIT",
+      "SUSPICIOUS",
+      "FEEDBACK"
+    ]
   }
 }

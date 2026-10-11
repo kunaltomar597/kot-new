@@ -1,4 +1,6 @@
 export * from './alert-center.js';
+export * from './apk-updates.js';
+export * from './app-updates.js';
 export * from './client.js';
 export * from './device-session.js';
 export * from './menu-cache.js';
@@ -7,3 +9,6 @@ export * from './outbox.js';
 export * from './server-trust.js';
 export * from './server-url.js';
 export * from './storage.js';
+export * from './tablet.js';
+export * from './suggestions.js';
+export { createDeviceErrorReporting, watchUncaughtErrors } from './error-reporting.js';

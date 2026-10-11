@@ -1,6 +1,7 @@
 import { Inject, Injectable, type NestMiddleware } from '@nestjs/common';
 import type { NextFunction, Request, Response } from 'express';
-import { DEVICE_AUTHENTICATOR, type DeviceAuthenticator } from './device.js';
+import { idleMsOf } from './activity.js';
+import { DEVICE_AUTHENTICATOR, type DeviceAuthenticator, rememberedDevice } from './device.js';
 import type { AuthenticatedRequest } from './principal.js';
 import { SessionService } from './session.service.js';
 
@@ -27,10 +28,13 @@ export class AuthenticationMiddleware implements NestMiddleware {
     try {
       const target = request as AuthenticatedRequest;
       // Both checks always run; what the request carries only decides what they conclude, never
-      // whether they run (CWE-807).
-      const device = await this.devices.authenticate(request);
+      // whether they run (CWE-807). The device's ran before the body was read (PC-D1), unless
+      // that check failed.
+      const checked = rememberedDevice(request);
+      const device =
+        checked === undefined ? await this.devices.authenticate(request) : checked.device;
       const token = bearerToken(request.headers.authorization);
-      const result = await this.sessions.authenticate(token, device);
+      const result = await this.sessions.authenticate(token, device, idleMsOf(request));
       target.device = device;
       if ('principal' in result) target.principal = result.principal;
       // Without a bearer token, a protected route simply answers "please sign in".

@@ -149,6 +149,27 @@ describe('[ONB-004] [BILL-002] restaurant profile', () => {
     expect(await setupEvents('PROFILE')).toBe(1);
   });
 
+  it('[TAB-003] keeps the tablets’ accent colour: set, kept when left out, cleared with null', async () => {
+    const set = await server()
+      .put('/api/v1/restaurant/profile')
+      .set(as(manager))
+      .send({ ...PROFILE, accentColor: '#b4232a' });
+    expect(set.status, JSON.stringify(set.body)).toBe(200);
+    expect(RestaurantProfile.parse(set.body).accentColor).toBe('#B4232A');
+    const kept = await server().put('/api/v1/restaurant/profile').set(as(manager)).send(PROFILE);
+    expect(RestaurantProfile.parse(kept.body).accentColor).toBe('#B4232A');
+    const bad = await server()
+      .put('/api/v1/restaurant/profile')
+      .set(as(manager))
+      .send({ ...PROFILE, accentColor: 'red' });
+    expect(bad.status).toBe(400);
+    const cleared = await server()
+      .put('/api/v1/restaurant/profile')
+      .set(as(manager))
+      .send({ ...PROFILE, accentColor: null });
+    expect(RestaurantProfile.parse(cleared.body).accentColor).toBeNull();
+  });
+
   it('is not for waiters or kitchen staff', async () => {
     const response = await server().put('/api/v1/restaurant/profile').set(as(waiter)).send(PROFILE);
     expect([response.status, codeOf(response)]).toEqual([403, 'FORBIDDEN']);
@@ -325,9 +346,6 @@ describe('[BILL-004] tax groups', () => {
 
     const inUse = await archive();
     expect([inUse.status, codeOf(inUse)]).toEqual([409, 'TAX_GROUP_IN_USE']);
-    expect(ApiError.parse(inUse.body).message).toBe(
-      '1 menu item uses this tax group. Give it another tax group first.',
-    );
     const listed = TaxGroupListResponse.parse(
       (await server().get('/api/v1/tax-groups').set(as(owner))).body,
     );

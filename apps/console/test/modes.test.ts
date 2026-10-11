@@ -1,12 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  homeFor,
-  isStationMode,
-  manageLandingOf,
-  managePagesFor,
-  modeOfPath,
-  modesFor,
-} from '../src/app/modes.js';
+import { grantOf, homeFor, isStationMode, modeOfPath, modesFor } from '../src/app/modes.js';
 import { deviceSummary } from './fakes.js';
 
 describe('[MGR-001] [KDS-001] console modes by role (BRD §4.2)', () => {
@@ -26,70 +19,6 @@ describe('[MGR-001] [KDS-001] console modes by role (BRD §4.2)', () => {
     expect(homeFor({ role: 'KITCHEN' })).toBe('kds');
   });
 
-  it('[AUTH-012] follows a custom role', () => {
-    const headCashier = {
-      role: 'CASHIER',
-      customRole: { added: ['STAFF_MANAGE'], removed: [] },
-    } as const;
-    // The dashboard opens for its Staff page, but a cashier still starts at the POS.
-    expect(modesFor(headCashier)).toEqual(['pos', 'manage']);
-    expect(homeFor(headCashier)).toBe('pos');
-    const expediter = {
-      role: 'MANAGER',
-      customRole: { added: [], removed: ['ORDER_CREATE'] },
-    } as const;
-    expect(modesFor(expediter)).toEqual(['kds', 'manage']);
-    expect(homeFor(expediter)).toBe('manage');
-  });
-
-  it('[MGR-001] [MGR-007] [AUTH-012] opens the dashboard pages a person may use', () => {
-    expect(managePagesFor({ role: 'OWNER' })).toEqual([
-      'overview',
-      'orders',
-      'alerts',
-      'menu',
-      'staff',
-      'devices',
-      'settings',
-      'security',
-    ]);
-    expect(managePagesFor({ role: 'MANAGER' })).toEqual([
-      'overview',
-      'orders',
-      'alerts',
-      'menu',
-      'staff',
-      'devices',
-      'settings',
-    ]);
-    expect(manageLandingOf(managePagesFor({ role: 'MANAGER' }))).toBe('overview');
-    // A head cashier manages staff, but the order feed is not theirs: Manage opens on Staff.
-    const headCashier = {
-      role: 'CASHIER',
-      customRole: { added: ['STAFF_MANAGE'], removed: [] },
-    } as const;
-    expect(managePagesFor(headCashier)).toEqual(['alerts', 'staff']);
-    expect(manageLandingOf(managePagesFor(headCashier))).toBe('staff');
-    const floorManager = {
-      role: 'MANAGER',
-      customRole: { added: [], removed: ['MENU_MANAGE', 'DEVICE_PAIR'] },
-    } as const;
-    expect(managePagesFor(floorManager)).toEqual([
-      'overview',
-      'orders',
-      'alerts',
-      'staff',
-      'settings',
-    ]);
-    // Without OPERATIONS_CONFIGURE, no live feed and no settings.
-    const menuManager = {
-      role: 'MANAGER',
-      customRole: { added: [], removed: ['OPERATIONS_CONFIGURE'] },
-    } as const;
-    expect(managePagesFor(menuManager)).toEqual(['alerts', 'menu', 'staff', 'devices']);
-    expect(manageLandingOf(['alerts'])).toBe('alerts');
-  });
-
   it('runs kitchen screens in station mode', () => {
     expect(isStationMode(deviceSummary({ type: 'KDS' }))).toBe(true);
     expect(isStationMode(deviceSummary())).toBe(false);
@@ -100,5 +29,20 @@ describe('[MGR-001] [KDS-001] console modes by role (BRD §4.2)', () => {
     expect(modeOfPath('/kds/station')).toBe('kds');
     expect(modeOfPath('/manage')).toBe('manage');
     expect(modeOfPath('/login')).toBeUndefined();
+  });
+});
+
+describe('[AUTH-012] a custom role opens what it adds', () => {
+  it('opens the dashboard for a waiter whose custom role edits the menu', () => {
+    expect(modesFor({ role: 'WAITER', capabilities: ['MENU_MANAGE'] })).toEqual(['pos', 'manage']);
+    expect(modesFor({ role: 'CASHIER', capabilities: ['ITEM_MARK_PREPARING_READY'] })).toEqual([
+      'pos',
+      'kds',
+    ]);
+    expect(
+      grantOf({ role: 'WAITER', capabilities: ['TABLE_MOVE_MERGE'] }, 'TABLE_MOVE_MERGE'),
+    ).toBe('ALLOW');
+    // Never more than the rules allow, whatever the list says.
+    expect(grantOf({ role: 'WAITER', capabilities: ['DATA_ADMIN'] }, 'DATA_ADMIN')).toBe('DENY');
   });
 });

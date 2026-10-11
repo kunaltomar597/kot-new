@@ -6,7 +6,7 @@ export const RESTAURANT_ID = '0199a0e0-0000-7000-8000-00000000a001';
 export const STREAM_ID = '0199a0e0-0000-4000-8000-00000000f001';
 
 function tile(staffId: string, displayName: string, role: Role): StaffTile {
-  return { staffId, displayName, role, customRoleName: null, photoId: null };
+  return { staffId, displayName, role, photoId: null };
 }
 
 export const STAFF: Readonly<Record<Role, StaffTile>> = {
@@ -25,6 +25,7 @@ export function deviceSummary(overrides: Partial<DeviceSummary> = {}): DeviceSum
     status: 'ACTIVE',
     tableId: null,
     stationId: null,
+    stationIds: [],
     staffId: null,
     pairedAt: '2026-09-25T10:00:00.000Z',
     lastSeenAt: null,
@@ -48,7 +49,7 @@ export function login(role: Role, inactivityTimeoutSeconds = 600): LoginResponse
       expiresAt: inMinutes(600),
       inactivityTimeoutSeconds,
     },
-    staff: { id: person.staffId, displayName: person.displayName, role, customRole: null },
+    staff: { id: person.staffId, displayName: person.displayName, role, capabilities: [] },
     secondFactorValidUntil: null,
   };
 }

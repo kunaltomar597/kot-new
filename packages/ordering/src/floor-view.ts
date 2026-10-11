@@ -21,7 +21,7 @@ export interface FloorSection {
  */
 export function floorSections(
   floor: FloorResponse,
-  overview: TableOverviewResponse,
+  overview: Pick<TableOverviewResponse, 'tables'>,
 ): FloorSection[] {
   const byId = new Map(overview.tables.map((table) => [table.tableId, table]));
   const placed = new Set<string>();
@@ -94,7 +94,7 @@ export function affectsFloor(eventType: string): boolean {
  */
 export function myTableIds(
   staffId: string,
-  overview: TableOverviewResponse,
+  overview: Pick<TableOverviewResponse, 'tables'>,
   assignments: readonly WaiterAssignmentView[],
 ): Set<string> {
   const floorTables = overview.tables.map((table) => ({
@@ -110,6 +110,6 @@ export function myTableIds(
 }
 
 /** Where guests can move to (TBL-005): the free tables, in the overview's order. */
-export function freeTables(overview: TableOverviewResponse): TableOverviewEntry[] {
+export function freeTables(overview: Pick<TableOverviewResponse, 'tables'>): TableOverviewEntry[] {
   return overview.tables.filter((table) => table.state === 'FREE');
 }

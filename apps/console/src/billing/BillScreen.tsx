@@ -1,4 +1,5 @@
 import type { BillView, InvoiceView } from '@rp/contracts';
+import { amountInWords } from '@rp/domain';
 import { Badge, Button, Card, ErrorState, Icon, LoadingState, Money, useToast } from '@rp/ui-web';
 import { useState } from 'react';
 import { useConsole } from '../app/console-context.js';
@@ -6,6 +7,7 @@ import { useT } from '../app/i18n.js';
 import { messageOf } from '../app/messages.js';
 import { useLive } from '../app/use-live.js';
 import { CustomerDialog } from './CustomerDialog.js';
+import { DigitalBillLine } from './DigitalBillLine.js';
 import { DiscountDialog } from './DiscountDialog.js';
 import { OverrideCancelled, useOverride } from './override.js';
 import { ReasonDialog } from './ReasonDialog.js';
@@ -217,6 +219,10 @@ export function BillScreen({
                         >
                           {t('billing.void')}
                         </Button>
+                        <DigitalBillLine
+                          invoiceId={invoice.id}
+                          invoiceNumber={invoice.invoiceNumber}
+                        />
                       </>
                     )}
                   </li>
@@ -464,6 +470,9 @@ function BillPreview({ bill }: { bill: BillView }) {
           <Money paise={bill.grandTotal} size="lg" strong />
         </dd>
       </dl>
+      {bill.amountInWords ? (
+        <p className="dashboard-section__hint">{amountInWords(bill.grandTotal)}</p>
+      ) : null}
     </Card>
   );
 }

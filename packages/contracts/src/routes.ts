@@ -10,7 +10,28 @@ import {
   NudgeRequest,
   NudgeResponse,
 } from './alerts.js';
-import { AuditVerifyResponse } from './audit.js';
+import {
+  ArchivedDaysResponse,
+  ArchivedInvoiceListResponse,
+  ArchivedInvoiceParams,
+  ArchivedInvoiceQuery,
+  ArchivedInvoiceResponse,
+  ArchiveParams,
+  ArchiveRunView,
+  ArchivesResponse,
+  DataExportResponse,
+  DataExportView,
+  StartArchiveRequest,
+  StartDataExportRequest,
+} from './archives.js';
+import { AuditListQuery, AuditListResponse, AuditVerifyResponse } from './audit.js';
+import {
+  BackupsResponse,
+  RecoveryKeyResponse,
+  RestoreBackupRequest,
+  RestoreBackupResponse,
+  StartBackupResponse,
+} from './backups.js';
 import {
   BillCustomerRequest,
   BillDiscountParams,
@@ -30,6 +51,7 @@ import {
   SplitBillResponse,
   VoidInvoiceRequest,
 } from './billing.js';
+import { DigitalBillEntry, InvoiceDigitalBillsResponse } from './digital-bills.js';
 import {
   CurrentSessionResponse,
   LoginResponse,
@@ -48,7 +70,8 @@ import {
   TotpEnrollmentResponse,
   UnlockStaffRequest,
 } from './auth.js';
-import { ApiError, Id } from './common.js';
+import { CurrentAppBuildResponse } from './app-builds.js';
+import { ApiError, type DeviceType, HTTP_DEVICE_TYPES, Id, STAFF_DEVICE_TYPES } from './common.js';
 import {
   KdsTicket,
   KdsTicketsQuery,
@@ -56,12 +79,23 @@ import {
   KdsTicketsResponse,
   NotifyManagerResponse,
 } from './kds.js';
-import { MenuImportReport, MenuImportRequest, MenuTemplateResponse } from './menu-import.js';
+import {
+  AiMenuImportParams,
+  AiMenuImportRequest,
+  AiMenuImportView,
+  MenuImportReport,
+  MenuImportRequest,
+  MenuReviewRequest,
+  MenuTemplateResponse,
+} from './menu-import.js';
 import {
   AssignPagerRequest,
   CreatePagerRequest,
   MyPagerResponse,
   PagerCredentialResponse,
+  PagerFirmwareDownloadParams,
+  PagerFirmwarePagerView,
+  PagerFirmwareResponse,
   PagerListResponse,
   PagerParams,
   PagerView,
@@ -74,19 +108,26 @@ import {
   CreatePairingCodeRequest,
   DeviceChallengeRequest,
   DeviceChallengeResponse,
+  DeviceHealthRequest,
   DeviceListResponse,
-  DeviceParams,
+  DeviceView,
   DeviceSummary,
   DeviceTokenRequest,
   DeviceTokenResponse,
+  KioskExitRequest,
+  KioskExitResponse,
+  LocateDeviceResponse,
   PairDeviceRequest,
   PairedDevice,
   PairingCodeResponse,
+  RenameDeviceRequest,
+  SetDeviceStationsRequest,
   RevokeDeviceRequest,
-  UpdateDeviceRequest,
+  TabletTableView,
 } from './devices.js';
 import {
   FloorArchiveRequest,
+  FloorLayoutRequest,
   FloorResponse,
   SectionParams,
   SectionRequest,
@@ -98,6 +139,13 @@ import {
   WaiterAssignmentsResponse,
 } from './floor.js';
 import {
+  RegenerateTableQrRequest,
+  TableQrCodesResponse,
+  TableQrView,
+  TableTentsRequest,
+  TableTentsResponse,
+} from './table-qr.js';
+import {
   CategoryRequest,
   CategoryView,
   ComboRequest,
@@ -108,6 +156,7 @@ import {
   ItemView,
   MenuArchiveRequest,
   MenuDraftResponse,
+  ItemPhotoRequest,
   MenuEntityParams,
   MenuPublishResponse,
   ModifierGroupRequest,
@@ -115,29 +164,53 @@ import {
 } from './menu-admin.js';
 import { MenuSnapshot } from './menu.js';
 import {
+  CancellationReportResponse,
+  DiscountReportResponse,
   GstSummaryResponse,
+  InvoiceRegisterQuery,
   InvoiceRegisterResponse,
   ItemSalesResponse,
+  ApprovalTimeReportResponse,
+  KitchenReportResponse,
   PaymentModesResponse,
   OrderDrillDownParams,
   OrderDrillDownResponse,
   ReportExportRequest,
   ReportExportResponse,
+  RecommendationReportResponse,
   ReportRangeQuery,
+  ReprintReportResponse,
   SalesSummaryResponse,
   ShiftReportResponse,
+  SourceSalesResponse,
+  StaffPerformanceResponse,
+  SuspiciousActivityResponse,
+  TableReportResponse,
 } from './reports.js';
 import {
   CashMovementRequest,
   CloseShiftRequest,
   CurrentShiftResponse,
   InvoicePaymentsView,
+  OpenCashDrawerRequest,
+  OpenCashDrawerResponse,
   OpenShiftRequest,
   RecordPaymentsRequest,
   ShiftParams,
   ShiftView,
 } from './payments.js';
 import {
+  EraseDinerContactRequest,
+  EraseDinerContactResponse,
+  FeedbackReportResponse,
+  TabletFeedbackRequest,
+  TabletFeedbackResponse,
+} from './feedback.js';
+import {
+  ApproveAtTableRequest,
+  ApproveOrderRequest,
+  FireOrderRequest,
+  BestSellersResponse,
   ModifyOrderItemRequest,
   OrderItemEndRequest,
   OrderItemParams,
@@ -145,8 +218,12 @@ import {
   OrderListResponse,
   OrderParams,
   OrderView,
+  PendingApprovalsResponse,
+  RejectOrderRequest,
   SubmitOrderRequest,
   SubmitOrderResponse,
+  TabletOrderRequest,
+  TabletOrdersResponse,
 } from './order.js';
 import {
   KotParams,
@@ -161,16 +238,23 @@ import {
   StationListResponse,
   StationRequest,
   StationView,
+  PrinterDiscoveryResponse,
   TestPrintResponse,
 } from './printing.js';
+import { LicenceView, ReactivateLicenceRequest } from './licence.js';
 import {
   AssignSessionWaiterRequest,
   CloseWithoutBillRequest,
+  MergeTablesRequest,
   MoveTableRequest,
   OpenTableRequest,
   TableOverviewResponse,
   TableSessionParams,
   TableSessionView,
+  PrintTableBillResponse,
+  TableStateView,
+  TransferItemsRequest,
+  TransferItemsResponse,
 } from './table-sessions.js';
 import {
   ArchiveRequest,
@@ -187,11 +271,8 @@ import {
   UpdateRestaurantProfileRequest,
 } from './restaurant.js';
 import {
-  RecommendationPreferenceListResponse,
-  RecommendationPreferenceParams,
-  RecommendationPreferenceRequest,
-  RecommendationPreferenceView,
   RecommendationRuleListResponse,
+  LearnedRecommendationsResponse,
   RecommendationRuleParams,
   RecommendationRuleRequest,
   RecommendationRuleView,
@@ -214,15 +295,43 @@ import {
   SettingView,
   UpdateSettingRequest,
 } from './settings.js';
-import { HealthResponse, TlsCaResponse, VersionResponse } from './system.js';
 import {
   ArchiveRoleRequest,
-  CreateStaffRequest,
-  CustomRoleRequest,
-  CustomRoleView,
-  DeactivateStaffRequest,
   RoleListResponse,
   RoleParams,
+  RoleRequest,
+  RoleView,
+} from './roles.js';
+import { DiagnosticsBundle, DiagnosticsRequestParams } from './control-plane/diagnostics.js';
+import {
+  ActivateRequest,
+  ActivateResponse,
+  FirstRunRequest,
+  FirstRunResponse,
+  FirstRunStatus,
+  GoLiveView,
+  MarkOnboardingStepRequest,
+  OnboardingResponse,
+  OnboardingStepParams,
+  SettingsExport,
+  SettingsImportResponse,
+} from './onboarding.js';
+import {
+  AllowDataDeletionRequest,
+  AllowDataDeletionResponse,
+  ApproveUpdateRequest,
+  ClientErrorReport,
+  HealthResponse,
+  LocalDiagnosticsRequestList,
+  SendDiagnosticsRequest,
+  SendDiagnosticsResponse,
+  SystemStatusResponse,
+  TlsCaResponse,
+  VersionResponse,
+} from './system.js';
+import {
+  CreateStaffRequest,
+  DeactivateStaffRequest,
   SetStaffPinRequest,
   StaffListResponse,
   StaffParams,
@@ -271,6 +380,12 @@ export interface RouteDefinition<TAccess extends string = RouteCapability> {
    * `PUBLIC` for the few endpoints that need neither (they must say why in `description`).
    */
   capability: TAccess;
+  /**
+   * For `DEVICE` endpoints of the local server: the kinds of device that may call it; the server
+   * refuses every other kind (403 `DEVICE_NOT_ALLOWED`, deny by default, SEC-003). Endpoints that
+   * need a signed-in person are for the devices staff sign in on (`STAFF_DEVICE_TYPES`).
+   */
+  devices?: readonly DeviceType[];
   request?: {
     params?: z.ZodObject;
     query?: z.ZodObject;
@@ -290,6 +405,7 @@ const standardErrors = {
 const deviceErrors = {
   400: standardErrors[400],
   401: { description: 'Unknown or unpaired device, or invalid credentials.', schema: ApiError },
+  403: { description: 'This kind of device may not call it.', schema: ApiError },
 } as const satisfies Readonly<Record<number, RouteResponse>>;
 
 export const ROUTES = [
@@ -315,6 +431,81 @@ export const ROUTES = [
         description: 'The idempotency key was used for a different order, or a note is too long.',
         schema: ApiError,
       },
+    },
+  },
+  {
+    operationId: 'listPendingApprovals',
+    method: 'GET',
+    path: '/api/v1/orders/pending-approval',
+    summary: "Diners' orders waiting for approval: the approvals inbox",
+    description:
+      'WTR-004, ORD-003: tablet and QR orders not yet approved, oldest first, with their table. ' +
+      'Waiters see their own tables; cashiers and managers see all.',
+    tags: ['orders'],
+    requirements: ['WTR-004', 'ORD-003'],
+    capability: 'ORDER_APPROVE_CUSTOMER',
+    responses: {
+      200: { description: 'The waiting orders.', schema: PendingApprovalsResponse },
+      ...standardErrors,
+    },
+  },
+  {
+    operationId: 'fireOrder',
+    method: 'POST',
+    path: '/api/v1/orders/:orderId/fire',
+    summary: 'Send held items to the kitchen',
+    description:
+      'ORD-016: the order’s held items (or the ones named) go to the kitchen now, as a new ticket ' +
+      'per station. Audited.',
+    tags: ['orders'],
+    requirements: ['ORD-016', 'ORD-007', 'AUD-001'],
+    capability: 'ORDER_CREATE',
+    request: { params: OrderParams, body: FireOrderRequest },
+    responses: {
+      200: { description: 'The order, fired.', schema: OrderView },
+      ...standardErrors,
+      404: { description: 'No such order.', schema: ApiError },
+      409: { description: 'Nothing on it is held.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'approveOrder',
+    method: 'POST',
+    path: '/api/v1/orders/:orderId/approve',
+    summary: "Send a diner's order to the kitchen, changed with the diner's agreement if needed",
+    description:
+      'ORD-003, ORD-004: quantities changed or lines removed first (with `dinerAgreed`), then ' +
+      'every waiting line goes to the kitchen as for a staff order (tickets, stock). Waiters ' +
+      'approve their own tables. Audited with the changes.',
+    tags: ['orders'],
+    requirements: ['ORD-003', 'ORD-004', 'WTR-004', 'AUD-001'],
+    capability: 'ORDER_APPROVE_CUSTOMER',
+    request: { params: OrderParams, body: ApproveOrderRequest },
+    responses: {
+      200: { description: 'The order, sent.', schema: OrderView },
+      ...standardErrors,
+      404: { description: 'No such order.', schema: ApiError },
+      409: {
+        description: 'Nothing waits for approval, or a dish ran out (remove it first).',
+        schema: ApiError,
+      },
+    },
+  },
+  {
+    operationId: 'rejectOrder',
+    method: 'POST',
+    path: '/api/v1/orders/:orderId/reject',
+    summary: "Refuse a diner's order, with a reason the diner sees",
+    description: 'ORD-003, WTR-004: every waiting line is rejected. Waiters, their own tables.',
+    tags: ['orders'],
+    requirements: ['ORD-003', 'WTR-004', 'AUD-001'],
+    capability: 'ORDER_APPROVE_CUSTOMER',
+    request: { params: OrderParams, body: RejectOrderRequest },
+    responses: {
+      200: { description: 'The order, rejected.', schema: OrderView },
+      ...standardErrors,
+      404: { description: 'No such order.', schema: ApiError },
+      409: { description: 'Nothing waits for approval.', schema: ApiError },
     },
   },
   {
@@ -468,6 +659,532 @@ export const ROUTES = [
     },
   },
   {
+    operationId: 'getSystemStatus',
+    method: 'GET',
+    path: '/api/v1/system',
+    summary: 'The System page: versions, services, storage, devices, update, backup and licence',
+    description:
+      'MGR-010, NFR-I03, DATA-006: what support asks for first. The backup and licence parts are ' +
+      'null until P7-05 and P7-01.',
+    tags: ['system'],
+    requirements: ['MGR-010', 'NFR-I03', 'DATA-006', 'UPD-004'],
+    capability: 'OPERATIONS_CONFIGURE',
+    responses: {
+      200: { description: 'The status.', schema: SystemStatusResponse },
+      ...standardErrors,
+    },
+  },
+  {
+    operationId: 'approveUpdateInstall',
+    method: 'POST',
+    path: '/api/v1/system/update/approve',
+    summary: '"Install now" for the update on offer',
+    description:
+      'UPD-004: the update installs at once instead of in the maintenance window (the update ' +
+      'agent, P7-04c, still waits for open tables unless it is security-critical). After a ' +
+      'failed update, it tries that version again. Audited.',
+    tags: ['system'],
+    requirements: ['UPD-004', 'AUD-001'],
+    capability: 'UPDATE_INSTALL_NOW',
+    request: { body: ApproveUpdateRequest },
+    responses: {
+      200: { description: 'The status with the approval.', schema: SystemStatusResponse },
+      ...standardErrors,
+      409: { description: 'That version is not on offer.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'allowDataDeletion',
+    method: 'POST',
+    path: '/api/v1/system/data-deletion',
+    summary: 'Allow the uninstaller to delete the data for 30 minutes',
+    description:
+      'NFR-I02: uninstalling keeps the data on the data drive unless the Owner, with a fresh ' +
+      'second factor and a reason, allows deleting it; the uninstaller may then delete it for 30 ' +
+      'minutes. Audited.',
+    tags: ['system'],
+    requirements: ['NFR-I02', 'AUTH-006', 'AUD-001'],
+    capability: 'DATA_ADMIN',
+    request: { body: AllowDataDeletionRequest },
+    responses: {
+      200: { description: 'Allowed until the time given.', schema: AllowDataDeletionResponse },
+      ...standardErrors,
+    },
+  },
+  {
+    operationId: 'previewDiagnostics',
+    method: 'GET',
+    path: '/api/v1/system/diagnostics',
+    summary: 'What "Send diagnostics to support" would send, as it would send it',
+    description:
+      'UPD-008: versions, configuration without secrets, devices, status and the tail of the ' +
+      'logs, scrubbed of secrets and personal data, so a manager can see it first.',
+    tags: ['system'],
+    requirements: ['UPD-008'],
+    capability: 'OPERATIONS_CONFIGURE',
+    responses: {
+      200: { description: 'The bundle.', schema: DiagnosticsBundle },
+      ...standardErrors,
+    },
+  },
+  {
+    operationId: 'sendDiagnostics',
+    method: 'POST',
+    path: '/api/v1/system/diagnostics',
+    summary: 'Send diagnostics to support',
+    description: 'UPD-008: makes the bundle and sends it to the Control Plane. Audited.',
+    tags: ['system'],
+    requirements: ['UPD-008', 'AUD-001'],
+    capability: 'OPERATIONS_CONFIGURE',
+    request: { body: SendDiagnosticsRequest },
+    responses: {
+      200: { description: 'Sent.', schema: SendDiagnosticsResponse },
+      ...standardErrors,
+      409: { description: 'This PC is not connected to the Control Plane.', schema: ApiError },
+      503: { description: 'The Control Plane could not be reached.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'listBackups',
+    method: 'GET',
+    path: '/api/v1/backups',
+    summary: 'The backups: how they stand, the files kept and the latest runs',
+    description:
+      'DATA-002, DATA-005: the nightly full backup to the data drive and the second location, ' +
+      'each checked after it is written.',
+    tags: ['system'],
+    requirements: ['DATA-002', 'DATA-005'],
+    capability: 'OPERATIONS_CONFIGURE',
+    responses: { 200: { description: 'The backups.', schema: BackupsResponse }, ...standardErrors },
+  },
+  {
+    operationId: 'startBackup',
+    method: 'POST',
+    path: '/api/v1/backups',
+    summary: 'Back up now',
+    description:
+      'DATA-002: starts a full backup in the background; read the backups to follow it. Audited.',
+    tags: ['system'],
+    requirements: ['DATA-002', 'AUD-001'],
+    capability: 'OPERATIONS_CONFIGURE',
+    responses: {
+      202: { description: 'Started.', schema: StartBackupResponse },
+      ...standardErrors,
+      409: { description: 'A backup is running already.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'restoreBackup',
+    method: 'POST',
+    path: '/api/v1/backups/restore',
+    summary: 'Restore this PC from one of its backups',
+    description:
+      'DATA-004: the Owner, with a fresh second factor and a reason. The backup is checked, the ' +
+      'request saved and the server restarts; the restore runs before it starts again. Audited.',
+    tags: ['system'],
+    requirements: ['DATA-004', 'AUTH-006', 'AUD-001'],
+    capability: 'DATA_ADMIN',
+    request: { body: RestoreBackupRequest },
+    responses: {
+      202: { description: 'The server restarts to restore.', schema: RestoreBackupResponse },
+      ...standardErrors,
+      404: { description: 'There is no such backup there.', schema: ApiError },
+      409: { description: 'A backup is running, or no second location is set.', schema: ApiError },
+      422: { description: 'The backup was made with another key.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'listArchives',
+    method: 'GET',
+    path: '/api/v1/archives',
+    summary: 'The years that may be archived and purged, and every archive-then-purge',
+    description:
+      'DATA-008: whole financial years that have ended, oldest first, each with whether GST law ' +
+      'still asks for its records (72 months, §12); the runs, which once done are the purge ' +
+      'records.',
+    tags: ['system'],
+    requirements: ['DATA-008', 'DATA-009'],
+    // Those who read reports may see the archives and open them (DATA-009); only the Owner
+    // archives (startArchive).
+    capability: 'REPORTS_VIEW_EXPORT',
+    responses: {
+      200: { description: 'The years and runs.', schema: ArchivesResponse },
+      ...standardErrors,
+    },
+  },
+  {
+    operationId: 'startArchive',
+    method: 'POST',
+    path: '/api/v1/archives',
+    summary: 'Archive a financial year, read the archive back, then purge the year',
+    description:
+      'DATA-008, AUD-004: the Owner with a fresh second factor and a reason. Only the oldest ' +
+      'year; within the statutory period only once the Owner acknowledges the warning. The ' +
+      'archive and a human-readable export (invoice register CSV, invoice PDFs) go to the folder ' +
+      'given or the second backup location; the purge runs through the separate purge login. ' +
+      'Runs in the background; audited.',
+    tags: ['system'],
+    requirements: ['DATA-008', 'AUD-004', 'AUTH-006', 'AUD-001'],
+    capability: 'DATA_ADMIN',
+    request: { body: StartArchiveRequest },
+    responses: {
+      202: { description: 'Started.', schema: ArchiveRunView },
+      ...standardErrors,
+      409: {
+        description: 'An archive is running, or the year is not the oldest.',
+        schema: ApiError,
+      },
+      422: {
+        description:
+          'Not a year that may be purged, no folder, the statutory warning not acknowledged, or ' +
+          'the purge login not set up.',
+        schema: ApiError,
+      },
+    },
+  },
+  {
+    operationId: 'getArchivedDays',
+    method: 'GET',
+    path: '/api/v1/archives/:id/days',
+    summary: 'An archived year day by day, read from the archive',
+    description:
+      'DATA-009: read-only, without restoring anything: invoices, voids, sales and tax per day. ' +
+      'The archive file must be where it was written (or its drive connected).',
+    tags: ['system'],
+    requirements: ['DATA-009'],
+    capability: 'REPORTS_VIEW_EXPORT',
+    request: { params: ArchiveParams },
+    responses: {
+      200: { description: 'The days.', schema: ArchivedDaysResponse },
+      ...standardErrors,
+      404: { description: 'No such archive, or its file is not there.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'listArchivedInvoices',
+    method: 'GET',
+    path: '/api/v1/archives/:id/invoices',
+    summary: 'Invoices in an archive, by business date or invoice number',
+    tags: ['system'],
+    requirements: ['DATA-009'],
+    capability: 'REPORTS_VIEW_EXPORT',
+    request: { params: ArchiveParams, query: ArchivedInvoiceQuery },
+    responses: {
+      200: { description: 'The invoices.', schema: ArchivedInvoiceListResponse },
+      ...standardErrors,
+      404: { description: 'No such archive, or its file is not there.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'getArchivedInvoice',
+    method: 'GET',
+    path: '/api/v1/archives/:id/invoices/:invoiceId',
+    summary: 'One archived invoice, with its text as printed',
+    tags: ['system'],
+    requirements: ['DATA-009'],
+    capability: 'REPORTS_VIEW_EXPORT',
+    request: { params: ArchivedInvoiceParams },
+    responses: {
+      200: { description: 'The invoice.', schema: ArchivedInvoiceResponse },
+      ...standardErrors,
+      404: { description: 'No such archive or invoice.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'getDataExport',
+    method: 'GET',
+    path: '/api/v1/data-export',
+    summary: 'The last full data export',
+    tags: ['system'],
+    requirements: ['DATA-010'],
+    capability: 'DATA_ADMIN',
+    responses: {
+      200: { description: 'The last export.', schema: DataExportResponse },
+      ...standardErrors,
+    },
+  },
+  {
+    operationId: 'startDataExport',
+    method: 'POST',
+    path: '/api/v1/data-export',
+    summary: 'Export all the restaurant’s data in open formats',
+    description:
+      'DATA-010: every table as JSON lines and CSV, the invoice register and the invoices as PDFs, ' +
+      'into a folder; at any time, including in restricted licence mode. No credentials or ' +
+      'secret hashes. The Owner; audited.',
+    tags: ['system'],
+    requirements: ['DATA-010', 'LIC-005', 'AUD-001'],
+    capability: 'DATA_ADMIN',
+    request: { body: StartDataExportRequest },
+    responses: {
+      202: { description: 'Started.', schema: DataExportView },
+      ...standardErrors,
+      409: { description: 'An export is running.', schema: ApiError },
+      422: { description: 'No folder.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'showRecoveryKey',
+    method: 'POST',
+    path: '/api/v1/backups/recovery-key',
+    summary: 'The backup recovery key, for the Owner to keep',
+    description:
+      'DATA-004: the key that reads this PC’s backups, written out to keep on paper away from ' +
+      'the PC. The Owner, with a fresh second factor. Audited.',
+    tags: ['system'],
+    requirements: ['DATA-004', 'AUTH-006', 'AUD-001'],
+    capability: 'DATA_ADMIN',
+    responses: {
+      200: { description: 'The recovery key.', schema: RecoveryKeyResponse },
+      ...standardErrors,
+    },
+  },
+  {
+    operationId: 'listDiagnosticsRequests',
+    method: 'GET',
+    path: '/api/v1/system/diagnostics/requests',
+    summary: 'Support’s open requests for diagnostics',
+    description: 'UPD-008: what vendor support asked for, and why, for a manager to answer.',
+    tags: ['system'],
+    requirements: ['UPD-008'],
+    capability: 'OPERATIONS_CONFIGURE',
+    responses: {
+      200: { description: 'The requests.', schema: LocalDiagnosticsRequestList },
+      ...standardErrors,
+    },
+  },
+  {
+    operationId: 'allowDiagnosticsRequest',
+    method: 'POST',
+    path: '/api/v1/system/diagnostics/requests/:id/allow',
+    summary: 'Allow support’s request: send the diagnostics bundle now',
+    tags: ['system'],
+    requirements: ['UPD-008', 'AUD-001'],
+    capability: 'OPERATIONS_CONFIGURE',
+    request: { params: DiagnosticsRequestParams },
+    responses: {
+      200: { description: 'Sent.', schema: SendDiagnosticsResponse },
+      ...standardErrors,
+      404: { description: 'No such open request.', schema: ApiError },
+      503: { description: 'The Control Plane could not be reached.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'declineDiagnosticsRequest',
+    method: 'POST',
+    path: '/api/v1/system/diagnostics/requests/:id/decline',
+    summary: 'Decline support’s request: nothing is sent',
+    tags: ['system'],
+    requirements: ['UPD-008', 'AUD-001'],
+    capability: 'OPERATIONS_CONFIGURE',
+    request: { params: DiagnosticsRequestParams },
+    responses: {
+      204: { description: 'Declined.' },
+      ...standardErrors,
+      404: { description: 'No such open request.', schema: ApiError },
+      503: { description: 'The Control Plane could not be reached.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'reportClientError',
+    method: 'POST',
+    path: '/api/v1/client-errors',
+    summary: 'An app’s error, for the vendor’s error service',
+    description:
+      'NFR-O02: the server scrubs it and reports it with its own key, so apps carry none ' +
+      '(SEC-002). At most 20 an hour from a device; the rest are dropped quietly.',
+    tags: ['system'],
+    requirements: ['NFR-O02'],
+    capability: 'DEVICE',
+    devices: HTTP_DEVICE_TYPES,
+    request: { body: ClientErrorReport },
+    responses: {
+      204: { description: 'Taken.' },
+      400: { description: 'The request does not match the contract.', schema: ApiError },
+      401: { description: 'Unknown or unpaired device.', schema: ApiError },
+      403: deviceErrors[403],
+    },
+  },
+  {
+    operationId: 'getCurrentAppBuild',
+    method: 'GET',
+    path: '/api/v1/devices/current/app-build',
+    summary: 'The APK of the calling phone’s or tablet’s app on this PC',
+    description:
+      'WTR-001, UPD-001 (P7-04e2): the build of the device’s own app (waiter app or table ' +
+      'tablet) in the PC’s release, with its version, client API, size and SHA-256; null when ' +
+      'the release has none, the APK failed the PC’s check, or the device is not a phone or ' +
+      'tablet. Open to apps the server no longer serves (N-1), so they can update.',
+    tags: ['devices'],
+    requirements: ['WTR-001', 'UPD-001', 'UPD-006'],
+    capability: 'DEVICE',
+    devices: ['WAITER_PHONE', 'TABLE_TABLET'],
+    responses: {
+      200: { description: 'The build, or null.', schema: CurrentAppBuildResponse },
+      401: { description: 'Unknown or unpaired device.', schema: ApiError },
+      403: deviceErrors[403],
+    },
+  },
+  {
+    operationId: 'downloadCurrentAppBuild',
+    method: 'GET',
+    path: '/api/v1/devices/current/app-build/apk',
+    summary: 'Download that APK',
+    description:
+      'WTR-001, UPD-007 (P7-04e2): the APK itself (application/vnd.android.package-archive), ' +
+      'downloaded by the device’s own HTTP client over the pinned LAN CA. The device checks ' +
+      'its size and SHA-256 against `getCurrentAppBuild` before Android installs it, and Android ' +
+      'refuses an APK signed with another key. Open to apps the server no longer serves.',
+    tags: ['devices'],
+    requirements: ['WTR-001', 'UPD-001', 'UPD-007'],
+    capability: 'DEVICE',
+    devices: ['WAITER_PHONE', 'TABLE_TABLET'],
+    responses: {
+      200: { description: 'The APK.' },
+      401: { description: 'Unknown or unpaired device.', schema: ApiError },
+      403: deviceErrors[403],
+      404: { description: 'No build of this device’s app on this PC.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'getFirstRun',
+    method: 'GET',
+    path: '/api/v1/first-run',
+    summary: 'Whether this server still needs its restaurant and Owner (a fresh install)',
+    description:
+      'Public because nothing exists yet to sign in with; it reveals only whether a restaurant ' +
+      'exists (ONB-001).',
+    tags: ['onboarding'],
+    requirements: ['ONB-001', 'ONB-004'],
+    capability: 'PUBLIC',
+    responses: { 200: { description: 'Whether setup is needed.', schema: FirstRunStatus } },
+  },
+  {
+    operationId: 'completeFirstRun',
+    method: 'POST',
+    path: '/api/v1/first-run',
+    summary: 'Create the restaurant and its Owner on a fresh install',
+    description:
+      'Public because nothing exists yet; only from the server PC itself and only while no ' +
+      'restaurant exists (ONB-001). Creates the built-in roles, a default invoice series and ' +
+      'the Owner with their PIN, which must not be easily guessed (PC-S5); the Owner sets a ' +
+      'password and authenticator next (AUTH-006). Audited.',
+    tags: ['onboarding'],
+    requirements: ['ONB-001', 'ONB-004', 'AUD-001'],
+    capability: 'PUBLIC',
+    request: { body: FirstRunRequest },
+    responses: {
+      201: { description: 'Created.', schema: FirstRunResponse },
+      400: { description: 'The request does not match the contract.', schema: ApiError },
+      403: { description: 'Not from the server PC, or already set up.', schema: ApiError },
+      422: { description: 'The PIN is too easy to guess.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'getOnboarding',
+    method: 'GET',
+    path: '/api/v1/onboarding',
+    summary: 'The first-run setup: each step’s status and whether this PC is activated',
+    description:
+      'ONB-004: statuses come from what is set up, so the setup resumes where it stopped; the ' +
+      'invoice look and the go-live test also need a person to confirm them.',
+    tags: ['onboarding'],
+    requirements: ['ONB-004', 'ONB-003'],
+    capability: 'OPERATIONS_CONFIGURE',
+    responses: {
+      200: { description: 'The setup.', schema: OnboardingResponse },
+      ...standardErrors,
+    },
+  },
+  {
+    operationId: 'markOnboardingStep',
+    method: 'PUT',
+    path: '/api/v1/onboarding/steps/:step',
+    summary: 'Confirm a step, skip one the restaurant does not need, or take the mark back',
+    tags: ['onboarding'],
+    requirements: ['ONB-004', 'AUD-001'],
+    capability: 'OPERATIONS_CONFIGURE',
+    request: { params: OnboardingStepParams, body: MarkOnboardingStepRequest },
+    responses: {
+      200: { description: 'The setup.', schema: OnboardingResponse },
+      ...standardErrors,
+      409: {
+        description: 'Not a step that may be confirmed or skipped, or not ready.',
+        schema: ApiError,
+      },
+    },
+  },
+  {
+    operationId: 'getGoLive',
+    method: 'GET',
+    path: '/api/v1/onboarding/go-live',
+    summary: 'The go-live test: each path the restaurant uses, and whether it was seen yet',
+    tags: ['onboarding'],
+    requirements: ['ONB-004'],
+    capability: 'OPERATIONS_CONFIGURE',
+    responses: { 200: { description: 'The test.', schema: GoLiveView }, ...standardErrors },
+  },
+  {
+    operationId: 'startGoLive',
+    method: 'POST',
+    path: '/api/v1/onboarding/go-live/start',
+    summary: 'Start (or start again) the go-live test: paths count from now',
+    tags: ['onboarding'],
+    requirements: ['ONB-004', 'AUD-001'],
+    capability: 'OPERATIONS_CONFIGURE',
+    responses: { 200: { description: 'The test.', schema: GoLiveView }, ...standardErrors },
+  },
+  {
+    operationId: 'exportSettings',
+    method: 'GET',
+    path: '/api/v1/settings/export',
+    summary: 'The restaurant’s settings as a file, for a new PC or a reinstall',
+    description: 'ONB-010: settings changed from their default; vendor settings are left out.',
+    tags: ['settings'],
+    requirements: ['ONB-010'],
+    capability: 'OPERATIONS_CONFIGURE',
+    responses: { 200: { description: 'The settings.', schema: SettingsExport }, ...standardErrors },
+  },
+  {
+    operationId: 'importSettings',
+    method: 'POST',
+    path: '/api/v1/settings/import',
+    summary: 'Apply settings from an export',
+    description:
+      'ONB-010: each setting is checked as if changed by hand: unknown, vendor-controlled, ' +
+      'invalid or not allowed for this person are skipped and listed; tax, invoice and data ' +
+      'settings need the Owner with a fresh second factor. Audited.',
+    tags: ['settings'],
+    requirements: ['ONB-010', 'AUD-001'],
+    capability: 'OPERATIONS_CONFIGURE',
+    request: { body: SettingsExport },
+    responses: {
+      200: { description: 'What was applied and skipped.', schema: SettingsImportResponse },
+      ...standardErrors,
+      422: { description: 'The settings conflict with each other.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'activateInstallation',
+    method: 'POST',
+    path: '/api/v1/activation',
+    summary: 'Activate this PC with the vendor’s one-time activation code',
+    description:
+      'ONB-003: enrols the PC with the Vendor Control Plane, which binds its licence (LIC-004). ' +
+      'Owner only. Audited.',
+    tags: ['onboarding'],
+    requirements: ['ONB-003', 'LIC-004'],
+    capability: 'LICENSE_MANAGE',
+    request: { body: ActivateRequest },
+    responses: {
+      200: { description: 'Activated.', schema: ActivateResponse },
+      ...standardErrors,
+      409: { description: 'Already activated, or no vendor address set.', schema: ApiError },
+      422: { description: 'The code is not valid or has expired.', schema: ApiError },
+      503: { description: 'The vendor could not be reached.', schema: ApiError },
+    },
+  },
+  {
     operationId: 'getVersion',
     method: 'GET',
     path: '/api/v1/version',
@@ -537,6 +1254,23 @@ export const ROUTES = [
     },
   },
   {
+    operationId: 'listAuditEntries',
+    method: 'GET',
+    path: '/api/v1/audit',
+    summary: 'Audit entries of a period, newest first, filtered and paged',
+    description:
+      'AUD-005: who did what, approved by whom, on which device, why, and the values before and ' +
+      'after. Filter by action, person or record. Owner and Manager only.',
+    tags: ['audit'],
+    requirements: ['AUD-005', 'AUD-001'],
+    capability: 'AUDIT_VIEW',
+    request: { query: AuditListQuery },
+    responses: {
+      200: { description: 'A page of entries.', schema: AuditListResponse },
+      ...standardErrors,
+    },
+  },
+  {
     operationId: 'verifyAuditChain',
     method: 'GET',
     path: '/api/v1/audit/verify',
@@ -561,6 +1295,7 @@ export const ROUTES = [
     tags: ['auth'],
     requirements: ['AUTH-001'],
     capability: 'DEVICE',
+    devices: HTTP_DEVICE_TYPES,
     responses: {
       200: { description: 'Login tiles.', schema: StaffTilesResponse },
       ...deviceErrors,
@@ -573,15 +1308,23 @@ export const ROUTES = [
     summary: 'Sign in on this device with a staff PIN',
     description:
       'Locks the staff login for 15 min after 5 failures in 10 min and rate-limits attempts per ' +
-      'device (AUTH-003, SEC-009). Kitchen staff sign in only when individual kitchen logins are on.',
+      'device (AUTH-003, SEC-009). Every wrong PIN or password on a device also counts against the ' +
+      'device: at `auth.deviceLockoutMaxFailures` within the window it takes none for the lockout ' +
+      'time (423 `DEVICE_LOCKED`) until a manager lets it again (PC-S5). Managers and the Owner are ' +
+      'alerted to each lockout (`SIGN_IN_LOCKED`). Kitchen staff sign in only when individual ' +
+      'kitchen logins are on.',
     tags: ['auth'],
-    requirements: ['AUTH-001', 'AUTH-002', 'AUTH-003', 'AUTH-005', 'AUTH-013'],
+    requirements: ['AUTH-001', 'AUTH-002', 'AUTH-003', 'AUTH-005', 'AUTH-013', 'SEC-009'],
     capability: 'DEVICE',
+    devices: STAFF_DEVICE_TYPES,
     request: { body: PinLoginRequest },
     responses: {
       200: { description: 'Signed in.', schema: LoginResponse },
       ...deviceErrors,
-      423: { description: 'Login locked after repeated failures.', schema: ApiError },
+      423: {
+        description: 'The login is locked, or this device takes no PINs for now.',
+        schema: ApiError,
+      },
       429: { description: 'Too many attempts from this device.', schema: ApiError },
     },
   },
@@ -592,15 +1335,20 @@ export const ROUTES = [
     summary: 'Sign in as the Owner with password and second factor',
     description:
       'Password + TOTP (or a recovery code) sign-in; the session carries a fresh step-up for ' +
-      'Owner-only actions (AUTH-006).',
+      'Owner-only actions (AUTH-006). A wrong password also counts against the device, as at ' +
+      '`pinLogin`.',
     tags: ['auth'],
     requirements: ['AUTH-006', 'AUTH-013'],
     capability: 'DEVICE',
+    devices: STAFF_DEVICE_TYPES,
     request: { body: OwnerLoginRequest },
     responses: {
       200: { description: 'Signed in.', schema: LoginResponse },
       ...deviceErrors,
-      423: { description: 'Login locked after repeated failures.', schema: ApiError },
+      423: {
+        description: 'The login is locked, or this device takes no passwords for now.',
+        schema: ApiError,
+      },
       429: { description: 'Too many attempts from this device.', schema: ApiError },
     },
   },
@@ -611,10 +1359,12 @@ export const ROUTES = [
     summary: 'Get a new access token and rotate the refresh token',
     description:
       'Fails when the session was revoked, expired or idle too long. Reusing an old refresh token ' +
-      'revokes the whole session (AUTH-005).',
+      'revokes the whole session (AUTH-005). Counts as activity only as far as `x-rp-idle-seconds` ' +
+      'says the person was there.',
     tags: ['auth'],
     requirements: ['AUTH-005'],
     capability: 'DEVICE',
+    devices: STAFF_DEVICE_TYPES,
     request: { body: RefreshRequest },
     responses: { 200: { description: 'New tokens.', schema: LoginResponse }, ...deviceErrors },
   },
@@ -635,7 +1385,10 @@ export const ROUTES = [
     summary: 'The signed-in person and their session on this device',
     description:
       'Apps check a restored session with it after a restart. Like every authenticated call it ' +
-      'counts as activity, so an app can keep a session alive while the person is using it.',
+      'counts as activity, so an app can keep a session alive while the person is using it. An ' +
+      'app that sends `x-rp-idle-seconds` (how long ago the person last touched it) is counted ' +
+      'active as of then, so calls it makes by itself do not keep an idle session alive ' +
+      '(MOBILE-E3).',
     tags: ['auth'],
     requirements: ['AUTH-005'],
     capability: 'SESSION',
@@ -661,8 +1414,11 @@ export const ROUTES = [
     path: '/api/v1/auth/override',
     summary: 'A manager approves one action on this device with their PIN',
     description:
-      'Returns a single-use token for one capability (and entity) of the signed-in requester; ' +
-      'both people are audited (AUTH-011).',
+      'Returns a single-use token for one capability and record of the signed-in requester; ' +
+      'both people are audited (AUTH-011). An approval for a voided item, a reopened or voided ' +
+      'invoice or a discount above the limit must name its record (`entityType`, `entityId`) and ' +
+      'works only on that record: used on another it is refused and not spent (PC-T2). A wrong ' +
+      'PIN also counts against the device, as at `pinLogin`.',
     tags: ['auth'],
     requirements: ['AUTH-011', 'AUTH-013'],
     capability: 'SESSION',
@@ -670,7 +1426,15 @@ export const ROUTES = [
     responses: {
       200: { description: 'Override granted.', schema: OverrideResponse },
       ...standardErrors,
-      423: { description: "The manager's login is locked.", schema: ApiError },
+      422: {
+        description:
+          'The approval does not name the record it is for (`OVERRIDE_RECORD_REQUIRED`).',
+        schema: ApiError,
+      },
+      423: {
+        description: "The manager's login is locked, or this device takes no PINs for now.",
+        schema: ApiError,
+      },
       429: { description: 'Too many attempts from this device.', schema: ApiError },
     },
   },
@@ -681,7 +1445,7 @@ export const ROUTES = [
     summary: "Unlock a staff member's PIN login after repeated failures",
     description:
       'A manager unlocks their own login and their team’s; the Owner’s and other managers’ ' +
-      'only the Owner (P4-02a).',
+      'only the Owner (P4-02a). Clears the lockout alert.',
     tags: ['auth'],
     requirements: ['AUTH-003', 'AUTH-013'],
     capability: 'STAFF_MANAGE',
@@ -745,6 +1509,72 @@ export const ROUTES = [
     },
   },
   {
+    operationId: 'listRoles',
+    method: 'GET',
+    path: '/api/v1/roles',
+    summary: 'The built-in roles and the Owner’s custom roles, with how many people have each',
+    tags: ['staff'],
+    requirements: ['AUTH-012', 'MGR-004'],
+    capability: 'STAFF_MANAGE',
+    responses: { 200: { description: 'Roles.', schema: RoleListResponse }, ...standardErrors },
+  },
+  {
+    operationId: 'createRole',
+    method: 'POST',
+    path: '/api/v1/roles',
+    summary: 'Create a custom role: a cashier, waiter or kitchen role with extra capabilities',
+    description:
+      'Owner only, with a fresh second factor (AUTH-006). Staff management and the Owner-only ' +
+      'actions can never be added. Audited.',
+    tags: ['staff'],
+    requirements: ['AUTH-012', 'AUTH-006', 'AUD-001'],
+    capability: 'STAFF_MANAGE',
+    request: { body: RoleRequest },
+    responses: {
+      201: { description: 'Created.', schema: RoleView },
+      ...standardErrors,
+      422: { description: 'A name in use, or nothing that can be added.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'updateRole',
+    method: 'PUT',
+    path: '/api/v1/roles/:roleId',
+    summary: 'Change a custom role; people with it get the change on their next request',
+    description: 'Owner only, with a fresh second factor (AUTH-006). Audited.',
+    tags: ['staff'],
+    requirements: ['AUTH-012', 'AUTH-006', 'AUD-001'],
+    capability: 'STAFF_MANAGE',
+    request: { params: RoleParams, body: RoleRequest },
+    responses: {
+      200: { description: 'Changed.', schema: RoleView },
+      ...standardErrors,
+      404: { description: 'No such custom role.', schema: ApiError },
+      409: {
+        description: 'A built-in or archived role, or a new base role while people have it.',
+        schema: ApiError,
+      },
+      422: { description: 'A name in use, or nothing that can be added.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'archiveRole',
+    method: 'POST',
+    path: '/api/v1/roles/:roleId/archive',
+    summary: 'Archive a custom role nobody active has',
+    description: 'Owner only, with a fresh second factor (AUTH-006). Audited with the reason.',
+    tags: ['staff'],
+    requirements: ['AUTH-012', 'AUD-001'],
+    capability: 'STAFF_MANAGE',
+    request: { params: RoleParams, body: ArchiveRoleRequest },
+    responses: {
+      200: { description: 'Archived.', schema: RoleView },
+      ...standardErrors,
+      404: { description: 'No such custom role.', schema: ApiError },
+      409: { description: 'People still have the role.', schema: ApiError },
+    },
+  },
+  {
     operationId: 'listStaff',
     method: 'GET',
     path: '/api/v1/staff',
@@ -767,23 +1597,18 @@ export const ROUTES = [
     summary: 'Add a person with a role and a PIN',
     description:
       'MGR-004. Managers add cashiers, waiters and kitchen staff; adding a manager needs the Owner ' +
-      'with a fresh second factor (403 `SECOND_FACTOR_REQUIRED` until then, AUTH-006). A custom ' +
-      'role (AUTH-012) is given like its base role, except that one built on the manager role or ' +
-      'giving staff management counts as a manager. The PIN has exactly `auth.pinLength` digits, ' +
-      'is hashed with the pepper and never stored or logged (AUTH-002). Audited.',
+      'with a fresh second factor (403 `SECOND_FACTOR_REQUIRED` until then, AUTH-006). The PIN ' +
+      'has exactly `auth.pinLength` digits, is not easily guessed while `auth.refuseEasyPins` is ' +
+      'on (422 `PIN_TOO_EASY`, PC-S5), is hashed with the pepper and never stored or logged ' +
+      '(AUTH-002). Audited.',
     tags: ['staff'],
-    requirements: ['MGR-004', 'AUTH-001', 'AUTH-002', 'AUTH-006', 'AUTH-012', 'AUD-001'],
+    requirements: ['MGR-004', 'AUTH-001', 'AUTH-002', 'AUTH-006', 'AUD-001'],
     capability: 'STAFF_MANAGE',
     request: { body: CreateStaffRequest },
     responses: {
       201: { description: 'The new person.', schema: StaffView },
       ...standardErrors,
-      404: { description: 'No such custom role, or it is archived.', schema: ApiError },
-      422: {
-        description:
-          'The PIN does not have the configured length, or the custom role is built on another role.',
-        schema: ApiError,
-      },
+      422: { description: 'The PIN does not have the configured length.', schema: ApiError },
     },
   },
   {
@@ -792,24 +1617,19 @@ export const ROUTES = [
     path: '/api/v1/staff/:staffId',
     summary: "Change a person's name, role, phone or e-mail",
     description:
-      "MGR-004. A new role, or custom role (AUTH-012), applies to the person's next request and " +
-      "closes their live connections (AUTH-010). Making someone a manager or no longer one needs the Owner's " +
-      'second factor (AUTH-006), as does giving or taking away a custom role built on the manager ' +
-      "role or giving staff management; a manager's details are changed by the Owner or " +
-      'themselves; nobody changes their own role. Audited with before and after.',
+      "MGR-004. A new role applies to the person's next request (AUTH-010). Making someone a " +
+      "manager or no longer one needs the Owner's second factor (AUTH-006); a manager's details " +
+      'are changed by the Owner or themselves; nobody changes their own role. Audited with ' +
+      'before and after.',
     tags: ['staff'],
-    requirements: ['MGR-004', 'AUTH-006', 'AUTH-012', 'AUD-001'],
+    requirements: ['MGR-004', 'AUTH-006', 'AUD-001'],
     capability: 'STAFF_MANAGE',
     request: { params: StaffParams, body: UpdateStaffRequest },
     responses: {
       200: { description: 'The person as they are now.', schema: StaffView },
       ...standardErrors,
-      404: { description: 'No such person, or no such active custom role.', schema: ApiError },
-      422: {
-        description:
-          'The change is not allowed on this record, or the custom role is built on another role.',
-        schema: ApiError,
-      },
+      404: { description: 'No such person.', schema: ApiError },
+      422: { description: 'The change is not allowed on this record.', schema: ApiError },
     },
   },
   {
@@ -857,7 +1677,8 @@ export const ROUTES = [
     path: '/api/v1/staff/:staffId/pin',
     summary: "Set or reset a person's PIN",
     description:
-      'MGR-004, AUTH-001, AUTH-002: exactly `auth.pinLength` digits, hashed with the pepper, never ' +
+      'MGR-004, AUTH-001, AUTH-002: exactly `auth.pinLength` digits, not easily guessed while ' +
+      '`auth.refuseEasyPins` is on (422 `PIN_TOO_EASY`, PC-S5), hashed with the pepper, never ' +
       "stored, logged or shown. Clears a lockout (AUTH-003). A manager's PIN is set by the Owner " +
       "or themselves, the Owner's only by the Owner. Audited without the PIN.",
     tags: ['staff'],
@@ -869,100 +1690,6 @@ export const ROUTES = [
       ...standardErrors,
       404: { description: 'No such person.', schema: ApiError },
       422: { description: 'The PIN does not have the configured length.', schema: ApiError },
-    },
-  },
-  {
-    operationId: 'listRoles',
-    method: 'GET',
-    path: '/api/v1/roles',
-    summary: 'The custom roles: what each adds to or takes from its base role',
-    description:
-      'AUTH-012: archived roles included, with how many active people have each, so the staff ' +
-      'editor can offer them.',
-    tags: ['staff'],
-    requirements: ['AUTH-012', 'MGR-004'],
-    capability: 'STAFF_MANAGE',
-    responses: {
-      200: { description: 'Custom roles.', schema: RoleListResponse },
-      ...standardErrors,
-    },
-  },
-  {
-    operationId: 'createRole',
-    method: 'POST',
-    path: '/api/v1/roles',
-    summary: 'The Owner combines permissions into a new role on top of a base role',
-    description:
-      'AUTH-012. Only the Owner, with a fresh second factor (403 `SECOND_FACTOR_REQUIRED` until ' +
-      'then, AUTH-006). It may add anything a manager may do and take away anything the base role ' +
-      'may do, never what only the Owner may do (422 `ROLE_PERMISSIONS_INVALID` with each ' +
-      'problem). Names are unique among active roles, built-in ones included. Audited.',
-    tags: ['staff'],
-    requirements: ['AUTH-012', 'AUTH-006', 'AUD-001'],
-    capability: 'STAFF_MANAGE',
-    request: { body: CustomRoleRequest },
-    responses: {
-      201: { description: 'The new role.', schema: CustomRoleView },
-      ...standardErrors,
-      409: { description: 'Another active role has that name.', schema: ApiError },
-      422: { description: 'Permissions that cannot be given this way.', schema: ApiError },
-    },
-  },
-  {
-    operationId: 'updateRole',
-    method: 'PUT',
-    path: '/api/v1/roles/:roleId',
-    summary: "Change a custom role's name, base role or permissions",
-    description:
-      'AUTH-012, AUTH-006: the Owner with a fresh second factor. The people who have it work with ' +
-      'the new permissions from their next request; their live connections close, so their ' +
-      'screens sign in again with them. Audited with before and after.',
-    tags: ['staff'],
-    requirements: ['AUTH-012', 'AUTH-006', 'AUTH-010', 'AUD-001'],
-    capability: 'STAFF_MANAGE',
-    request: { params: RoleParams, body: CustomRoleRequest },
-    responses: {
-      200: { description: 'The role as it is now.', schema: CustomRoleView },
-      ...standardErrors,
-      404: { description: 'No such custom role.', schema: ApiError },
-      409: { description: 'Archived, or another active role has that name.', schema: ApiError },
-      422: { description: 'Permissions that cannot be given this way.', schema: ApiError },
-    },
-  },
-  {
-    operationId: 'archiveRole',
-    method: 'POST',
-    path: '/api/v1/roles/:roleId/archive',
-    summary: 'Archive a custom role nobody active has',
-    description:
-      'AUTH-012, AUTH-006: the Owner with a fresh second factor, with a reason. Deactivated people ' +
-      'keep it in their records. Audited.',
-    tags: ['staff'],
-    requirements: ['AUTH-012', 'AUTH-006', 'AUD-001'],
-    capability: 'STAFF_MANAGE',
-    request: { params: RoleParams, body: ArchiveRoleRequest },
-    responses: {
-      200: { description: 'The role, archived.', schema: CustomRoleView },
-      ...standardErrors,
-      404: { description: 'No such custom role.', schema: ApiError },
-      409: { description: 'Already archived, or active people have it.', schema: ApiError },
-    },
-  },
-  {
-    operationId: 'restoreRole',
-    method: 'POST',
-    path: '/api/v1/roles/:roleId/restore',
-    summary: 'Offer an archived custom role again',
-    description: 'AUTH-012, AUTH-006: the Owner with a fresh second factor. Audited.',
-    tags: ['staff'],
-    requirements: ['AUTH-012', 'AUTH-006', 'AUD-001'],
-    capability: 'STAFF_MANAGE',
-    request: { params: RoleParams },
-    responses: {
-      200: { description: 'The role, offered again.', schema: CustomRoleView },
-      ...standardErrors,
-      404: { description: 'No such custom role.', schema: ApiError },
-      409: { description: 'Not archived, or another active role has its name.', schema: ApiError },
     },
   },
   {
@@ -1068,18 +1795,19 @@ export const ROUTES = [
     tags: ['devices'],
     requirements: ['AUTH-007', 'AUTH-009'],
     capability: 'DEVICE',
+    devices: HTTP_DEVICE_TYPES,
     responses: { 200: { description: 'This device.', schema: DeviceSummary }, ...deviceErrors },
   },
   {
     operationId: 'listDevices',
     method: 'GET',
     path: '/api/v1/devices',
-    summary: 'Paired and revoked devices of the restaurant, with their state now',
+    summary: 'Paired and revoked devices of the restaurant',
     description:
-      'Each device with its binding, whether it is connected now, its battery against the low ' +
-      'level of its type, and its app and firmware versions (MGR-006). Keys are never listed.',
+      'Each device with its binding, whether it is connected now, its last reported battery and ' +
+      'versions, and when it was last seen (MGR-006).',
     tags: ['devices'],
-    requirements: ['AUTH-007', 'AUTH-008', 'MGR-006', 'TAB-015'],
+    requirements: ['AUTH-007', 'AUTH-008', 'MGR-006'],
     capability: 'DEVICE_PAIR',
     responses: { 200: { description: 'Devices.', schema: DeviceListResponse }, ...standardErrors },
   },
@@ -1088,11 +1816,11 @@ export const ROUTES = [
     method: 'PATCH',
     path: '/api/v1/devices/:deviceId',
     summary: 'Rename a device',
-    description: 'Audited. The device and every device list hear of it (`RestaurantChanged`).',
+    description: 'Audited, and announced to every screen as `RestaurantChanged` `DEVICES`.',
     tags: ['devices'],
     requirements: ['MGR-006', 'AUD-001'],
     capability: 'DEVICE_PAIR',
-    request: { params: DeviceParams, body: UpdateDeviceRequest },
+    request: { params: z.object({ deviceId: Id }), body: RenameDeviceRequest },
     responses: {
       200: { description: 'Renamed.', schema: DeviceSummary },
       ...standardErrors,
@@ -1101,22 +1829,23 @@ export const ROUTES = [
     },
   },
   {
-    operationId: 'locateDevice',
-    method: 'POST',
-    path: '/api/v1/devices/:deviceId/locate',
-    summary: 'Make a device show itself: a screen sounds, a tablet beeps, a pager vibrates',
+    operationId: 'setDeviceStations',
+    method: 'PUT',
+    path: '/api/v1/devices/:deviceId/stations',
+    summary: 'Choose the stations a kitchen screen shows',
     description:
-      'Only while the device is connected: the request is refused otherwise, and a device that ' +
-      'connects later does not hear it (`DeviceLocateRequested`, MGR-006).',
+      'KDS-002: one or more stations, or none for every station (the Expo/Pass view). The screen ' +
+      'reconnects at once to show them. Audited, and announced as `RestaurantChanged` `DEVICES`.',
     tags: ['devices'],
-    requirements: ['MGR-006'],
+    requirements: ['KDS-002', 'MGR-006', 'AUD-001'],
     capability: 'DEVICE_PAIR',
-    request: { params: DeviceParams },
+    request: { params: z.object({ deviceId: Id }), body: SetDeviceStationsRequest },
     responses: {
-      204: { description: 'The device was asked to show itself.' },
+      200: { description: 'Changed.', schema: DeviceSummary },
       ...standardErrors,
       404: { description: 'No such device.', schema: ApiError },
-      409: { description: 'The device is unpaired or not connected.', schema: ApiError },
+      409: { description: 'Not a kitchen screen, or unpaired.', schema: ApiError },
+      422: { description: 'A station that is not here, or archived.', schema: ApiError },
     },
   },
   {
@@ -1124,27 +1853,59 @@ export const ROUTES = [
     method: 'POST',
     path: '/api/v1/devices/:deviceId/revoke',
     summary: 'Unpair a device: its tokens and sessions stop working at once',
-    description:
-      'Its live connections close within 5 seconds, a pager is disconnected from the broker, and ' +
-      'its device alerts are cleared. Audited with the reason.',
     tags: ['devices'],
-    requirements: ['AUTH-008', 'MGR-006'],
+    requirements: ['AUTH-008'],
     capability: 'DEVICE_PAIR',
-    request: { params: DeviceParams, body: RevokeDeviceRequest },
+    request: { params: z.object({ deviceId: Id }), body: RevokeDeviceRequest },
     responses: { 200: { description: 'Revoked.', schema: DeviceSummary }, ...standardErrors },
+  },
+  {
+    operationId: 'unlockDevicePins',
+    method: 'POST',
+    path: '/api/v1/devices/:deviceId/pins/unlock',
+    summary: 'Let a device take PINs again after too many wrong ones',
+    description:
+      'PC-S5, MOBILE-S3: a device that stopped taking PINs and passwords after too many wrong ' +
+      'ones takes them again at once; the lockout alert clears. Audited.',
+    tags: ['devices'],
+    requirements: ['AUTH-003', 'SEC-009', 'AUD-001'],
+    capability: 'DEVICE_PAIR',
+    request: { params: z.object({ deviceId: Id }) },
+    responses: {
+      200: { description: 'It takes PINs again.', schema: DeviceView },
+      ...standardErrors,
+      404: { description: 'No such device.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'locateDevice',
+    method: 'POST',
+    path: '/api/v1/devices/:deviceId/locate',
+    summary: 'Ask a connected table tablet to show itself: it flashes and sounds',
+    description:
+      'MGR-006 "Locate". Only table tablets for now (pagers follow with their firmware, P2-05); ' +
+      'the tablet must be connected.',
+    tags: ['devices'],
+    requirements: ['MGR-006'],
+    capability: 'DEVICE_PAIR',
+    request: { params: z.object({ deviceId: Id }) },
+    responses: {
+      200: { description: 'Sent to the device.', schema: LocateDeviceResponse },
+      ...standardErrors,
+      404: { description: 'No such device.', schema: ApiError },
+      409: { description: 'Not a tablet, unpaired, or not connected.', schema: ApiError },
+    },
   },
   {
     operationId: 'bindTabletTable',
     method: 'PUT',
     path: '/api/v1/devices/:deviceId/table',
     summary: 'Move a table tablet to another table',
-    description:
-      'Needs a manager (AUTH-009); the tablet then serves only the new table, and its live ' +
-      'connection restarts in the new table’s rooms. Audited.',
+    description: 'Needs a manager (AUTH-009); the tablet then serves only the new table.',
     tags: ['devices'],
-    requirements: ['AUTH-009', 'TAB-002'],
+    requirements: ['AUTH-009'],
     capability: 'DEVICE_PAIR',
-    request: { params: DeviceParams, body: BindTableRequest },
+    request: { params: z.object({ deviceId: Id }), body: BindTableRequest },
     responses: { 200: { description: 'Rebound.', schema: DeviceSummary }, ...standardErrors },
   },
   {
@@ -1158,6 +1919,7 @@ export const ROUTES = [
     tags: ['restaurant'],
     requirements: ['ONB-004', 'BILL-002', 'NFR-L03'],
     capability: 'DEVICE',
+    devices: HTTP_DEVICE_TYPES,
     responses: {
       200: { description: 'The restaurant.', schema: RestaurantProfile },
       ...deviceErrors,
@@ -1365,6 +2127,25 @@ export const ROUTES = [
     responses: { 200: { description: 'The floor.', schema: FloorResponse }, ...standardErrors },
   },
   {
+    operationId: 'saveFloorLayout',
+    method: 'PUT',
+    path: '/api/v1/floor/layout',
+    summary: 'Save where tables sit on the floor plan',
+    description:
+      'ONB-004 step 5 (S): the tables dragged to a new place, or taken off the plan. Tables of one ' +
+      'section may not overlap. Audited; every screen hears the floor changed.',
+    tags: ['floor'],
+    requirements: ['ONB-004', 'TBL-001', 'AUD-001'],
+    capability: 'STAFF_MANAGE',
+    request: { body: FloorLayoutRequest },
+    responses: {
+      200: { description: 'The floor.', schema: FloorResponse },
+      ...standardErrors,
+      404: { description: 'No such table.', schema: ApiError },
+      422: { description: 'Two tables overlap.', schema: ApiError },
+    },
+  },
+  {
     operationId: 'createSection',
     method: 'POST',
     path: '/api/v1/sections',
@@ -1427,6 +2208,74 @@ export const ROUTES = [
       ...standardErrors,
       404: { description: 'No such section.', schema: ApiError },
       409: { description: 'An active section has its name.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'listTableQrCodes',
+    method: 'GET',
+    path: '/api/v1/tables/qr-codes',
+    summary: 'Every table’s QR code, or that it has none yet',
+    tags: ['floor'],
+    requirements: ['QR-001', 'ONB-004'],
+    capability: 'STAFF_MANAGE',
+    responses: {
+      200: { description: 'The tables in floor order.', schema: TableQrCodesResponse },
+      ...standardErrors,
+    },
+  },
+  {
+    operationId: 'issueTableQrCodes',
+    method: 'POST',
+    path: '/api/v1/tables/qr-codes',
+    summary: 'Give every table without a QR code one',
+    description:
+      'Each code has at least 128 random bits; the relay is sent only its hash. Tables that have a ' +
+      'code keep it. Audited.',
+    tags: ['floor'],
+    requirements: ['QR-001', 'ONB-004', 'AUD-001'],
+    capability: 'STAFF_MANAGE',
+    responses: {
+      200: { description: 'Every table’s code now.', schema: TableQrCodesResponse },
+      ...standardErrors,
+    },
+  },
+  {
+    operationId: 'regenerateTableQrCode',
+    method: 'POST',
+    path: '/api/v1/tables/:tableId/qr-code',
+    summary: 'Give a table a new QR code; the printed one stops working',
+    description:
+      'For a code that was copied or photographed. The old code stops opening the menu as soon ' +
+      'as the relay hears of it (seconds when online). Audited with the reason.',
+    tags: ['floor'],
+    requirements: ['QR-001', 'AUD-001'],
+    capability: 'STAFF_MANAGE',
+    request: { params: TableParams, body: RegenerateTableQrRequest },
+    responses: {
+      200: { description: 'The table’s new code.', schema: TableQrView },
+      ...standardErrors,
+      404: { description: 'No such active table.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'printTableTents',
+    method: 'POST',
+    path: '/api/v1/tables/qr-codes/tents',
+    summary: 'Table tents to print, as a PDF',
+    description:
+      'Each table’s code with the restaurant’s name and colour and the table’s label (ONB-004 ' +
+      'step 10). Needs RP_QR_SITE_URL (`QR_SITE_NOT_SET`); tables without a code are left out.',
+    tags: ['floor'],
+    requirements: ['QR-001', 'ONB-004'],
+    capability: 'STAFF_MANAGE',
+    request: { body: TableTentsRequest },
+    responses: {
+      200: { description: 'The PDF, base64.', schema: TableTentsResponse },
+      ...standardErrors,
+      409: {
+        description: 'The QR site is not set, or no table to print has a code.',
+        schema: ApiError,
+      },
     },
   },
   {
@@ -1618,6 +2467,133 @@ export const ROUTES = [
       ...standardErrors,
       404: { description: 'No such open session or active table.', schema: ApiError },
       409: { description: 'The new table is not free.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'mergeTables',
+    method: 'POST',
+    path: '/api/v1/table-sessions/:sessionId/merge',
+    summary: 'Merge this table into another open table, for one bill',
+    description:
+      'Its orders, tickets and open requests go to the other table, its guests are added to the ' +
+      "other table's, and its session closes: its tablet resets and the table is free (or needs " +
+      'cleaning). Not while either bill is printed, nor with discounts on this one. Waiters may ' +
+      'merge only their own tables. Audited (TBL-006).',
+    tags: ['tables'],
+    requirements: ['TBL-006', 'AUD-001'],
+    capability: 'TABLE_MOVE_MERGE',
+    request: { params: TableSessionParams, body: MergeTablesRequest },
+    responses: {
+      200: { description: 'The table merged into.', schema: TableSessionView },
+      ...standardErrors,
+      404: { description: 'No such open session.', schema: ApiError },
+      409: {
+        description: 'The same table, a bill is printed, or this bill has discounts.',
+        schema: ApiError,
+      },
+    },
+  },
+  {
+    operationId: 'transferItems',
+    method: 'POST',
+    path: '/api/v1/table-sessions/:sessionId/transfer',
+    summary: "Move dishes to another open table's bill",
+    description:
+      'Whole lines, a combo with its parts; not dishes waiting for approval, ended or with a ' +
+      'discount, nor while either bill is printed. Kitchen tickets stay as they are and show ' +
+      'where each moved dish now goes. Waiters may move dishes only between their own tables. ' +
+      'Audited (TBL-006).',
+    tags: ['tables'],
+    requirements: ['TBL-006', 'AUD-001'],
+    capability: 'TABLE_MOVE_MERGE',
+    request: { params: TableSessionParams, body: TransferItemsRequest },
+    responses: {
+      200: { description: 'Both tables after the move.', schema: TransferItemsResponse },
+      ...standardErrors,
+      404: { description: 'No such open session or dish.', schema: ApiError },
+      409: { description: 'A dish cannot move, or a bill is printed.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'printTableBill',
+    method: 'POST',
+    path: '/api/v1/table-sessions/:sessionId/print-bill',
+    summary: "Print a table's bill at the bill printer, from the waiter app",
+    description:
+      'WTR-008 (S). Issues the invoice as the POS would and prints it on the bill printer; when it ' +
+      'cannot print, the bill is issued all the same and the answer says why. Waiters may do it ' +
+      'only for their own tables, and only when the restaurant allows it (`bills.waiterMayPrint`; ' +
+      'the BRD lets waiters only ask for the bill). A printed bill is not printed again from here.',
+    tags: ['billing'],
+    requirements: ['WTR-008', 'BILL-014', 'AUD-001'],
+    capability: 'BILL_REQUEST',
+    request: { params: TableSessionParams },
+    responses: {
+      200: { description: 'The invoice, and whether it printed.', schema: PrintTableBillResponse },
+      ...standardErrors,
+      404: { description: 'No such open session.', schema: ApiError },
+      409: { description: 'The bill is already printed, or cannot be issued.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'getLicence',
+    method: 'GET',
+    path: '/api/v1/licence',
+    summary: 'The licence: its state, the days left and what the restaurant can do',
+    description:
+      'LIC-003, LIC-005, LIC-008. Every signed-in person, for the reminders and banners; the ' +
+      'Owner and managers also get the plan, device limits and reason.',
+    tags: ['licence'],
+    requirements: ['LIC-003', 'LIC-005', 'LIC-008'],
+    capability: 'SESSION',
+    responses: { 200: { description: 'The licence.', schema: LicenceView }, ...standardErrors },
+  },
+  {
+    operationId: 'reactivateLicence',
+    method: 'POST',
+    path: '/api/v1/licence/reactivate',
+    summary: 'Enter an offline reactivation code read out by the vendor',
+    description:
+      'LIC-006. The Owner only; a few tries an hour. The licence is active again until the end ' +
+      'of the code’s day. Audited.',
+    tags: ['licence'],
+    requirements: ['LIC-006', 'AUD-001'],
+    capability: 'LICENSE_MANAGE',
+    request: { body: ReactivateLicenceRequest },
+    responses: {
+      200: { description: 'The licence now.', schema: LicenceView },
+      ...standardErrors,
+      409: { description: 'Not this installation’s code, or one already used.', schema: ApiError },
+      429: { description: 'Too many tries: wait an hour.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'checkLicence',
+    method: 'POST',
+    path: '/api/v1/licence/check',
+    summary: 'Ask the Control Plane for the licence now',
+    description: 'LIC-006: after paying, the Owner need not wait for the next heartbeat.',
+    tags: ['licence'],
+    requirements: ['LIC-006'],
+    capability: 'LICENSE_MANAGE',
+    responses: { 200: { description: 'The licence now.', schema: LicenceView }, ...standardErrors },
+  },
+  {
+    operationId: 'markTableClean',
+    method: 'POST',
+    path: '/api/v1/tables/:tableId/clean',
+    summary: 'Mark a table clean, ready for the next guests',
+    description:
+      'Only a table that needs cleaning (setting `tables.needsCleaning`, TBL-004); it becomes free.',
+    tags: ['tables'],
+    requirements: ['TBL-004'],
+    capability: 'ORDER_CREATE',
+    request: { params: z.object({ tableId: Id }) },
+    responses: {
+      200: { description: 'The table, now free.', schema: TableStateView },
+      ...standardErrors,
+      404: { description: 'No such active table.', schema: ApiError },
+      409: { description: 'The table does not need cleaning.', schema: ApiError },
     },
   },
   {
@@ -1864,6 +2840,26 @@ export const ROUTES = [
     },
   },
   {
+    operationId: 'setItemPhoto',
+    method: 'PUT',
+    path: '/api/v1/menu/items/:id/photo',
+    summary: 'Give a dish its photo, or take it away',
+    description:
+      'ONB-007: for bulk photo upload, after each photo is uploaded. A draft change, published ' +
+      'with the menu; audited with before and after.',
+    tags: ['menu'],
+    requirements: ['ONB-007', 'MENU-008', 'AUD-001'],
+    capability: 'MENU_MANAGE',
+    request: { params: MenuEntityParams, body: ItemPhotoRequest },
+    responses: {
+      200: { description: 'The dish.', schema: ItemView },
+      ...standardErrors,
+      404: { description: 'No such dish.', schema: ApiError },
+      409: { description: 'The dish is archived.', schema: ApiError },
+      422: { description: 'No such photo here.', schema: ApiError },
+    },
+  },
+  {
     operationId: 'archiveItem',
     method: 'POST',
     path: '/api/v1/menu/items/:id/archive',
@@ -2017,6 +3013,68 @@ export const ROUTES = [
     },
   },
   {
+    operationId: 'startAiMenuImport',
+    method: 'POST',
+    path: '/api/v1/menu/ai-imports',
+    summary: 'Read a printed menu from photos or a PDF',
+    description:
+      'ONB-006: the photos are made smaller here, then read by the vendor’s AI service (the ' +
+      'Control Plane holds the AI key, SEC-002). The answer comes at once; ask for the import ' +
+      'until it is DONE or FAILED. Needs the internet and this PC enrolled with the vendor.',
+    tags: ['menu'],
+    requirements: ['ONB-006', 'VCP-008', 'AUD-001'],
+    capability: 'MENU_MANAGE',
+    request: { body: AiMenuImportRequest },
+    responses: {
+      202: { description: 'Queued at the vendor.', schema: AiMenuImportView },
+      ...standardErrors,
+      429: { description: 'Today’s number of menus is used up.', schema: ApiError },
+      503: {
+        description:
+          'Not available: no vendor connection, not enrolled, offline, or AI import not set up.',
+        schema: ApiError,
+      },
+    },
+  },
+  {
+    operationId: 'getAiMenuImport',
+    method: 'GET',
+    path: '/api/v1/menu/ai-imports/:importId',
+    summary: 'How reading the menu is going, and the draft to check',
+    tags: ['menu'],
+    requirements: ['ONB-006'],
+    capability: 'MENU_MANAGE',
+    request: { params: AiMenuImportParams },
+    responses: {
+      200: { description: 'The import, with its draft once DONE.', schema: AiMenuImportView },
+      ...standardErrors,
+      404: { description: 'No such import.', schema: ApiError },
+      503: { description: 'The vendor cannot be reached.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'commitAiMenuImport',
+    method: 'POST',
+    path: '/api/v1/menu/ai-imports/:importId/commit',
+    summary: 'Import the checked draft and publish it',
+    description:
+      'ONB-006: refused until every dish is marked checked by the manager. Then the draft goes ' +
+      'through the template import (ONB-005): every problem is listed, or the menu is added in ' +
+      'one transaction, audited, and published.',
+    tags: ['menu'],
+    requirements: ['ONB-006', 'ONB-005', 'MENU-013', 'AUD-001'],
+    capability: 'MENU_MANAGE',
+    request: { params: AiMenuImportParams, body: MenuReviewRequest },
+    responses: {
+      200: {
+        description: 'The report; `committed` says whether it was imported.',
+        schema: MenuImportReport,
+      },
+      ...standardErrors,
+      422: { description: 'Some dishes are not checked yet.', schema: ApiError },
+    },
+  },
+  {
     operationId: 'uploadPhoto',
     method: 'POST',
     path: '/api/v1/photos',
@@ -2091,6 +3149,179 @@ export const ROUTES = [
     },
   },
   {
+    operationId: 'getTabletTable',
+    method: 'GET',
+    path: '/api/v1/devices/current/table',
+    summary:
+      "This table tablet's table: the open session, if any, and the idle screen's promotions",
+    description:
+      'TAB-002, TAB-003, AUTH-009: the tablet unlocks while its table has an open session and ' +
+      'shows its idle screen otherwise. It reads again when its table opens, closes, changes ' +
+      'state or moves, and when the manager moves the tablet. Only table tablets.',
+    tags: ['devices'],
+    requirements: ['TAB-002', 'TAB-003', 'AUTH-009'],
+    capability: 'DEVICE',
+    devices: ['TABLE_TABLET'],
+    responses: {
+      200: { description: 'The table.', schema: TabletTableView },
+      ...deviceErrors,
+      403: { description: 'Not a table tablet.', schema: ApiError },
+      409: { description: 'The tablet is not bound to a table.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'reportDeviceHealth',
+    method: 'POST',
+    path: '/api/v1/devices/current/health',
+    summary: 'An app reports its battery, charging, connection and version',
+    description:
+      'TAB-015, NTF-003: shown on the dashboard; a table tablet or kitchen screen at or below ' +
+      '`devices.lowBatteryAlertPercent` and not charging alerts the managers once, cleared when ' +
+      'it charges or recovers. Not for pagers (they report over MQTT).',
+    tags: ['devices'],
+    requirements: ['TAB-015', 'NTF-003', 'MGR-006'],
+    capability: 'DEVICE',
+    devices: ['KDS', 'WAITER_PHONE', 'TABLE_TABLET'],
+    request: { body: DeviceHealthRequest },
+    responses: {
+      204: { description: 'Recorded.' },
+      ...deviceErrors,
+      403: { description: 'A pager.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'exitKiosk',
+    method: 'POST',
+    path: '/api/v1/devices/current/kiosk-exit',
+    summary: "A manager lets staff out of a table tablet's kiosk mode with their PIN",
+    description:
+      'TAB-001, AUTH-009: checks the PIN of an active manager or the Owner and audits the exit ' +
+      '(TABLET_KIOSK_EXITED). Wrong PINs count against the tablet, not the person: at ' +
+      '`auth.tabletLockoutMaxFailures` the tablet takes no PINs for the lockout time and the ' +
+      'managers are alerted, so a diner cannot lock the managers out (MOBILE-S3, MOBILE-D1). ' +
+      'Only table tablets.',
+    tags: ['devices'],
+    requirements: ['TAB-001', 'AUTH-013', 'AUD-001'],
+    capability: 'DEVICE',
+    devices: ['TABLE_TABLET'],
+    request: { body: KioskExitRequest },
+    responses: {
+      200: { description: 'Allowed.', schema: KioskExitResponse },
+      ...deviceErrors,
+      403: { description: 'Not a table tablet, or not a manager.', schema: ApiError },
+      423: {
+        description: "The manager's login is locked, or the tablet takes no PINs for now.",
+        schema: ApiError,
+      },
+      429: { description: 'Too many attempts from this tablet.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'submitTabletFeedback',
+    method: 'POST',
+    path: '/api/v1/devices/current/feedback',
+    summary: 'Feedback from the table after the bill: food and service, a comment, a number',
+    description:
+      'TAB-014, BILL-011, SEC-019: once per table session, from the tablet of the open table. ' +
+      'A phone number is kept only with consent, recorded with its purpose, words and time.',
+    tags: ['feedback'],
+    requirements: ['TAB-014', 'BILL-011', 'SEC-019', 'AUTH-009'],
+    capability: 'DEVICE',
+    devices: ['TABLE_TABLET'],
+    request: { body: TabletFeedbackRequest },
+    responses: {
+      201: { description: 'Thank you.', schema: TabletFeedbackResponse },
+      ...deviceErrors,
+      403: { description: 'Not a table tablet bound to a table.', schema: ApiError },
+      409: {
+        description: 'The table is not open, or this table already gave feedback.',
+        schema: ApiError,
+      },
+    },
+  },
+  {
+    operationId: 'eraseDinerContact',
+    method: 'POST',
+    path: '/api/v1/diner-contacts/erase',
+    summary: "Erase a diner's phone number on their request",
+    description:
+      'DATA-011, SEC-019: the number is cleared from every contact record, order and bill ' +
+      '(matched on its last ten digits), and feedback keeps no link to it; invoices keep what ' +
+      'tax law needs but send no more digital bills to it, and a digital bill still waiting for ' +
+      'it is not sent. Audited without the number.',
+    tags: ['feedback'],
+    requirements: ['DATA-011', 'SEC-019', 'AUD-001'],
+    capability: 'DATA_ADMIN',
+    request: { body: EraseDinerContactRequest },
+    responses: {
+      200: { description: 'Erased.', schema: EraseDinerContactResponse },
+      ...standardErrors,
+    },
+  },
+  {
+    operationId: 'submitTabletOrder',
+    method: 'POST',
+    path: '/api/v1/devices/current/orders',
+    summary: "A diner's order from the table tablet, for its own open table",
+    description:
+      'TAB-008, TAB-009, ORD-003, ORD-013: priced by the server, idempotent, and waiting for a ' +
+      "waiter's approval; the table's waiter is alerted (ORD-005). Only table tablets.",
+    tags: ['orders'],
+    requirements: ['TAB-008', 'TAB-009', 'ORD-003', 'ORD-013', 'ORD-014', 'AUTH-009'],
+    capability: 'DEVICE',
+    devices: ['TABLE_TABLET'],
+    request: { body: TabletOrderRequest },
+    responses: {
+      200: { description: 'Accepted, or lines rejected.', schema: SubmitOrderResponse },
+      ...deviceErrors,
+      403: { description: 'Not a table tablet bound to a table.', schema: ApiError },
+      409: { description: 'The table is not open.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'listTabletOrders',
+    method: 'GET',
+    path: '/api/v1/devices/current/orders',
+    summary: "The orders at this table tablet's table: each line's status and the running total",
+    description: 'TAB-009, TAB-010, AUTH-009: the open session at its own table only.',
+    tags: ['orders'],
+    requirements: ['TAB-009', 'TAB-010', 'AUTH-009'],
+    capability: 'DEVICE',
+    devices: ['TABLE_TABLET'],
+    responses: {
+      200: { description: 'The orders.', schema: TabletOrdersResponse },
+      ...deviceErrors,
+      403: { description: 'Not a table tablet bound to a table.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'approveOrderAtTable',
+    method: 'POST',
+    path: '/api/v1/devices/current/orders/:orderId/approve',
+    summary: 'Approve at table: the waiter approves on the tablet with their PIN',
+    description:
+      'ORD-004: the PIN is checked like a sign-in, but wrong ones count against the tablet, not ' +
+      "the person (MOBILE-D1); waiters may approve only their own table's orders. Only this " +
+      "tablet's table.",
+    tags: ['orders'],
+    requirements: ['ORD-004', 'ORD-003', 'AUTH-013', 'AUTH-009'],
+    capability: 'DEVICE',
+    devices: ['TABLE_TABLET'],
+    request: { params: OrderParams, body: ApproveAtTableRequest },
+    responses: {
+      200: { description: 'The order, sent.', schema: OrderView },
+      ...deviceErrors,
+      403: { description: 'Not this table, or not allowed to approve.', schema: ApiError },
+      404: { description: 'No such order at this table.', schema: ApiError },
+      409: { description: 'Nothing waits for approval, or a dish ran out.', schema: ApiError },
+      423: {
+        description: 'The login is locked, or the tablet takes no PINs for now.',
+        schema: ApiError,
+      },
+      429: { description: 'Too many attempts from this tablet.', schema: ApiError },
+    },
+  },
+  {
     operationId: 'listDeviceAlerts',
     method: 'GET',
     path: '/api/v1/devices/current/alerts',
@@ -2103,6 +3334,7 @@ export const ROUTES = [
     tags: ['notifications'],
     requirements: ['WTR-006', 'NTF-006', 'AUTH-005'],
     capability: 'DEVICE',
+    devices: ['WAITER_PHONE'],
     responses: {
       200: { description: 'The holder and their open alerts.', schema: DeviceAlertsResponse },
       ...deviceErrors,
@@ -2121,6 +3353,7 @@ export const ROUTES = [
     tags: ['notifications'],
     requirements: ['WTR-006', 'NTF-004'],
     capability: 'DEVICE',
+    devices: ['WAITER_PHONE'],
     request: { params: AlertParams },
     responses: {
       200: { description: 'The alert.', schema: AlertView },
@@ -2146,6 +3379,19 @@ export const ROUTES = [
       201: { description: 'The alerts, one per person.', schema: NudgeResponse },
       ...standardErrors,
       422: { description: 'Someone chosen is not active staff here.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'getMyBreak',
+    method: 'GET',
+    path: '/api/v1/staff/me/break',
+    summary: 'Whether the signed-in person is on break',
+    tags: ['notifications'],
+    requirements: ['NTF-009'],
+    capability: 'SESSION',
+    responses: {
+      200: { description: 'The break state.', schema: BreakView },
+      ...standardErrors,
     },
   },
   {
@@ -2229,6 +3475,7 @@ export const ROUTES = [
     tags: ['service-requests'],
     requirements: ['TAB-004', 'AUTH-009'],
     capability: 'DEVICE',
+    devices: ['TABLE_TABLET'],
     responses: {
       200: {
         description: 'The open session and its requests.',
@@ -2251,6 +3498,7 @@ export const ROUTES = [
     tags: ['service-requests'],
     requirements: ['TAB-004', 'BILL-015', 'NTF-003', 'NTF-005', 'SEC-009'],
     capability: 'DEVICE',
+    devices: ['TABLE_TABLET'],
     request: { body: RaiseServiceRequest },
     responses: {
       201: { description: 'The request, active.', schema: ServiceRequestView },
@@ -2275,12 +3523,29 @@ export const ROUTES = [
     tags: ['service-requests'],
     requirements: ['TAB-004', 'AUTH-009'],
     capability: 'DEVICE',
+    devices: ['TABLE_TABLET'],
     request: { params: ServiceRequestParams },
     responses: {
       200: { description: 'The request.', schema: ServiceRequestView },
       ...deviceErrors,
       403: { description: 'Not a table tablet bound to a table.', schema: ApiError },
       404: { description: 'No such request at this table.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'listBestSellers',
+    method: 'GET',
+    path: '/api/v1/menu/bestsellers',
+    summary: 'The most ordered dishes lately, for the bestseller badge and filter',
+    description:
+      'TAB-005, REC-004: by quantity over `reco.bestSellerDays`, the top `menu.bestSellerCount`.',
+    tags: ['menu'],
+    requirements: ['TAB-005', 'REC-004'],
+    capability: 'DEVICE',
+    devices: ['TABLE_TABLET'],
+    responses: {
+      200: { description: 'The bestsellers, most ordered first.', schema: BestSellersResponse },
+      ...deviceErrors,
     },
   },
   {
@@ -2325,6 +3590,7 @@ export const ROUTES = [
     tags: ['recommendations'],
     requirements: ['TAB-011', 'REC-001', 'REC-005', 'REC-006', 'REC-007', 'REC-011', 'AUTH-009'],
     capability: 'DEVICE',
+    devices: ['TABLE_TABLET'],
     request: { query: TableRecommendationsQuery },
     responses: {
       200: { description: 'Suggestions, best first.', schema: RecommendationsResponse },
@@ -2363,6 +3629,7 @@ export const ROUTES = [
     tags: ['recommendations'],
     requirements: ['REC-008', 'TAB-011', 'AUTH-009'],
     capability: 'DEVICE',
+    devices: ['TABLE_TABLET'],
     request: { body: RecordTableRecommendationEventsRequest },
     responses: {
       204: { description: 'Recorded.' },
@@ -2440,37 +3707,38 @@ export const ROUTES = [
     },
   },
   {
-    operationId: 'listRecommendationPreferences',
+    operationId: 'getLearnedRecommendations',
     method: 'GET',
-    path: '/api/v1/recommendation-preferences',
-    summary: 'The dishes pinned, boosted or blocked from suggestions',
-    description: 'REC-009: every dish not archived whose preference is not NORMAL.',
+    path: '/api/v1/recommendations/learned',
+    summary: 'What the restaurant’s orders taught the engine',
+    description:
+      'REC-003: the last run of the nightly learning job (the window, how many orders and visits, ' +
+      'whether there were enough) and its 50 strongest "frequently ordered together" rules.',
     tags: ['recommendations'],
-    requirements: ['REC-009'],
+    requirements: ['REC-003'],
     capability: 'OPERATIONS_CONFIGURE',
     responses: {
-      200: { description: 'The preferences.', schema: RecommendationPreferenceListResponse },
+      200: {
+        description: 'The last run and its findings.',
+        schema: LearnedRecommendationsResponse,
+      },
       ...standardErrors,
     },
   },
   {
-    operationId: 'setRecommendationPreference',
-    method: 'PUT',
-    path: '/api/v1/recommendation-preferences/:itemId',
-    summary: 'Pin, boost or block a dish, or put it back to normal',
+    operationId: 'learnRecommendationsNow',
+    method: 'POST',
+    path: '/api/v1/recommendations/learned/run',
+    summary: 'Learn again now',
     description:
-      'REC-009: pinned dishes come first wherever they can be served, boosted ones before the ' +
-      "best sellers and first among a rule's, blocked ones never. Applies at once, without " +
-      'publishing the menu. Audited with before, after and the reason; a change that changes ' +
-      'nothing writes nothing.',
+      'REC-003: runs the nightly learning job at once, for after a big menu change; the answer is ' +
+      'what it found.',
     tags: ['recommendations'],
-    requirements: ['REC-009', 'AUD-001'],
+    requirements: ['REC-003'],
     capability: 'OPERATIONS_CONFIGURE',
-    request: { params: RecommendationPreferenceParams, body: RecommendationPreferenceRequest },
     responses: {
-      200: { description: 'The dish’s preference now.', schema: RecommendationPreferenceView },
+      200: { description: 'The run and its findings.', schema: LearnedRecommendationsResponse },
       ...standardErrors,
-      404: { description: 'No such dish, or it is archived.', schema: ApiError },
     },
   },
   {
@@ -2560,6 +3828,68 @@ export const ROUTES = [
     },
   },
   {
+    operationId: 'getPagerFirmware',
+    method: 'GET',
+    path: '/api/v1/pagers/firmware',
+    summary: 'The firmware this PC passes on to its pagers, and each pager’s update',
+    description:
+      'PGR-011, UPD-001 (P2-04b): the vendor’s signed firmware release this PC fetched and ' +
+      'checked (size, SHA-256, the image, the secure boot signature against the keys built into ' +
+      'the software), a newer one on its way or refused, and for each pager whether it runs it, ' +
+      'waits (and for what), is updating, or was given up on.',
+    tags: ['pagers'],
+    requirements: ['PGR-011', 'UPD-001', 'UPD-007'],
+    capability: 'DEVICE_PAIR',
+    responses: {
+      200: { description: 'The firmware and the pagers.', schema: PagerFirmwareResponse },
+      ...standardErrors,
+    },
+  },
+  {
+    operationId: 'updatePagerFirmwareNow',
+    method: 'POST',
+    path: '/api/v1/pagers/:deviceId/firmware-update',
+    summary: '"Update now": offer the firmware to this pager even while someone wears it',
+    description:
+      'UPD-004 (P2-04b): the pager is offered the firmware outside the maintenance window, as soon ' +
+      'as it is connected, charged enough and has no alert waiting. A pager that rolled back or ' +
+      'failed every attempt is tried again. Audited.',
+    tags: ['pagers'],
+    requirements: ['PGR-011', 'UPD-004', 'AUD-001'],
+    capability: 'UPDATE_INSTALL_NOW',
+    request: { params: PagerParams },
+    responses: {
+      200: { description: 'The pager’s update.', schema: PagerFirmwarePagerView },
+      ...standardErrors,
+      404: { description: 'No such pager.', schema: ApiError },
+      409: {
+        description:
+          'No firmware to update to (`NO_PAGER_FIRMWARE`), its rollout was halted ' +
+          '(`PAGER_FIRMWARE_HALTED`), or the pager runs it already (`PAGER_FIRMWARE_CURRENT`).',
+        schema: ApiError,
+      },
+    },
+  },
+  {
+    operationId: 'downloadPagerFirmware',
+    method: 'GET',
+    path: '/api/v1/pager-firmware/:token',
+    summary: 'The firmware image a pager was offered',
+    description:
+      'PGR-011, UPD-007 (P2-04b): application/octet-stream. Public because a pager has no device ' +
+      'token: the path carries a random token sent to that pager alone on its own MQTT topic ' +
+      '(its broker credential and the ACL), valid 15 minutes. The pager checks the size and ' +
+      'SHA-256 of the offer, and its bootloader the secure boot signature.',
+    tags: ['pagers'],
+    requirements: ['PGR-011', 'UPD-007', 'SEC-012'],
+    capability: 'PUBLIC',
+    request: { params: PagerFirmwareDownloadParams },
+    responses: {
+      200: { description: 'The firmware image.' },
+      404: { description: 'Unknown or expired token.', schema: ApiError },
+    },
+  },
+  {
     operationId: 'getMenu',
     method: 'GET',
     path: '/api/v1/menu',
@@ -2570,6 +3900,7 @@ export const ROUTES = [
     tags: ['menu'],
     requirements: ['MENU-012', 'MENU-013', 'MENU-006'],
     capability: 'DEVICE',
+    devices: HTTP_DEVICE_TYPES,
     responses: {
       200: { description: 'The menu.', schema: MenuSnapshot },
       ...deviceErrors,
@@ -2783,6 +4114,23 @@ export const ROUTES = [
       ...standardErrors,
       404: { description: 'No such printer.', schema: ApiError },
       409: { description: 'Still in use.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'discoverPrinters',
+    method: 'POST',
+    path: '/api/v1/printers/discover',
+    summary: "Find receipt printers on the restaurant's network",
+    description:
+      "ONB-004 step 6 (S). Looks at every address of the PC's own networks (one /24 each at " +
+      'most) for a printer port (`printers.discoveryPorts`), for a few seconds, and says which ' +
+      'printers are already added. Nothing is added or printed.',
+    tags: ['printing'],
+    requirements: ['ONB-004', 'KDS-008'],
+    capability: 'OPERATIONS_CONFIGURE',
+    responses: {
+      200: { description: 'What answered.', schema: PrinterDiscoveryResponse },
+      ...standardErrors,
     },
   },
   {
@@ -3153,6 +4501,66 @@ export const ROUTES = [
     },
   },
   {
+    operationId: 'openCashDrawer',
+    method: 'POST',
+    path: '/api/v1/cash-drawer/open',
+    summary: 'Open the cash drawer without a sale, with a reason',
+    description:
+      'BILL-016, AUD-006. The receipt printer kicks the drawer; an opening is audited ' +
+      '(CASH_DRAWER_OPENED) and appears in the suspicious-activity report.',
+    tags: ['payments'],
+    requirements: ['BILL-016', 'AUD-006', 'AUD-001'],
+    capability: 'BILL_PRINT_AND_PAYMENT',
+    request: { body: OpenCashDrawerRequest },
+    responses: {
+      200: {
+        description: 'Whether the printer took the kick (only an opening is audited).',
+        schema: OpenCashDrawerResponse,
+      },
+      ...standardErrors,
+      422: { description: 'No bill printer is set, or no such printer.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'listInvoiceDigitalBills',
+    method: 'GET',
+    path: '/api/v1/invoices/:id/digital-bills',
+    summary: 'The digital bills of an invoice, and whether one may be sent',
+    description:
+      'BILL-012: the restaurant’s channel, the consented number (masked) and each send, newest ' +
+      'first. Staff never see the whole number again.',
+    tags: ['billing'],
+    requirements: ['BILL-012', 'BILL-011'],
+    capability: 'BILL_PRINT_AND_PAYMENT',
+    request: { params: InvoiceParams },
+    responses: {
+      200: { description: 'The digital bills.', schema: InvoiceDigitalBillsResponse },
+      ...standardErrors,
+      404: { description: 'No such invoice.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'sendInvoiceDigitalBill',
+    method: 'POST',
+    path: '/api/v1/invoices/:id/digital-bills',
+    summary: 'Send the bill to the diner on WhatsApp or SMS (again)',
+    description:
+      'BILL-012: only to a mobile number the diner gave with consent (BILL-011), through the ' +
+      'vendor’s Control Plane; queued while the internet is down. A settled bill goes by itself ' +
+      'when digital bills are on; this sends it again. Audited, without the number.',
+    tags: ['billing'],
+    requirements: ['BILL-012', 'BILL-011', 'AUD-001'],
+    capability: 'BILL_PRINT_AND_PAYMENT',
+    request: { params: InvoiceParams },
+    responses: {
+      202: { description: 'Queued.', schema: DigitalBillEntry },
+      ...standardErrors,
+      404: { description: 'No such invoice.', schema: ApiError },
+      409: { description: 'Digital bills are off, or the invoice is voided.', schema: ApiError },
+      422: { description: 'No mobile number given with consent.', schema: ApiError },
+    },
+  },
+  {
     operationId: 'recordPayments',
     method: 'POST',
     path: '/api/v1/invoices/:id/payments',
@@ -3319,9 +4727,168 @@ export const ROUTES = [
     tags: ['reports'],
     requirements: ['RPT-006'],
     capability: 'REPORTS_VIEW_EXPORT',
-    request: { query: ReportRangeQuery },
+    request: { query: InvoiceRegisterQuery },
     responses: {
       200: { description: 'The report.', schema: InvoiceRegisterResponse },
+      ...standardErrors,
+    },
+  },
+  {
+    operationId: 'getSourceSales',
+    method: 'GET',
+    path: '/api/v1/reports/sources',
+    summary: 'Sales by order source and order type',
+    tags: ['reports'],
+    requirements: ['RPT-004', 'RPT-018'],
+    capability: 'REPORTS_VIEW_EXPORT',
+    request: { query: ReportRangeQuery },
+    responses: {
+      200: { description: 'The report.', schema: SourceSalesResponse },
+      ...standardErrors,
+    },
+  },
+  {
+    operationId: 'getStaffPerformance',
+    method: 'GET',
+    path: '/api/v1/reports/staff',
+    summary: 'Each person: orders, approvals, sales, acknowledgements, escalations, cancellations',
+    tags: ['reports'],
+    requirements: ['RPT-003', 'RPT-018'],
+    capability: 'REPORTS_VIEW_EXPORT',
+    request: { query: ReportRangeQuery },
+    responses: {
+      200: { description: 'The report.', schema: StaffPerformanceResponse },
+      ...standardErrors,
+    },
+  },
+  {
+    operationId: 'getDiscountReport',
+    method: 'GET',
+    path: '/api/v1/reports/discounts',
+    summary: 'Discounts and complimentary items with who, approver, reason and value',
+    tags: ['reports'],
+    requirements: ['RPT-007', 'RPT-018'],
+    capability: 'REPORTS_VIEW_EXPORT',
+    request: { query: ReportRangeQuery },
+    responses: {
+      200: { description: 'The report.', schema: DiscountReportResponse },
+      ...standardErrors,
+    },
+  },
+  {
+    operationId: 'getCancellationReport',
+    method: 'GET',
+    path: '/api/v1/reports/cancellations',
+    summary: 'Items cancelled or voided with their stage (wastage), and bills voided',
+    tags: ['reports'],
+    requirements: ['RPT-008', 'RPT-018'],
+    capability: 'REPORTS_VIEW_EXPORT',
+    request: { query: ReportRangeQuery },
+    responses: {
+      200: { description: 'The report.', schema: CancellationReportResponse },
+      ...standardErrors,
+    },
+  },
+  {
+    operationId: 'getReprintReport',
+    method: 'GET',
+    path: '/api/v1/reports/reprints',
+    summary: 'Kitchen tickets and bills printed again, and bills edited after printing',
+    tags: ['reports'],
+    requirements: ['RPT-009', 'RPT-018'],
+    capability: 'REPORTS_VIEW_EXPORT',
+    request: { query: ReportRangeQuery },
+    responses: {
+      200: { description: 'The report.', schema: ReprintReportResponse },
+      ...standardErrors,
+    },
+  },
+  {
+    operationId: 'getSuspiciousActivityReport',
+    method: 'GET',
+    path: '/api/v1/reports/suspicious',
+    summary: 'Suspicious activity: voids and edits after printing, big discounts, and more',
+    description:
+      'RPT-014, AUD-006. Voids after the bill printed, bill edits after printing, discounts ' +
+      'above the threshold, repeated reprints, cash variances above the threshold, items voided ' +
+      'after the kitchen started, items sent but never on a settled bill, and no-sale drawer ' +
+      'openings, each with the person it is about.',
+    tags: ['reports'],
+    requirements: ['RPT-014', 'AUD-006', 'RPT-018'],
+    capability: 'REPORTS_VIEW_EXPORT',
+    request: { query: ReportRangeQuery },
+    responses: {
+      200: { description: 'The report.', schema: SuspiciousActivityResponse },
+      ...standardErrors,
+    },
+  },
+  {
+    operationId: 'getFeedbackReport',
+    method: 'GET',
+    path: '/api/v1/reports/feedback',
+    summary: "Diners' feedback: ratings by day and the comments",
+    tags: ['reports'],
+    requirements: ['RPT-013', 'TAB-014'],
+    capability: 'REPORTS_VIEW_EXPORT',
+    request: { query: ReportRangeQuery },
+    responses: {
+      200: { description: 'The report.', schema: FeedbackReportResponse },
+      ...standardErrors,
+    },
+  },
+  {
+    operationId: 'getApprovalTimeReport',
+    method: 'GET',
+    path: '/api/v1/reports/approvals',
+    summary: 'How long customer orders wait for a waiter to approve them (pilot KPI, risk R-04)',
+    tags: ['reports'],
+    requirements: ['RPT-003', 'RPT-018', 'ORD-004'],
+    capability: 'REPORTS_VIEW_EXPORT',
+    request: { query: ReportRangeQuery },
+    responses: {
+      200: { description: 'The report.', schema: ApprovalTimeReportResponse },
+      ...standardErrors,
+    },
+  },
+  {
+    operationId: 'getKitchenReport',
+    method: 'GET',
+    path: '/api/v1/reports/kitchen',
+    summary: 'Kitchen performance by station and dish, and Notify manager presses',
+    tags: ['reports'],
+    requirements: ['RPT-010', 'RPT-018'],
+    capability: 'REPORTS_VIEW_EXPORT',
+    request: { query: ReportRangeQuery },
+    responses: {
+      200: { description: 'The report.', schema: KitchenReportResponse },
+      ...standardErrors,
+    },
+  },
+  {
+    operationId: 'getTableReport',
+    method: 'GET',
+    path: '/api/v1/reports/tables',
+    summary: 'Covers, turnover, seated time and spend per cover',
+    tags: ['reports'],
+    requirements: ['RPT-011', 'RPT-018'],
+    capability: 'REPORTS_VIEW_EXPORT',
+    request: { query: ReportRangeQuery },
+    responses: {
+      200: { description: 'The report.', schema: TableReportResponse },
+      ...standardErrors,
+    },
+  },
+  {
+    operationId: 'getRecommendationReport',
+    method: 'GET',
+    path: '/api/v1/reports/recommendations',
+    summary: 'Suggestions shown, opened, added and ordered, with revenue, per layer',
+    tags: ['reports'],
+    requirements: ['RPT-012', 'REC-008', 'RPT-018'],
+    capability: 'REPORTS_VIEW_EXPORT',
+    request: { query: ReportRangeQuery },
+    responses: {
+      200: { description: 'The report.', schema: RecommendationReportResponse },
       ...standardErrors,
     },
   },
@@ -3329,11 +4896,12 @@ export const ROUTES = [
     operationId: 'exportReport',
     method: 'POST',
     path: '/api/v1/reports/exports',
-    summary: 'Export a report as CSV, stamped and audited',
+    summary: 'Export a report as CSV, Excel or PDF, stamped and audited',
     description:
       'The file starts with the restaurant, the report, its filters, who generated it and when ' +
       '(RPT-017); every export is audited as REPORT_EXPORTED. Cashiers may export their own shift ' +
-      'report only. Amounts are plain rupees with two decimals.',
+      'report only. CSV amounts are plain rupees with two decimals; Excel amounts are numbers in ' +
+      'rupees; PDF shows ₹ with Indian grouping. Excel takes at most 200,000 rows and PDF 5,000.',
     tags: ['reports'],
     requirements: ['RPT-017', 'AUD-001'],
     capability: 'REPORTS_VIEW_EXPORT',
@@ -3341,6 +4909,7 @@ export const ROUTES = [
     responses: {
       200: { description: 'The exported file.', schema: ReportExportResponse },
       ...standardErrors,
+      422: { description: 'Too many rows for this format: use CSV.', schema: ApiError },
     },
   },
   {

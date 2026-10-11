@@ -1,7 +1,7 @@
 import type { AlertView } from '@rp/contracts';
 import { createTranslator } from '@rp/i18n';
 import { describe, expect, it } from 'vitest';
-import { alertAge, describeAlert, sizeText } from '../src/alert-text.js';
+import { alertAge, describeAlert } from '../src/alert-text.js';
 
 const t = createTranslator();
 
@@ -97,6 +97,62 @@ describe('[WTR-006] [NFR-U04] what an alert says on the waiter app and the POS',
     expect(describeAlert(alert({ type: 'READY_NOT_COLLECTED', payload: {} }), t).detail).toBeNull();
   });
 
+  it('[AUD-006] tells the Owner how much the daily report flagged, and from which day', () => {
+    const report = alert({ type: 'SUSPICIOUS_ACTIVITY', tableLabel: null });
+    expect(
+      describeAlert({ ...report, payload: { businessDate: '2026-09-30', flags: 3 } }, t),
+    ).toEqual({
+      title: 'Suspicious activity to review',
+      detail: '3 things to review from 30-09-2026. See Reports, Suspicious activity.',
+    });
+    expect(describeAlert({ ...report, payload: { flags: 3 } }, t).detail).toBeNull();
+  });
+
+  it('[UPD-008] says who from support asks for diagnostics, and why', () => {
+    const asked = alert({ type: 'SUPPORT_REQUEST', tableLabel: null });
+    expect(
+      describeAlert(
+        {
+          ...asked,
+          payload: { requestId: 'r1', requestedBy: 'Asha', reason: 'Bills print twice' },
+        },
+        t,
+      ),
+    ).toEqual({
+      title: 'Support asks for diagnostics',
+      detail: 'Asha from support: “Bills print twice”. Allow or decline it on the System page.',
+    });
+    expect(describeAlert({ ...asked, payload: {} }, t).detail).toBeNull();
+  });
+
+  it('[PC-S5] says whose sign-in locked, or which device stopped taking PINs, and until when', () => {
+    const locked = alert({ type: 'SIGN_IN_LOCKED', tableLabel: null });
+    // 09:00 UTC is 14:30 in India.
+    const lockedUntil = '2026-10-10T09:00:00.000Z';
+    expect(
+      describeAlert(
+        {
+          ...locked,
+          payload: { scope: 'PERSON', staffName: 'Ravi', deviceName: 'POS 1', lockedUntil },
+        },
+        t,
+      ),
+    ).toEqual({
+      title: 'Sign-in locked after wrong PINs',
+      detail:
+        'Ravi cannot sign in until 14:30: too many wrong PINs on POS 1. If it was not them, someone may be guessing. Unlock it on the Staff page.',
+    });
+    expect(
+      describeAlert(
+        { ...locked, payload: { scope: 'DEVICE', deviceName: 'Table 4 tablet', lockedUntil } },
+        t,
+      ).detail,
+    ).toBe(
+      'Table 4 tablet takes no PINs until 14:30: too many wrong ones were typed on it. If staff did not mistype them, someone may be guessing. Let it take PINs again on the Devices page.',
+    );
+    expect(describeAlert({ ...locked, payload: { scope: 'DEVICE' } }, t).detail).toBeNull();
+  });
+
   it('[PGR-013] says which device ran low or went offline', () => {
     const pager = { deviceType: 'PAGER', deviceName: 'Pager 3', online: true, batteryPercent: 12 };
     const device = alert({ type: 'DEVICE_LOW_BATTERY_OR_OFFLINE', tableLabel: null });
@@ -113,47 +169,6 @@ describe('[WTR-006] [NFR-U04] what an alert says on the waiter app and the POS',
     expect(
       describeAlert({ ...device, payload: { ...pager, batteryPercent: null } }, t).detail,
     ).toBeNull();
-  });
-
-  it('[NTF-003] [MGR-008] says which printer stopped, in its own words, and what waits for it', () => {
-    const printer = alert({ type: 'PRINTER_OFFLINE', tableLabel: null });
-    const down = {
-      printerName: 'Kitchen printer',
-      error: 'No printer answers at 192.168.1.50:9100. Check its IP address.',
-      queued: 3,
-    };
-    expect(describeAlert({ ...printer, payload: down }, t)).toEqual({
-      title: 'Printer offline',
-      detail:
-        'Kitchen printer: No printer answers at 192.168.1.50:9100. Check its IP address. 3 tickets wait for it.',
-    });
-    expect(describeAlert({ ...printer, payload: { ...down, queued: 1 } }, t).detail).toBe(
-      'Kitchen printer: No printer answers at 192.168.1.50:9100. Check its IP address. 1 ticket waits for it.',
-    );
-    expect(
-      describeAlert({ ...printer, payload: { ...down, error: null, queued: 0 } }, t).detail,
-    ).toBe('Kitchen printer is not printing.');
-  });
-
-  it('[NTF-003] [DATA-006] says how full the data drive is and how much is free', () => {
-    const disk = alert({ type: 'DISK_OR_BACKUP', tableLabel: null });
-    expect(
-      describeAlert({ ...disk, payload: { usedPercent: 86, freeBytes: 13_314_398_618 } }, t),
-    ).toEqual({
-      title: 'Disk or backup needs attention',
-      detail: 'The data drive is 86% full, with 12.4 GB free.',
-    });
-    expect(describeAlert({ ...disk, payload: {} }, t).detail).toBeNull();
-  });
-
-  it('writes sizes as Windows shows them', () => {
-    expect(sizeText(0, t)).toBe('0 bytes');
-    expect(sizeText(900, t)).toBe('900 bytes');
-    expect(sizeText(1_536, t)).toBe('1.5 KB');
-    expect(sizeText(850 * 1_024 * 1_024, t)).toBe('850 MB');
-    expect(sizeText(12.44 * 1_024 ** 3, t)).toBe('12.4 GB');
-    expect(sizeText(3 * 1_024 ** 4, t)).toBe('3 TB');
-    expect(sizeText(5 * 1_024 ** 5, t)).toBe('5120 TB');
   });
 
   it('has words for every kind of alert', () => {

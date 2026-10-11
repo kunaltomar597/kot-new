@@ -1,0 +1,81 @@
+{
+  "input": {
+    "type": "object",
+    "properties": {
+      "tenantId": {
+        "type": "string",
+        "format": "uuid",
+        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+      },
+      "token": { "type": "string", "minLength": 1 },
+      "expiresAt": {
+        "type": "string",
+        "format": "date-time",
+        "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+      },
+      "realtime": {
+        "type": "object",
+        "properties": {
+          "apiKey": { "type": "string", "minLength": 1 },
+          "changes": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "event": { "type": "string", "const": "INSERT" },
+                "schema": { "type": "string", "const": "relay" },
+                "table": { "type": "string", "enum": ["qr_orders", "qr_service_requests"] },
+                "filter": { "type": "string" }
+              },
+              "required": ["event", "schema", "table", "filter"]
+            }
+          }
+        },
+        "required": ["apiKey", "changes"]
+      }
+    },
+    "required": ["tenantId", "token", "expiresAt", "realtime"]
+  },
+  "output": {
+    "type": "object",
+    "properties": {
+      "tenantId": {
+        "type": "string",
+        "format": "uuid",
+        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+      },
+      "token": { "type": "string", "minLength": 1 },
+      "expiresAt": {
+        "type": "string",
+        "format": "date-time",
+        "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+      },
+      "realtime": {
+        "type": "object",
+        "properties": {
+          "apiKey": { "type": "string", "minLength": 1 },
+          "changes": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "event": { "type": "string", "const": "INSERT" },
+                "schema": { "type": "string", "const": "relay" },
+                "table": { "type": "string", "enum": ["qr_orders", "qr_service_requests"] },
+                "filter": { "type": "string" }
+              },
+              "required": ["event", "schema", "table", "filter"],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": ["apiKey", "changes"],
+        "additionalProperties": false
+      }
+    },
+    "required": ["tenantId", "token", "expiresAt", "realtime"],
+    "additionalProperties": false
+  }
+}

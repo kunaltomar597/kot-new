@@ -109,7 +109,7 @@ async function servedCertificate(): Promise<{ fingerprint: string; protocol: str
 
 beforeAll(async () => {
   database = await createTestDatabase();
-  app = await createTestApp({ databaseUrl: database.url, config: { tls: true }, listen: true });
+  app = await createTestApp({ databaseUrl: database.url, config: { tls: true } });
   tls = app.get(TlsService);
   url = appUrl(app);
   port = Number(new URL(url).port);

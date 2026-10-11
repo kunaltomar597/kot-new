@@ -8,4 +8,9 @@ docs/brd/*.pdf
 docs/brd/requirements.json
 docs/brd/requirements.md
 firmware
+# Frozen client API versions (P7-04d): written minified by `pnpm contracts:freeze`.
+docs/api/compat/*.json
 storybook-static
+# Written by `next build` (and git-ignored)
+next-env.d.ts
+.next

@@ -1,0 +1,19 @@
+{
+  "input": {
+    "type": "object",
+    "properties": {
+      "withCode": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+      "deactivated": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+    },
+    "required": ["withCode", "deactivated"]
+  },
+  "output": {
+    "type": "object",
+    "properties": {
+      "withCode": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+      "deactivated": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+    },
+    "required": ["withCode", "deactivated"],
+    "additionalProperties": false
+  }
+}

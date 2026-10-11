@@ -1,0 +1,540 @@
+import { createHash } from 'node:crypto';
+import {
+  Inject,
+  Injectable,
+  Logger,
+  type OnApplicationBootstrap,
+  type OnModuleDestroy,
+  type OnModuleInit,
+} from '@nestjs/common';
+import {
+  type QrOrderStatus,
+  QrPickupOrder,
+  type QrPickupServiceRequest,
+} from '@rp/contracts/relay';
+import { canonicalJson } from '@rp/domain';
+import {
+  type QrOutcome,
+  type QrRequestOutcome,
+  type QrRequestTarget,
+  qrRequestStatusOf,
+  qrRequestSteps,
+  qrStatusOf,
+  qrSteps,
+} from '@rp/ordering';
+import { APP_CONFIG, type AppConfig } from '../config/app-config.js';
+import { PrismaService } from '../database/prisma.service.js';
+import { AppError } from '../errors/app-error.js';
+import { EventBus } from '../events/event-bus.js';
+import { OrdersService } from '../orders/orders.service.js';
+import { ServiceRequestsService } from '../service-requests/service-requests.service.js';
+import { PacedLoop } from './paced-loop.js';
+import { type RelayClient, RelayError } from './relay-client.js';
+import { RelayRealtime } from './relay-realtime.js';
+import { RelaySyncService } from './relay-sync.service.js';
+
+export const RELAY_ORDERS_OPTIONS = Symbol('RELAY_ORDERS_OPTIONS');
+
+export interface RelayOrdersOptions {
+  readonly firstDelayMs: number;
+  /** How often to look for diners' orders without the Realtime doorbell (QR-009). */
+  readonly pollMs: number;
+  /** How often to look anyway while the doorbell works: a safety net (P5-03d). */
+  readonly pollWithRealtimeMs: number;
+  /** Wait after start-up before joining Realtime. */
+  readonly realtimeDelayMs: number;
+  /** A ring picks up this soon, so a burst of orders is one pickup. */
+  readonly ringDelayMs: number;
+  readonly heartbeatMs: number;
+  /** Renew the Realtime token this long before it runs out. */
+  readonly refreshBeforeMs: number;
+  /** After the restaurant acts on a QR order, tell the relay this soon (QR-007). */
+  readonly pushDebounceMs: number;
+  readonly retryBaseMs: number;
+  readonly retryMaxMs: number;
+}
+
+export const DEFAULT_RELAY_ORDERS_OPTIONS: RelayOrdersOptions = {
+  firstDelayMs: 12_000,
+  pollMs: 5_000,
+  pollWithRealtimeMs: 60_000,
+  realtimeDelayMs: 12_000,
+  ringDelayMs: 100,
+  heartbeatMs: 25_000,
+  refreshBeforeMs: 5 * 60_000,
+  pushDebounceMs: 500,
+  retryBaseMs: 5_000,
+  retryMaxMs: 60_000,
+};
+
+/** Shown to the diner when the restaurant could not take the order at all. */
+const COULD_NOT_TAKE = 'The restaurant could not take this order. Please call a waiter.';
+const TABLE_CLOSED = 'This table is not taking orders right now. Please call a waiter.';
+const TABLE_NOT_SEATED = 'This table is not open yet. Please wave to a waiter to be seated.';
+
+const hashOf = (value: unknown) => createHash('sha256').update(canonicalJson(value)).digest('hex');
+
+/**
+ * The QR relay's sync agent, order side (P5-03b, QR-007, QR-009, QR-010, ORD-013). New orders
+ * and requests ring a Realtime doorbell (P5-03d), so polling slows to a safety net while it works.
+ *
+ * 1. Pick up: diners' orders waiting at the relay go into the inbox (`relay_orders`), once each.
+ * 2. Take: an order past its pickup time is left to expire. Otherwise the relay is told it was
+ *    received, then it becomes a normal QR order priced here, waiting for a waiter. A table that
+ *    is not open goes to its section's waiter, and approving opens it. Lines the menu can no
+ *    longer serve reject it with the reason. A restart between the two steps resumes.
+ * 3. Tell: whenever the restaurant acts on it (approved, rejected, each line's state), the relay
+ *    is told, in the order it accepts. A durable event consumer marks what changed, so nothing is
+ *    lost while offline.
+ */
+@Injectable()
+export class RelayOrdersService implements OnModuleInit, OnApplicationBootstrap, OnModuleDestroy {
+  private readonly logger = new Logger(RelayOrdersService.name);
+  private readonly loop: PacedLoop;
+  private unsubscribe: (() => void) | undefined;
+  private lastError: string | null = null;
+  private realtime: RelayRealtime | undefined;
+
+  constructor(
+    @Inject(APP_CONFIG) private readonly config: AppConfig,
+    private readonly prisma: PrismaService,
+    private readonly orders: OrdersService,
+    private readonly requests: ServiceRequestsService,
+    private readonly sync: RelaySyncService,
+    private readonly events: EventBus,
+    @Inject(RELAY_ORDERS_OPTIONS) private readonly options: RelayOrdersOptions,
+  ) {
+    this.loop = new PacedLoop(
+      () => this.cycle(),
+      options,
+      (error) => {
+        const code = error instanceof RelayError ? error.code : 'INTERNAL';
+        if (this.lastError !== code) {
+          this.logger.warn({ code, err: error }, 'QR orders not in step with the relay');
+        }
+        this.lastError = code;
+      },
+    );
+  }
+
+  onModuleInit(): void {
+    // Whatever the restaurant does to a QR order is to be told to the relay; marked in the same
+    // transaction as the event is handled, so it survives a restart or a long outage.
+    this.events.subscribe({
+      name: 'relay.qr-orders',
+      types: ['OrderApproved', 'OrderRejected', 'ItemStatusChanged'],
+      handle: async (event, { tx }) => {
+        if (
+          event.type !== 'OrderApproved' &&
+          event.type !== 'OrderRejected' &&
+          event.type !== 'ItemStatusChanged'
+        ) {
+          return;
+        }
+        await tx.relayOrder.updateMany({
+          where: { orderId: event.payload.orderId, pushedHash: { not: null } },
+          data: { pushedHash: null },
+        });
+      },
+    });
+    // QR-011: the waiter on the way, or the request closed, is told to the diner the same way.
+    this.events.subscribe({
+      name: 'relay.qr-service-requests',
+      types: ['ServiceRequestAcknowledged', 'ServiceRequestCancelled'],
+      handle: async (event, { tx }) => {
+        if (
+          event.type !== 'ServiceRequestAcknowledged' &&
+          event.type !== 'ServiceRequestCancelled'
+        ) {
+          return;
+        }
+        await tx.relayServiceRequest.updateMany({
+          where: { serviceRequestId: event.payload.serviceRequestId, pushedHash: { not: null } },
+          data: { pushedHash: null },
+        });
+      },
+    });
+  }
+
+  onApplicationBootstrap(): void {
+    if (this.config.relayUrl === undefined) return;
+    const acts = new Set([
+      'OrderApproved',
+      'OrderRejected',
+      'ItemStatusChanged',
+      'ServiceRequestAcknowledged',
+      'ServiceRequestCancelled',
+    ]);
+    this.unsubscribe = this.events.onPublished((events) => {
+      if (events.some(({ event }) => acts.has(event.type))) {
+        this.loop.soon(this.options.pushDebounceMs);
+      }
+    });
+    this.loop.start(this.options.firstDelayMs);
+    this.realtime = new RelayRealtime({
+      relayUrl: this.config.relayUrl,
+      session: async () => (await this.sync.client())?.session(),
+      onRing: () => {
+        this.loop.soon(this.options.ringDelayMs);
+      },
+      onChange: (subscribed) => {
+        this.logger.log(
+          subscribed
+            ? 'QR orders arrive by Realtime; polling slows down'
+            : 'QR orders are polled until Realtime is back',
+        );
+        // Without the doorbell, look again at the normal pace straight away.
+        if (!subscribed) this.loop.soon(this.options.pollMs);
+      },
+      heartbeatMs: this.options.heartbeatMs,
+      refreshBeforeMs: this.options.refreshBeforeMs,
+      retryBaseMs: this.options.retryBaseMs,
+      retryMaxMs: this.options.retryMaxMs,
+      notConfiguredRetryMs: 60 * 60_000,
+    });
+    this.realtime.start(this.options.realtimeDelayMs);
+  }
+
+  async onModuleDestroy(): Promise<void> {
+    this.unsubscribe?.();
+    this.realtime?.stop();
+    await this.loop.stop();
+  }
+
+  /** Joins Realtime now rather than after `realtimeDelayMs` (tests, support tools). */
+  startRealtimeNow(): void {
+    this.realtime?.stop();
+    this.realtime?.start(0);
+  }
+
+  /** New QR orders ring by Realtime (true), or are polled (P5-03d). */
+  get realtimeSubscribed(): boolean {
+    return this.realtime?.subscribed ?? false;
+  }
+
+  /** Picks up, takes and tells now (the loop calls it; so do tests). Never throws. */
+  async run(): Promise<{ lastError: string | null }> {
+    await this.loop.run();
+    return { lastError: this.lastError };
+  }
+
+  private async cycle(): Promise<number> {
+    const client = await this.sync.client();
+    if (client === undefined) return this.options.retryMaxMs;
+    const restaurant = await this.prisma.restaurant.findFirst({
+      orderBy: { createdAt: 'asc' },
+      select: { id: true },
+    });
+    if (restaurant === null) return this.options.retryMaxMs;
+    const { orders } = await client.pickup();
+    for (const order of orders) await this.inbox(restaurant.id, order);
+    await this.takeWaiting(client, restaurant.id);
+    await this.tell(client, restaurant.id);
+    const { requests } = await client.pickupServiceRequests();
+    for (const request of requests) await this.inboxRequest(restaurant.id, request);
+    await this.raiseWaiting(client, restaurant.id);
+    await this.tellRequests(client, restaurant.id);
+    this.lastError = null;
+    return this.realtimeSubscribed ? this.options.pollWithRealtimeMs : this.options.pollMs;
+  }
+
+  /**
+   * The inbox: one row per relay order, whatever happens next (ORD-013). An order offered again
+   * after it was dealt with means the relay never heard "received" (an answer lost, a relay
+   * restored): what it was told is forgotten, so it is told again from the start.
+   */
+  private async inbox(restaurantId: string, order: QrPickupOrder): Promise<void> {
+    const added = await this.prisma.relayOrder.createMany({
+      data: [
+        {
+          relayOrderId: order.id,
+          restaurantId,
+          tableId: order.tableId,
+          payload: order,
+          expiresAt: new Date(order.expiresAt),
+        },
+      ],
+      skipDuplicates: true,
+    });
+    if (added.count === 0) {
+      await this.prisma.relayOrder.updateMany({
+        where: { relayOrderId: order.id, restaurantId, outcome: { not: null } },
+        data: { pushedStatus: null, pushedHash: null },
+      });
+    }
+  }
+
+  /** Takes every inbox order not yet dealt with, oldest first. */
+  private async takeWaiting(client: RelayClient, restaurantId: string): Promise<void> {
+    const waiting = await this.prisma.relayOrder.findMany({
+      where: { restaurantId, outcome: null },
+      orderBy: { createdAt: 'asc' },
+      take: 100,
+    });
+    for (const row of waiting) {
+      const order = QrPickupOrder.parse(row.payload);
+      const outcome = await this.take(client, restaurantId, order);
+      await this.prisma.relayOrder.update({
+        where: { relayOrderId: row.relayOrderId },
+        data: {
+          outcome: outcome.outcome,
+          orderId: outcome.orderId,
+          rejectionReason: outcome.reason,
+          // What the relay was told so far; the telling step takes it from there.
+          pushedHash: null,
+          ...(outcome.pushed !== undefined && { pushedStatus: outcome.pushed }),
+        },
+      });
+    }
+  }
+
+  private async take(
+    client: RelayClient,
+    restaurantId: string,
+    order: QrPickupOrder,
+  ): Promise<{
+    outcome: QrOutcome;
+    orderId: string | null;
+    reason: string | null;
+    pushed?: QrOrderStatus;
+  }> {
+    const expired = { outcome: 'EXPIRED' as const, orderId: null, reason: null };
+    // Done already, before a restart: just finish the record.
+    const existing = await this.prisma.order.findFirst({
+      where: { restaurantId, source: 'QR', externalRef: order.id },
+      select: { id: true },
+    });
+    if (existing !== null) return { outcome: 'CREATED', orderId: existing.id, reason: null };
+
+    // QR-007: past its pickup time by the relay's clock, it is left to expire, never made.
+    const offset = this.sync.status().clockOffsetMs ?? 0;
+    if (Date.now() + offset > Date.parse(order.expiresAt))
+      return { ...expired, pushed: 'SUBMITTED' };
+    try {
+      await client.updateOrder(order.id, { status: 'RECEIVED' });
+    } catch (error) {
+      if (!(error instanceof RelayError)) throw error;
+      // Too late after all, or the relay already closed it: nothing is made.
+      if (error.code === 'ORDER_EXPIRED' || error.code === 'INVALID_STATUS_CHANGE') {
+        return { ...expired, pushed: 'EXPIRED' };
+      }
+      if (error.code === 'ORDER_NOT_FOUND') return { ...expired, pushed: 'EXPIRED' };
+      throw error;
+    }
+
+    const table = await this.prisma.diningTable.findFirst({
+      where: { id: order.tableId, restaurantId, archivedAt: null },
+      select: { id: true, sessions: { where: { status: 'OPEN' }, select: { id: true } } },
+    });
+    if (table === null) {
+      return { outcome: 'REJECTED', orderId: null, reason: TABLE_CLOSED, pushed: 'RECEIVED' };
+    }
+    const sessionId = table.sessions[0]?.id;
+    try {
+      const answer = await this.orders.submit(
+        { restaurantId, staffId: null, deviceId: null },
+        {
+          idempotencyKey: order.idempotencyKey,
+          source: 'QR',
+          orderType: 'DINE_IN',
+          ...(sessionId !== undefined && { tableSessionId: sessionId }),
+          lines: order.lines,
+          ...(order.orderNote !== null && { orderNote: order.orderNote }),
+          ...(order.customerName !== null && { customerName: order.customerName }),
+        },
+        { tableId: table.id, externalRef: order.id },
+      );
+      if (answer.status === 'ACCEPTED') {
+        this.logger.log({ orderId: answer.orderId, relayOrderId: order.id }, 'QR order taken');
+        return { outcome: 'CREATED', orderId: answer.orderId, reason: null, pushed: 'RECEIVED' };
+      }
+      const reason = answer.rejectedLines.map((line) => line.message).join(' ');
+      return { outcome: 'REJECTED', orderId: null, reason, pushed: 'RECEIVED' };
+    } catch (error) {
+      if (!(error instanceof AppError)) throw error;
+      this.logger.warn({ code: error.code, relayOrderId: order.id }, 'QR order refused');
+      return { outcome: 'REJECTED', orderId: null, reason: COULD_NOT_TAKE, pushed: 'RECEIVED' };
+    }
+  }
+
+  /** Tells the relay what changed since it was last told (QR-007). */
+  private async tell(client: RelayClient, restaurantId: string): Promise<void> {
+    const rows = await this.prisma.relayOrder.findMany({
+      where: { restaurantId, outcome: { not: null }, pushedHash: null },
+      orderBy: { createdAt: 'asc' },
+      take: 100,
+      include: {
+        order: {
+          select: {
+            id: true,
+            items: {
+              where: { parentOrderItemId: null },
+              orderBy: { createdAt: 'asc' },
+              select: { clientLineId: true, state: true, endReason: true },
+            },
+          },
+        },
+      },
+    });
+    for (const row of rows) {
+      const target = qrStatusOf({
+        outcome: row.outcome as QrOutcome,
+        rejectionReason: row.rejectionReason,
+        lines: row.order?.items ?? [],
+      });
+      const localOrderId = row.order?.id;
+      const hash = hashOf({ target, localOrderId });
+      let pushed = (row.pushedStatus ?? null) as QrOrderStatus | null;
+      for (const status of qrSteps(pushed, target.status)) {
+        try {
+          await client.updateOrder(row.relayOrderId, {
+            status,
+            ...(status === target.status && { detail: target.detail }),
+            ...(localOrderId !== undefined && { localOrderId }),
+          });
+          pushed = status;
+        } catch (error) {
+          // The relay is past this already, or the order is gone: there is nothing more to tell.
+          if (
+            error instanceof RelayError &&
+            ['INVALID_STATUS_CHANGE', 'ORDER_EXPIRED', 'ORDER_NOT_FOUND'].includes(error.code)
+          ) {
+            this.logger.warn(
+              { code: error.code, relayOrderId: row.relayOrderId },
+              'QR order status not taken',
+            );
+            break;
+          }
+          throw error;
+        }
+      }
+      await this.prisma.relayOrder.update({
+        where: { relayOrderId: row.relayOrderId },
+        data: { pushedHash: hash, ...(pushed !== null && { pushedStatus: pushed }) },
+      });
+    }
+  }
+
+  // ---------------------------------------------------------------- call waiter / request bill
+
+  private async inboxRequest(restaurantId: string, request: QrPickupServiceRequest): Promise<void> {
+    await this.prisma.relayServiceRequest.createMany({
+      data: [
+        {
+          relayRequestId: request.id,
+          restaurantId,
+          tableId: request.tableId,
+          type: request.type,
+          expiresAt: new Date(request.expiresAt),
+        },
+      ],
+      skipDuplicates: true,
+    });
+  }
+
+  /**
+   * QR-011: each waiting request is told received, then raised like the tablet's at its table. A
+   * request already open there (from the tablet or another phone) is the same request; a table
+   * that is not open cannot take one, as at the tablet.
+   */
+  private async raiseWaiting(client: RelayClient, restaurantId: string): Promise<void> {
+    const waiting = await this.prisma.relayServiceRequest.findMany({
+      where: { restaurantId, outcome: null },
+      orderBy: { createdAt: 'asc' },
+      take: 100,
+    });
+    for (const row of waiting) {
+      const result = await this.raiseOne(client, restaurantId, row);
+      await this.prisma.relayServiceRequest.update({
+        where: { relayRequestId: row.relayRequestId },
+        data: {
+          outcome: result.outcome,
+          serviceRequestId: result.serviceRequestId,
+          rejectionReason: result.reason,
+          pushedHash: null,
+          ...(result.pushed !== undefined && { pushedStatus: result.pushed }),
+        },
+      });
+    }
+  }
+
+  private async raiseOne(
+    client: RelayClient,
+    restaurantId: string,
+    row: { relayRequestId: string; tableId: string; type: string; expiresAt: Date },
+  ): Promise<{
+    outcome: QrRequestOutcome;
+    serviceRequestId: string | null;
+    reason: string | null;
+    pushed?: 'SUBMITTED' | QrRequestTarget;
+  }> {
+    const expired = { outcome: 'EXPIRED' as const, serviceRequestId: null, reason: null };
+    const offset = this.sync.status().clockOffsetMs ?? 0;
+    if (Date.now() + offset > row.expiresAt.getTime()) return { ...expired, pushed: 'SUBMITTED' };
+    try {
+      await client.updateServiceRequest(row.relayRequestId, { status: 'RECEIVED' });
+    } catch (error) {
+      if (!(error instanceof RelayError)) throw error;
+      if (['REQUEST_EXPIRED', 'INVALID_STATUS_CHANGE', 'REQUEST_NOT_FOUND'].includes(error.code)) {
+        return { ...expired, pushed: 'EXPIRED' };
+      }
+      throw error;
+    }
+    const type = row.type === 'WATER' || row.type === 'BILL' ? row.type : 'WAITER';
+    try {
+      const raised = await this.requests.raiseFromQr(restaurantId, row.tableId, type);
+      return { outcome: 'RAISED', serviceRequestId: raised.id, reason: null, pushed: 'RECEIVED' };
+    } catch (error) {
+      if (!(error instanceof AppError)) throw error;
+      const open = error.details?.serviceRequestId;
+      if (error.code === 'SERVICE_REQUEST_ACTIVE' && typeof open === 'string') {
+        return { outcome: 'RAISED', serviceRequestId: open, reason: null, pushed: 'RECEIVED' };
+      }
+      return {
+        outcome: 'REJECTED',
+        serviceRequestId: null,
+        reason: error.code === 'TABLE_NOT_OPEN' ? TABLE_NOT_SEATED : COULD_NOT_TAKE,
+        pushed: 'RECEIVED',
+      };
+    }
+  }
+
+  /** Tells the relay how each request went since it was last told (QR-011). */
+  private async tellRequests(client: RelayClient, restaurantId: string): Promise<void> {
+    const rows = await this.prisma.relayServiceRequest.findMany({
+      where: { restaurantId, outcome: { not: null }, pushedHash: null },
+      orderBy: { createdAt: 'asc' },
+      take: 100,
+      include: { serviceRequest: { select: { state: true } } },
+    });
+    for (const row of rows) {
+      const target = qrRequestStatusOf(
+        row.outcome as QrRequestOutcome,
+        row.serviceRequest?.state ?? null,
+      );
+      let pushed = (row.pushedStatus ?? null) as 'SUBMITTED' | QrRequestTarget | null;
+      for (const status of qrRequestSteps(pushed, target)) {
+        try {
+          await client.updateServiceRequest(row.relayRequestId, {
+            status,
+            ...(status === 'REJECTED' &&
+              row.rejectionReason !== null && { rejectionReason: row.rejectionReason }),
+          });
+          pushed = status;
+        } catch (error) {
+          if (
+            error instanceof RelayError &&
+            ['INVALID_STATUS_CHANGE', 'REQUEST_EXPIRED', 'REQUEST_NOT_FOUND'].includes(error.code)
+          ) {
+            break;
+          }
+          throw error;
+        }
+      }
+      await this.prisma.relayServiceRequest.update({
+        where: { relayRequestId: row.relayRequestId },
+        data: { pushedHash: hashOf({ target }), ...(pushed !== null && { pushedStatus: pushed }) },
+      });
+    }
+  }
+}

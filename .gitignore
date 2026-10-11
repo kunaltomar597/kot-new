@@ -26,9 +26,14 @@ apps/table-tablet/android/
 out/
 # Storybook workbench build (packages/ui-web)
 storybook-static/
+# The Windows installer's staging folder and output (apps/desktop, P0-16d)
+apps/desktop/staging/
+apps/desktop/release/
 # Playwright output (apps/console e2e)
 test-results/
 playwright-report/
+# ZAP's plans, scripts and reports from a DAST run (infra/dast, P8-03c1)
+infra/dast/reports/
 # ESP-IDF
 firmware/**/build/
 firmware/**/sdkconfig.old
@@ -48,3 +53,10 @@ apps/server/src/generated/
 apps/control-plane/src/generated/
 # Local server data directory in development
 .data/
+
+# Local copies kept beside the repository (the BRD is tracked in docs/brd/)
+/latest_context.md
+/Restaurant_Platform_BRD_v1.0.pdf
+
+# Vitest report output
+.vitest/

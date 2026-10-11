@@ -1,12 +1,12 @@
 import type { DomainEvent } from '@rp/contracts';
 import {
-  CAPABILITIES,
   type Capability,
-  grantOf,
+  DEFAULT_PERMISSION_MATRIX,
+  grantFor,
   OVERRIDE_APPROVER_ROLES,
-  type PermissionHolder,
+  type PermissionMatrix,
   type Role,
-  type RoleCustomisation,
+  ROLES,
 } from '@rp/domain';
 import type { AuthenticatedDevice } from '../auth/device.js';
 import type { EventAudience } from '../events/outbox.js';
@@ -19,12 +19,6 @@ export const rooms = {
   /** Every connected device of the restaurant, table tablets included. */
   all: (restaurantId: string) => `r:${restaurantId}:all`,
   role: (restaurantId: string, role: Role) => `r:${restaurantId}:role:${role}`,
-  /**
-   * Everyone who may use a capability at all (ALLOW, OWN or OVERRIDE), custom roles included
-   * (P4-02e): events about that capability's work go here.
-   */
-  capability: (restaurantId: string, capability: Capability) =>
-    `r:${restaurantId}:can:${capability}`,
   staff: (restaurantId: string, staffId: string) => `r:${restaurantId}:staff:${staffId}`,
   table: (restaurantId: string, tableId: string) => `r:${restaurantId}:table:${tableId}`,
   section: (restaurantId: string, sectionId: string) => `r:${restaurantId}:section:${sectionId}`,
@@ -42,19 +36,14 @@ export const rooms = {
 /** Who is connected: the device and, if someone is signed in on it, the person. */
 export interface ConnectionIdentity {
   readonly device: AuthenticatedDevice;
-  readonly person?: {
-    readonly staffId: string;
-    readonly role: Role;
-    readonly customRole?: RoleCustomisation | null;
-  };
+  readonly person?: { readonly staffId: string; readonly role: Role };
   /** Sections the person is assigned to for the current business day. */
   readonly sectionIds?: readonly string[];
 }
 
 /**
  * The rooms a connection joins. A table tablet only ever hears about its own table (AUTH-009);
- * a kitchen screen hears its station; a person hears what their role may see (SEC-003), with
- * their custom role's changes (AUTH-012).
+ * a kitchen screen hears its station; a person hears what their role may see (SEC-003).
  */
 export function roomsForConnection(identity: ConnectionIdentity): string[] {
   const { device, person } = identity;
@@ -65,9 +54,9 @@ export function roomsForConnection(identity: ConnectionIdentity): string[] {
     return joined;
   }
   if (device.type === 'KDS') {
-    joined.push(
-      device.stationId === null ? rooms.allStations(rid) : rooms.station(rid, device.stationId),
-    );
+    // KDS-002: each of its stations, or every station (the Expo/Pass view).
+    if (device.stationIds.length === 0) joined.push(rooms.allStations(rid));
+    for (const stationId of device.stationIds) joined.push(rooms.station(rid, stationId));
   }
   if (device.type === 'WAITER_PHONE' && device.staffId !== null) {
     joined.push(rooms.alerts(rid, device.staffId));
@@ -75,36 +64,27 @@ export function roomsForConnection(identity: ConnectionIdentity): string[] {
   if (person !== undefined) {
     joined.push(rooms.role(rid, person.role), rooms.staff(rid, person.staffId));
     for (const sectionId of identity.sectionIds ?? []) joined.push(rooms.section(rid, sectionId));
-    joined.push(...capabilityRooms(rid, person));
   } else if (device.type === 'KDS') {
     // Station mode (AUTH-005): the screen acts for the kitchen when nobody is signed in.
-    joined.push(rooms.role(rid, 'KITCHEN'), ...capabilityRooms(rid, { role: 'KITCHEN' }));
+    joined.push(rooms.role(rid, 'KITCHEN'));
   }
   return joined;
 }
 
-/** The capability rooms of what `holder` may do, among the capabilities events are sent by. */
-function capabilityRooms(rid: string, holder: PermissionHolder): string[] {
-  return CAPABILITIES.filter(
-    (capability) => ROUTED_CAPABILITIES.has(capability) && grantOf(holder, capability) !== 'DENY',
-  ).map((capability) => rooms.capability(rid, capability));
-}
-
 /**
- * Who sees an event type: everyone granted the capability at all (ALLOW, OWN or OVERRIDE, their
- * custom role applied), so the socket never shows a person what their REST calls could not.
- * Station-scoped kitchen work reaches kitchen screens through their station rooms instead.
+ * Which roles see an event type: those the BRD §4.2 matrix grants the capability at all (ALLOW,
+ * OWN or OVERRIDE), so the socket never shows a role what its REST calls could not. Station-scoped
+ * kitchen work reaches kitchen screens through their station rooms instead.
  */
-const VISIBLE_WITH: Readonly<
-  Record<DomainEvent['type'], Capability | 'EVERYONE' | 'MANAGERS' | 'THE_DEVICE'>
-> = {
+const VISIBLE_WITH: Readonly<Record<DomainEvent['type'], Capability | 'EVERYONE' | 'MANAGERS'>> = {
   MenuPublished: 'EVERYONE',
   ItemAvailabilityChanged: 'EVERYONE',
-  // Only menu editors read the draft; ordering surfaces wait for the published menu.
-  MenuDraftChanged: 'MENU_MANAGE',
   TableOpened: 'ORDER_CREATE',
   TableMoved: 'ORDER_CREATE',
   TableClosed: 'ORDER_CREATE',
+  OrdersMoved: 'ORDER_CREATE',
+  // Every screen shows the licence's reminder or banner (LIC-005).
+  LicenceChanged: 'EVERYONE',
   TableStateChanged: 'ORDER_CREATE',
   TableWaiterChanged: 'ORDER_CREATE',
   OrderSubmitted: 'ORDER_CREATE',
@@ -130,8 +110,8 @@ const VISIBLE_WITH: Readonly<
   AlertCleared: 'MANAGERS',
   DeviceStatusChanged: 'DEVICE_PAIR',
   DeviceRevoked: 'DEVICE_PAIR',
-  // Only the device a manager is looking for (MGR-006 "Locate").
-  DeviceLocateRequested: 'THE_DEVICE',
+  // Managers see that someone asked; the device itself hears it through its own room (P3-01c).
+  DeviceLocateRequested: 'DEVICE_PAIR',
   // The POS and managers are alerted when a printer stops or starts again (KDS-008, NTF-003).
   PrinterStatusChanged: 'BILL_PRINT_AND_PAYMENT',
   // Only the changed keys: every screen may hear it and reads what it may see again.
@@ -140,11 +120,9 @@ const VISIBLE_WITH: Readonly<
   RestaurantChanged: 'EVERYONE',
 };
 
-const ROUTED_CAPABILITIES: ReadonlySet<Capability> = new Set(
-  Object.values(VISIBLE_WITH).filter((visibility): visibility is Capability =>
-    (CAPABILITIES as readonly string[]).includes(visibility),
-  ),
-);
+function rolesWith(capability: Capability, matrix: PermissionMatrix): Role[] {
+  return ROLES.filter((role) => grantFor(role, capability, matrix) !== 'DENY');
+}
 
 /** Tables, stations and people an event names in its own payload. */
 function named(event: DomainEvent): Required<EventAudience> {
@@ -166,6 +144,7 @@ function named(event: DomainEvent): Required<EventAudience> {
       found.staffIds.push(event.payload.waiterId);
       break;
     case 'TableMoved':
+    case 'OrdersMoved':
       found.tableIds.push(event.payload.fromTableId, event.payload.toTableId);
       break;
     case 'KotCreated':
@@ -187,11 +166,15 @@ function named(event: DomainEvent): Required<EventAudience> {
 }
 
 /**
- * The rooms an event is sent to (ORD-010 broadcast, SEC-003 filter): the people allowed to see its
+ * The rooms an event is sent to (ORD-010 broadcast, SEC-003 filter): the roles allowed to see its
  * type, plus the tables, stations, sections and people it concerns (from the event and the
  * producer's audience hints). `DeviceRevoked` also ends the device's own connections (gateway).
  */
-export function roomsForEvent(event: DomainEvent, audience: EventAudience = {}): string[] {
+export function roomsForEvent(
+  event: DomainEvent,
+  audience: EventAudience = {},
+  matrix: PermissionMatrix = DEFAULT_PERMISSION_MATRIX,
+): string[] {
   const rid = event.restaurantId;
   const targets = new Set<string>();
   const visibility = VISIBLE_WITH[event.type];
@@ -199,8 +182,8 @@ export function roomsForEvent(event: DomainEvent, audience: EventAudience = {}):
     targets.add(rooms.all(rid));
   } else if (visibility === 'MANAGERS') {
     for (const role of OVERRIDE_APPROVER_ROLES) targets.add(rooms.role(rid, role));
-  } else if (visibility !== 'THE_DEVICE') {
-    targets.add(rooms.capability(rid, visibility));
+  } else {
+    for (const role of rolesWith(visibility, matrix)) targets.add(rooms.role(rid, role));
   }
   const own = named(event);
   for (const tableId of [...own.tableIds, ...(audience.tableIds ?? [])]) {
@@ -223,17 +206,11 @@ export function roomsForEvent(event: DomainEvent, audience: EventAudience = {}):
   ) {
     for (const staffId of event.payload.recipients) targets.add(rooms.alerts(rid, staffId));
   }
-  if (event.type === 'DeviceLocateRequested')
+  // "Locate" goes to the one device asked (MGR-006).
+  if (event.type === 'DeviceLocateRequested') {
     targets.add(rooms.device(rid, event.payload.deviceId));
+  }
   return [...targets];
-}
-
-/**
- * Events that only mean something the moment they happen (MGR-006 "Locate"): a device that
- * connects later is not sent them again, so it does not beep for a manager who has gone.
- */
-export function isLiveOnly(event: DomainEvent): boolean {
-  return event.type === 'DeviceLocateRequested';
 }
 
 /** True when a connection in `joined` receives `targets` (replay uses the live routing). */

@@ -39,12 +39,15 @@ export async function authenticateDevice(
   app: INestApplication,
   deviceId: string,
   privateKey: KeyObject,
+  /** Extra headers of the token request, e.g. the app's `x-rp-client` (UPD-006). */
+  headers: Record<string, string> = {},
 ): Promise<string> {
   const { challenge } = DeviceChallengeResponse.parse(
     (await api(app).post('/api/v1/devices/challenge').send({ deviceId })).body,
   );
   const response = await api(app)
     .post('/api/v1/devices/token')
+    .set(headers)
     .send({
       deviceId,
       challenge,
@@ -71,6 +74,8 @@ export type TestDeviceType =
 export interface TestDeviceBinding {
   readonly tableId?: string;
   readonly stationId?: string;
+  /** A kitchen screen's other stations (KDS-002). */
+  readonly extraStationIds?: readonly string[];
   readonly staffId?: string;
 }
 
@@ -92,6 +97,7 @@ export async function registerDevice(
       keyAlgorithm: 'Ed25519',
       tableId: binding.tableId ?? null,
       stationId: binding.stationId ?? null,
+      extraStationIds: [...(binding.extraStationIds ?? [])],
       staffId: binding.staffId ?? null,
     },
   });
@@ -187,6 +193,18 @@ export async function signIn(
     );
   }
   return LoginResponse.parse(response.body);
+}
+
+/** A new device token for a device the kit registered, asked for with these headers. */
+export function renewDeviceToken(
+  app: INestApplication,
+  deviceId: string,
+  headers: Record<string, string> = {},
+): Promise<string> {
+  const credentials = deviceCredentials.get(deviceId);
+  if (credentials === undefined)
+    throw new Error(`Device ${deviceId} was not registered by the kit`);
+  return authenticateDevice(app, deviceId, credentials.privateKey, headers);
 }
 
 /** The device token of a device the kit registered (for socket handshakes). */

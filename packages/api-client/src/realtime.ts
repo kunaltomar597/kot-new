@@ -17,7 +17,7 @@ export type RecoveryDecision = 'retry' | 'stop';
 /** Where the connection's credentials come from (the `ApiClient`). */
 export interface RealtimeAuthority {
   /** Fresh credentials for a (re)connection. */
-  handshake(): Promise<{ deviceToken: string; accessToken?: string }>;
+  handshake(): Promise<{ deviceToken: string; accessToken?: string; client?: string }>;
   /** The server refused the handshake with `code`: fix what can be fixed, then retry or stop. */
   recover(code: string): Promise<RecoveryDecision>;
   /** The server ended the connection (AUTH-008): forget what it says is over. */
@@ -65,10 +65,14 @@ export interface RealtimeConnectionOptions extends RealtimeHandlers {
 }
 
 const SEEN_LIMIT = 2_000;
-/** Refusals worth retrying as they are: the server is starting or had a hiccup. */
+/**
+ * Refusals worth retrying as they are: the server is starting or had a hiccup, or the device had
+ * too many connections (its old ones close in the meantime).
+ */
 const TRANSIENT = new Set<string>([
   REALTIME_CONNECT_ERRORS.starting,
   REALTIME_CONNECT_ERRORS.internalError,
+  REALTIME_CONNECT_ERRORS.tooManyConnections,
 ]);
 
 /**

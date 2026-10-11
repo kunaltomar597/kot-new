@@ -24,7 +24,7 @@ let options: ServiceDayOptions;
 
 beforeAll(async () => {
   database = await createTestDatabase();
-  app = await createTestApp({ databaseUrl: database.url, listen: true });
+  app = await createTestApp({ databaseUrl: database.url });
   const hasher = app.get(CredentialHasher);
   await seedDevelopmentData(app.get(PrismaService), { hashPin: (pin) => hasher.hash(pin) });
   printer = createServer((socket) => {

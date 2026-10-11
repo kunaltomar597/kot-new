@@ -1,0 +1,247 @@
+{
+  "input": {
+    "type": "object",
+    "properties": {
+      "from": {
+        "type": "string",
+        "format": "date",
+        "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+      },
+      "to": {
+        "type": "string",
+        "format": "date",
+        "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+      },
+      "discounts": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "discountId": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "businessDate": {
+              "type": "string",
+              "format": "date",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+            },
+            "invoiceId": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "invoiceNumber": { "type": "string" },
+            "orderId": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                },
+                { "type": "null" }
+              ]
+            },
+            "item": { "type": ["string", "null"] },
+            "complimentary": { "type": "boolean" },
+            "kind": { "type": "string", "enum": ["PERCENT", "FLAT"] },
+            "rateBp": {
+              "anyOf": [
+                { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                { "type": "null" }
+              ]
+            },
+            "amount": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+            "reason": { "type": "string" },
+            "appliedBy": {
+              "anyOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "name": { "type": "string" }
+                  },
+                  "required": ["id", "name"]
+                },
+                { "type": "null" }
+              ]
+            },
+            "approvedBy": {
+              "anyOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "name": { "type": "string" }
+                  },
+                  "required": ["id", "name"]
+                },
+                { "type": "null" }
+              ]
+            }
+          },
+          "required": [
+            "discountId",
+            "businessDate",
+            "invoiceId",
+            "invoiceNumber",
+            "orderId",
+            "item",
+            "complimentary",
+            "kind",
+            "rateBp",
+            "amount",
+            "reason",
+            "appliedBy",
+            "approvedBy"
+          ]
+        }
+      },
+      "totals": {
+        "type": "object",
+        "properties": {
+          "count": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+          "amount": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+          "complimentaryCount": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+          "complimentaryAmount": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+        },
+        "required": ["count", "amount", "complimentaryCount", "complimentaryAmount"]
+      }
+    },
+    "required": ["from", "to", "discounts", "totals"]
+  },
+  "output": {
+    "type": "object",
+    "properties": {
+      "from": {
+        "type": "string",
+        "format": "date",
+        "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+      },
+      "to": {
+        "type": "string",
+        "format": "date",
+        "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+      },
+      "discounts": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "discountId": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "businessDate": {
+              "type": "string",
+              "format": "date",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+            },
+            "invoiceId": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "invoiceNumber": { "type": "string" },
+            "orderId": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                },
+                { "type": "null" }
+              ]
+            },
+            "item": { "type": ["string", "null"] },
+            "complimentary": { "type": "boolean" },
+            "kind": { "type": "string", "enum": ["PERCENT", "FLAT"] },
+            "rateBp": {
+              "anyOf": [
+                { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                { "type": "null" }
+              ]
+            },
+            "amount": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+            "reason": { "type": "string" },
+            "appliedBy": {
+              "anyOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "name": { "type": "string" }
+                  },
+                  "required": ["id", "name"],
+                  "additionalProperties": false
+                },
+                { "type": "null" }
+              ]
+            },
+            "approvedBy": {
+              "anyOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "name": { "type": "string" }
+                  },
+                  "required": ["id", "name"],
+                  "additionalProperties": false
+                },
+                { "type": "null" }
+              ]
+            }
+          },
+          "required": [
+            "discountId",
+            "businessDate",
+            "invoiceId",
+            "invoiceNumber",
+            "orderId",
+            "item",
+            "complimentary",
+            "kind",
+            "rateBp",
+            "amount",
+            "reason",
+            "appliedBy",
+            "approvedBy"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "totals": {
+        "type": "object",
+        "properties": {
+          "count": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+          "amount": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+          "complimentaryCount": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+          "complimentaryAmount": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+        },
+        "required": ["count", "amount", "complimentaryCount", "complimentaryAmount"],
+        "additionalProperties": false
+      }
+    },
+    "required": ["from", "to", "discounts", "totals"],
+    "additionalProperties": false
+  }
+}

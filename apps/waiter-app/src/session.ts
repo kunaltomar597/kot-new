@@ -1,13 +1,23 @@
 import { createTranslator } from '@rp/i18n';
-import { DeviceSession } from '@rp/mobile-core';
 import {
+  ApkUpdater,
+  createDeviceErrorReporting,
+  DeviceSession,
+  OtaUpdater,
+  watchUncaughtErrors,
+} from '@rp/mobile-core';
+import {
+  AndroidScreenGuard,
   AndroidAlertNotifier,
+  AndroidApkInstaller,
   AndroidServerTrust,
+  ExpoOtaUpdates,
   installRandomValues,
   KeystoreDeviceKeys,
   plainStore,
   secureStore,
 } from '@rp/mobile-native';
+import { setScreenGuard } from '@rp/ui-native';
 import Constants from 'expo-constants';
 import { alertNotificationText } from './notifications';
 
@@ -27,7 +37,9 @@ export const notifier = new AndroidAlertNotifier(alertNotificationText(translato
  */
 async function createSession(): Promise<DeviceSession> {
   await installRandomValues();
-  return new DeviceSession({
+  // No screenshots or recent-apps preview of a PIN pad (MOBILE-I4); a device without it still works.
+  await AndroidScreenGuard.load().then(setScreenGuard, () => undefined);
+  const session = new DeviceSession({
     secureStore: await secureStore(),
     plainStore: await plainStore(),
     keys: new KeystoreDeviceKeys(),
@@ -36,10 +48,16 @@ async function createSession(): Promise<DeviceSession> {
     // also with the screen off or the app closed (P2-06b, WTR-005).
     followAlerts: true,
     alertNotifier: notifier,
+    appKind: 'waiter-app',
     ...(Constants.expoConfig?.version !== undefined && {
       appVersion: Constants.expoConfig.version,
     }),
   });
+  // NFR-O02: uncaught errors reach the vendor through the restaurant's server, scrubbed.
+  watchUncaughtErrors(
+    createDeviceErrorReporting(session, 'waiter-app', Constants.expoConfig?.version ?? null),
+  );
+  return session;
 }
 
 let created: Promise<DeviceSession> | undefined;
@@ -55,4 +73,52 @@ export function deviceSession(): Promise<DeviceSession> {
     return session;
   });
   return created;
+}
+
+let updating: Promise<OtaUpdater> | undefined;
+
+/**
+ * The phone's over-the-air updates (P7-04e1, UPD-001), started with the screen and never stopped:
+ * EAS updates its server speaks, applied while nobody is signed in and the app is on screen.
+ */
+export function appUpdater(): Promise<OtaUpdater> {
+  updating ??= Promise.all([deviceSession(), ExpoOtaUpdates.load()]).then(([session, source]) => {
+    const updater = new OtaUpdater({
+      session,
+      source,
+      onError: createDeviceErrorReporting(
+        session,
+        'waiter-app',
+        Constants.expoConfig?.version ?? null,
+      ),
+    });
+    updater.start();
+    return updater;
+  });
+  return updating;
+}
+
+let installing: Promise<ApkUpdater> | undefined;
+
+/**
+ * New APKs of the waiter app from the restaurant PC (P7-04e2, WTR-001): offered on the sign-in
+ * screen and on "Update this app"; a person installs one and Android asks them to confirm.
+ */
+export function apkUpdater(): Promise<ApkUpdater> {
+  installing ??= Promise.all([deviceSession(), AndroidApkInstaller.load()]).then(
+    ([session, installer]) => {
+      const updater = new ApkUpdater({
+        session,
+        installer,
+        onError: createDeviceErrorReporting(
+          session,
+          'waiter-app',
+          Constants.expoConfig?.version ?? null,
+        ),
+      });
+      updater.start();
+      return updater;
+    },
+  );
+  return installing;
 }

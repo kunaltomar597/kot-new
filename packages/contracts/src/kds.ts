@@ -26,6 +26,8 @@ export const KdsTicketLine = z.object({
   /** The item's state now (it moves on after the ticket was raised). */
   state: OrderItemState,
   readyAt: Timestamp.nullable(),
+  /** The table the dish now goes to, when it was moved to another table's bill (TBL-006). */
+  movedTo: z.string().nullable().default(null),
 });
 export type KdsTicketLine = z.infer<typeof KdsTicketLine>;
 
@@ -61,8 +63,10 @@ export const KdsSettings = z.object({
 export type KdsSettings = z.infer<typeof KdsSettings>;
 
 export const KdsTicketsResponse = z.object({
-  /** The station shown; null for all stations. */
+  /** The station shown; null for all stations, or for several (see `stations`). */
   station: z.object({ id: Id, name: z.string() }).nullable(),
+  /** Every station shown; empty for all stations, the Expo/Pass view (KDS-002). */
+  stations: z.array(z.object({ id: Id, name: z.string() })).default([]),
   /** Open tickets, oldest first. */
   tickets: z.array(KdsTicket),
   /** Tickets bumped in the last hour, newest first, for Recall (KDS-005). */

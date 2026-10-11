@@ -1,0 +1,4 @@
+{
+  "input": { "type": "string", "enum": ["DATA_DRIVE", "SECOND"] },
+  "output": { "type": "string", "enum": ["DATA_DRIVE", "SECOND"] }
+}

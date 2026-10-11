@@ -258,6 +258,8 @@ describe('[TAB-004] [NTF-003] a diner calls from the table tablet', () => {
     expect(await alertOf(call.id)).toMatchObject({
       status: 'ACKNOWLEDGED',
       acknowledgedById: kit.staff.WAITER,
+      // PAGER-R2: with the device it came from.
+      acknowledgedByDeviceId: kit.deviceId,
     });
     later(600);
     await notifications().processDue();
@@ -462,7 +464,7 @@ describe('[AUTH-009] [SEC-009] who may call and how often', () => {
       .post('/api/v1/devices/current/service-requests')
       .set(authHeaders(kit.deviceId))
       .send({ type: 'WATER' });
-    expect([pos.status, codeOf(pos)]).toEqual([403, 'NOT_A_TABLE_TABLET']);
+    expect([pos.status, codeOf(pos)]).toEqual([403, 'DEVICE_NOT_ALLOWED']);
     const free = await prisma.diningTable.create({
       data: {
         restaurantId: kit.restaurantId,

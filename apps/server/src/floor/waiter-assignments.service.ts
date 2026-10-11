@@ -5,9 +5,8 @@ import type {
   WaiterAssignmentsResponse,
   WaiterAssignmentView,
 } from '@rp/contracts';
-import { grantOf, type WaiterAssignment } from '@rp/domain';
+import { grantFor, type WaiterAssignment } from '@rp/domain';
 import { AuditService } from '../audit/audit.service.js';
-import { holderOf, ROLE_GRANTS_SELECT } from '../auth/custom-roles.js';
 import type { Principal } from '../auth/principal.js';
 import { currentBusinessDate, dbDate, isoDateOf } from '../common/business-dates.js';
 import { newId } from '../common/ids.js';
@@ -136,11 +135,11 @@ export class WaiterAssignmentsService {
 
     const staff = await tx.staff.findMany({
       where: { id: { in: staffIds }, restaurantId, active: true, archivedAt: null },
-      select: { id: true, role: { select: ROLE_GRANTS_SELECT } },
+      select: { id: true, role: { select: { baseRole: true } } },
     });
     const assignable = new Set(
       staff
-        .filter((person) => grantOf(holderOf(person.role), 'ORDER_CREATE') !== 'DENY')
+        .filter((person) => grantFor(person.role.baseRole, 'ORDER_CREATE') !== 'DENY')
         .map((person) => person.id),
     );
     const refused = staffIds.filter((id) => !assignable.has(id));

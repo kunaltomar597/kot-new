@@ -5,3 +5,46 @@
   height: auto;
   border-radius: var(--rp-radius-sm);
 }
+
+/*
+ * The camera view of a QR scanner: the picture fills a 4:3 box (wide enough for a PC's webcam,
+ * not too tall on a phone) and a square in the middle shows where to hold the code.
+ */
+.rp-qr-scanner {
+  position: relative;
+  overflow: hidden;
+  width: 100%;
+  max-width: 28rem;
+  aspect-ratio: 4 / 3;
+  border-radius: var(--rp-radius-md);
+  background: var(--rp-color-surface-sunken);
+}
+
+.rp-qr-scanner__video {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* A camera facing the person is shown as a mirror; the frames read are never mirrored. */
+.rp-qr-scanner__video--mirrored {
+  transform: scaleX(-1);
+}
+
+.rp-qr-scanner__target {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 60%;
+  aspect-ratio: 1;
+  transform: translate(-50%, -50%);
+  border: 3px solid var(--rp-color-on-primary);
+  border-radius: var(--rp-radius-md);
+  box-shadow: 0 0 0 100vmax var(--rp-color-overlay);
+  pointer-events: none;
+}
+
+.rp-qr-scanner[data-state='stopped'] .rp-qr-scanner__target {
+  display: none;
+}

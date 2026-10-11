@@ -1,44 +1,47 @@
-import type { CustomRoleView } from '@rp/contracts';
-import type { Capability } from '@rp/domain';
+import type { RoleView } from '@rp/contracts';
+import { type Capability, CUSTOM_ROLE_BASES, type CustomRoleBase } from '@rp/domain';
 import {
   Badge,
   Button,
+  ChoiceGroup,
   ConfirmDialog,
+  Dialog,
   EmptyState,
   ErrorState,
   Icon,
   LoadingState,
+  Select,
+  TextField,
   useToast,
 } from '@rp/ui-web';
-import { type ReactNode, useCallback, useState } from 'react';
-import { useNavigate } from 'react-router';
+import { type ReactNode, useCallback, useId, useState } from 'react';
 import { useConsole, useConsoleState } from '../../app/console-context.js';
 import { useT } from '../../app/i18n.js';
 import { messageOf } from '../../app/messages.js';
 import { useLive } from '../../app/use-live.js';
-import { ReasonDialog } from '../../billing/ReasonDialog.js';
 import { SecondFactorCancelled, useSecondFactor } from '../../owner/second-factor.js';
-import { countsAsManager, rolesInOrder } from './roles-view.js';
+import {
+  addable,
+  included,
+  type RoleForm,
+  roleFormOf,
+  roleProblem,
+  roleRequestOf,
+  sortRoles,
+} from './roles-view.js';
 
-/** The dialog open over the list. */
-interface Open {
-  readonly kind: 'ARCHIVE' | 'RESTORE';
-  readonly role: CustomRoleView;
-}
+type Open =
+  { readonly kind: 'ADD' } | { readonly kind: 'EDIT' | 'ARCHIVE'; readonly role: RoleView };
 
 /**
- * The Roles page (P4-02e, AUTH-012): the custom roles, active first, each with the role it is
- * built on, what it adds and takes away, and how many active people have it. The Owner creates
- * and changes them (on a page of their own), archives the ones nobody active has and restores
- * them, after confirming the second factor (AUTH-006); everyone else who looks after staff sees
- * them, to give them on the People page. The list follows changes made on any screen
- * (`RestaurantChanged`).
+ * Roles (P4-02e, AUTH-012): the built-in roles of BRD §4.2 and the Owner's custom roles, each a
+ * cashier, waiter or kitchen role that may do more. Managers see them; only the Owner adds,
+ * changes or archives one, confirming password and authenticator (AUTH-006).
  */
 export function RolesScreen() {
   const t = useT();
   const controller = useConsole();
-  const navigate = useNavigate();
-  const { person: me } = useConsoleState();
+  const { person } = useConsoleState();
   const toast = useToast();
   const { withSecondFactor, dialog: secondFactorDialog } = useSecondFactor();
   const { data, reload } = useLive(
@@ -48,6 +51,7 @@ export function RolesScreen() {
   const [open, setOpen] = useState<Open | undefined>();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | undefined>();
+  const isOwner = person?.role === 'OWNER';
 
   const close = useCallback(() => {
     setOpen(undefined);
@@ -55,7 +59,6 @@ export function RolesScreen() {
     setError(undefined);
   }, []);
 
-  /** Archiving and restoring ask the Owner for the second factor first, when it is not fresh. */
   const run = async (action: () => Promise<unknown>, message: string) => {
     setBusy(true);
     setError(undefined);
@@ -70,8 +73,8 @@ export function RolesScreen() {
     }
   };
 
-  if (me === undefined) return null;
-  const isOwner = me.role === 'OWNER';
+  const capabilityList = (capabilities: readonly Capability[]) =>
+    capabilities.map((capability) => t(`capabilities.${capability}`)).join('; ');
 
   let content: ReactNode;
   if (data.status === 'loading') {
@@ -85,28 +88,85 @@ export function RolesScreen() {
         retryLabel={t('states.retry')}
       />
     );
-  } else if (data.value.roles.length === 0) {
-    content = <EmptyState title={t('customRoles.none')} />;
   } else {
+    const { builtIn, custom } = sortRoles(data.value.roles);
+    const row = (role: RoleView) => {
+      const archived = role.archivedAt !== null;
+      return (
+        <li key={role.id} className="staff-row" data-inactive={archived ? '' : undefined}>
+          <div className="staff-row__who">
+            <h4 className="staff-row__name">
+              {role.builtIn ? t(`roles.${role.baseRole}`) : role.name}
+            </h4>
+            <p className="staff-row__role">
+              {role.builtIn
+                ? t('customRoles.builtIn')
+                : t('customRoles.onBase', { role: t(`roles.${role.baseRole}`) })}
+            </p>
+            {role.capabilities.length === 0 ? null : (
+              <p className="staff-row__contact">
+                {t('customRoles.adds', { list: capabilityList(role.capabilities) })}
+              </p>
+            )}
+            <p className="staff-row__states">
+              <Badge tone="neutral">{t('customRoles.people', { count: role.staffCount })}</Badge>
+              {archived ? (
+                <Badge tone="neutral" icon={<Icon name="ban" />}>
+                  {t('customRoles.archived')}
+                </Badge>
+              ) : null}
+            </p>
+          </div>
+          {isOwner && !role.builtIn && !archived ? (
+            <div
+              className="staff-row__actions"
+              role="group"
+              aria-label={t('customRoles.actionsFor', { name: role.name })}
+            >
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  setOpen({ kind: 'EDIT', role });
+                }}
+              >
+                {t('customRoles.edit')}
+              </Button>
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  setOpen({ kind: 'ARCHIVE', role });
+                }}
+              >
+                {t('customRoles.archive')}
+              </Button>
+            </div>
+          ) : null}
+        </li>
+      );
+    };
     content = (
-      <ul className="staff-list">
-        {rolesInOrder(data.value.roles).map((role) => (
-          <RoleRow
-            key={role.id}
-            role={role}
-            isOwner={isOwner}
-            onEdit={() => {
-              void navigate(`/manage/staff/roles/${role.id}`);
-            }}
-            onArchive={() => {
-              setOpen({ kind: 'ARCHIVE', role });
-            }}
-            onRestore={() => {
-              setOpen({ kind: 'RESTORE', role });
-            }}
-          />
-        ))}
-      </ul>
+      <>
+        <section className="device-group" aria-labelledby="roles-custom">
+          <h3 id="roles-custom" className="device-group__heading">
+            {t('customRoles.customTitle')}
+          </h3>
+          {custom.length === 0 ? (
+            <EmptyState title={t('customRoles.none')} />
+          ) : (
+            <ul className="staff-list" aria-labelledby="roles-custom">
+              {custom.map(row)}
+            </ul>
+          )}
+        </section>
+        <section className="device-group" aria-labelledby="roles-built-in">
+          <h3 id="roles-built-in" className="device-group__heading">
+            {t('customRoles.builtInTitle')}
+          </h3>
+          <ul className="staff-list" aria-labelledby="roles-built-in">
+            {builtIn.map(row)}
+          </ul>
+        </section>
+      </>
     );
   }
 
@@ -119,8 +179,9 @@ export function RolesScreen() {
         {isOwner ? (
           <Button
             startIcon={<Icon name="plus" />}
+            disabled={data.status !== 'ready'}
             onClick={() => {
-              void navigate('/manage/staff/roles/new');
+              setOpen({ kind: 'ADD' });
             }}
           >
             {t('customRoles.add')}
@@ -132,128 +193,228 @@ export function RolesScreen() {
         {isOwner ? null : ` ${t('customRoles.ownerOnly')}`}
       </p>
       {content}
-      {open?.kind === 'ARCHIVE' ? (
-        <ReasonDialog
-          title={t('customRoles.archiveDialog.title', { name: open.role.name })}
-          description={t('customRoles.archiveDialog.description', { name: open.role.name })}
-          label={t('customRoles.archiveDialog.reason')}
-          confirmLabel={t('customRoles.archiveDialog.confirm')}
-          tone="danger"
+      {(open?.kind === 'ADD' || open?.kind === 'EDIT') && data.status === 'ready' ? (
+        <RoleDialog
+          role={open.kind === 'EDIT' ? open.role : undefined}
+          roles={data.value.roles}
           busy={busy}
           error={error}
-          onConfirm={(reason) => {
-            const { role } = open;
+          onSave={(form) => {
+            const body = roleRequestOf(form);
             void run(
-              () => controller.api.archiveRole({ params: { roleId: role.id }, body: { reason } }),
-              t('customRoles.archivedDone', { name: role.name }),
+              () =>
+                open.kind === 'EDIT'
+                  ? controller.api.updateRole({ params: { roleId: open.role.id }, body })
+                  : controller.api.createRole({ body }),
+              open.kind === 'EDIT'
+                ? t('customRoles.saved', { name: body.name })
+                : t('customRoles.added', { name: body.name }),
             );
           }}
           onClose={close}
         />
       ) : null}
-      {open?.kind === 'RESTORE' ? (
-        <ConfirmDialog
-          open
-          tone="primary"
-          title={t('customRoles.restoreDialog.title', { name: open.role.name })}
-          description={t('customRoles.restoreDialog.description', { name: open.role.name })}
-          confirmLabel={t('customRoles.restoreDialog.confirm')}
-          cancelLabel={t('customRoles.restoreDialog.cancel')}
+      {open?.kind === 'ARCHIVE' ? (
+        <ArchiveRoleDialog
+          role={open.role}
           busy={busy}
-          onConfirm={() => {
-            const { role } = open;
+          error={error}
+          onArchive={(reason) => {
             void run(
-              () => controller.api.restoreRole({ params: { roleId: role.id } }),
-              t('customRoles.restored', { name: role.name }),
+              () =>
+                controller.api.archiveRole({ params: { roleId: open.role.id }, body: { reason } }),
+              t('customRoles.archivedToast', { name: open.role.name }),
             );
           }}
-          onCancel={close}
-        >
-          {error === undefined ? null : (
-            <p role="alert" className="console-notice console-notice--danger">
-              {error}
-            </p>
-          )}
-        </ConfirmDialog>
+          onClose={close}
+        />
       ) : null}
       {secondFactorDialog}
     </section>
   );
 }
 
-/** One role: what it is built on, what it changes, who has it, and the Owner's actions. */
-function RoleRow({
+function RoleDialog({
   role,
-  isOwner,
-  onEdit,
-  onArchive,
-  onRestore,
+  roles,
+  busy,
+  error,
+  onSave,
+  onClose,
 }: {
-  role: CustomRoleView;
-  isOwner: boolean;
-  onEdit: () => void;
-  onArchive: () => void;
-  onRestore: () => void;
+  role: RoleView | undefined;
+  roles: readonly RoleView[];
+  busy: boolean;
+  error: string | undefined;
+  onSave: (form: RoleForm) => void;
+  onClose: () => void;
 }) {
   const t = useT();
-  const archived = role.archivedAt !== null;
-  const base = t(`roles.${role.baseRole}`);
+  const formId = useId();
+  const [form, setForm] = useState<RoleForm>(() => roleFormOf(role));
+  const [submitted, setSubmitted] = useState(false);
+  const problem = roleProblem(form, roles, role?.id);
+  const baseLocked = role !== undefined && role.staffCount > 0;
+  const already = included(form.baseRole);
   const list = (capabilities: readonly Capability[]) =>
-    new Intl.ListFormat(t.locale, { type: 'conjunction' }).format(
-      capabilities.map((capability) => t(`capabilities.${capability}`)),
-    );
-  const actions: { readonly label: string; readonly onClick: () => void }[] = !isOwner
-    ? []
-    : archived
-      ? [{ label: t('customRoles.restore'), onClick: onRestore }]
-      : [
-          { label: t('customRoles.edit'), onClick: onEdit },
-          ...(role.staffCount === 0
-            ? [{ label: t('customRoles.archive'), onClick: onArchive }]
-            : []),
-        ];
+    capabilities.map((capability) => t(`capabilities.${capability}`)).join('; ');
   return (
-    <li className="staff-row" data-inactive={archived || undefined}>
-      <div className="staff-row__who">
-        <h3 className="staff-row__name">{role.name}</h3>
-        <p className="staff-row__role">{t('customRoles.basedOn', { role: base })}</p>
-        <p className="staff-row__states">
-          {archived ? <Badge tone="neutral">{t('customRoles.archived')}</Badge> : null}
-          {countsAsManager(role) ? (
-            <Badge tone="info">{t('customRoles.countsAsManager')}</Badge>
-          ) : null}
-          <Badge tone={role.staffCount === 0 ? 'neutral' : 'success'}>
-            {t('customRoles.people', { count: role.staffCount })}
-          </Badge>
-        </p>
-        {role.added.length === 0 && role.removed.length === 0 ? (
-          <p className="staff-row__contact">{t('customRoles.sameAsBase', { role: base })}</p>
-        ) : null}
-        {role.added.length > 0 ? (
-          <p className="staff-row__contact">{t('customRoles.adds', { list: list(role.added) })}</p>
-        ) : null}
-        {role.removed.length > 0 ? (
-          <p className="staff-row__contact">
-            {t('customRoles.takesAway', { list: list(role.removed) })}
+    <Dialog
+      open
+      size="lg"
+      onClose={onClose}
+      dismissible={!busy}
+      title={
+        role === undefined
+          ? t('customRoles.form.addTitle')
+          : t('customRoles.form.editTitle', { name: role.name })
+      }
+      footer={
+        <>
+          <Button variant="secondary" onClick={onClose} disabled={busy}>
+            {t('customRoles.form.cancel')}
+          </Button>
+          <Button type="submit" form={formId} loading={busy}>
+            {role === undefined ? t('customRoles.form.create') : t('customRoles.form.save')}
+          </Button>
+        </>
+      }
+    >
+      <form
+        id={formId}
+        className="console-form"
+        noValidate
+        onSubmit={(event) => {
+          event.preventDefault();
+          setSubmitted(true);
+          if (problem === undefined) onSave(form);
+        }}
+      >
+        <TextField
+          label={t('customRoles.form.name')}
+          hint={t('customRoles.form.nameHint')}
+          value={form.name}
+          maxLength={40}
+          autoComplete="off"
+          required
+          data-autofocus
+          error={
+            submitted && (problem === 'NAME_REQUIRED' || problem === 'NAME_TAKEN')
+              ? problem === 'NAME_TAKEN'
+                ? t('customRoles.form.nameTaken')
+                : t('customRoles.form.nameRequired')
+              : undefined
+          }
+          onChange={(event) => {
+            setForm((current) => ({ ...current, name: event.target.value }));
+          }}
+        />
+        {baseLocked ? (
+          <p className="menu-form__hint">
+            {t('customRoles.form.baseLocked', { role: t(`roles.${form.baseRole}`) })}
           </p>
-        ) : null}
-        {isOwner && !archived && role.staffCount > 0 ? (
-          <p className="staff-row__contact">{t('customRoles.inUse')}</p>
-        ) : null}
-      </div>
-      {actions.length === 0 ? null : (
-        <div
-          className="staff-row__actions"
-          role="group"
-          aria-label={t('customRoles.actionsFor', { name: role.name })}
-        >
-          {actions.map((action) => (
-            <Button key={action.label} variant="secondary" onClick={action.onClick}>
-              {action.label}
-            </Button>
-          ))}
-        </div>
+        ) : (
+          <Select
+            label={t('customRoles.form.base')}
+            hint={t('customRoles.form.baseHint')}
+            value={form.baseRole}
+            options={CUSTOM_ROLE_BASES.map((base) => ({ value: base, label: t(`roles.${base}`) }))}
+            onChange={(event) => {
+              const baseRole = event.target.value as CustomRoleBase;
+              setForm((current) => ({ ...current, baseRole }));
+            }}
+          />
+        )}
+        <ChoiceGroup
+          legend={t('customRoles.form.add')}
+          hint={t('customRoles.form.addHint')}
+          mode="multiple"
+          options={addable(form.baseRole).map((capability) => ({
+            id: capability,
+            label: t(`capabilities.${capability}`),
+          }))}
+          value={form.capabilities.filter((capability) =>
+            addable(form.baseRole).includes(capability),
+          )}
+          error={
+            submitted && problem === 'NOTHING_ADDED'
+              ? t('customRoles.form.nothingAdded')
+              : undefined
+          }
+          onChange={(capabilities) => {
+            setForm((current) => ({
+              ...current,
+              capabilities: capabilities as RoleForm['capabilities'],
+            }));
+          }}
+        />
+        {already.length === 0 ? null : (
+          <p className="menu-form__hint">
+            {t('customRoles.form.already', {
+              role: t(`roles.${form.baseRole}`),
+              list: list(already),
+            })}
+          </p>
+        )}
+        {error === undefined ? null : (
+          <p role="alert" className="console-notice console-notice--danger">
+            {error}
+          </p>
+        )}
+      </form>
+    </Dialog>
+  );
+}
+
+function ArchiveRoleDialog({
+  role,
+  busy,
+  error,
+  onArchive,
+  onClose,
+}: {
+  role: RoleView;
+  busy: boolean;
+  error: string | undefined;
+  onArchive: (reason: string) => void;
+  onClose: () => void;
+}) {
+  const t = useT();
+  const [reason, setReason] = useState('');
+  const [submitted, setSubmitted] = useState(false);
+  const short = reason.trim().length < 3;
+  return (
+    <ConfirmDialog
+      open
+      tone="danger"
+      title={t('customRoles.archiveDialog.title', { name: role.name })}
+      description={t('customRoles.archiveDialog.description')}
+      confirmLabel={t('customRoles.archiveDialog.confirm')}
+      cancelLabel={t('customRoles.archiveDialog.cancel')}
+      busy={busy}
+      onConfirm={() => {
+        setSubmitted(true);
+        if (!short) onArchive(reason.trim());
+      }}
+      onCancel={onClose}
+    >
+      <TextField
+        label={t('customRoles.archiveDialog.reason')}
+        value={reason}
+        maxLength={200}
+        autoComplete="off"
+        required
+        data-autofocus
+        error={submitted && short ? t('customRoles.archiveDialog.reasonRequired') : undefined}
+        onChange={(event) => {
+          setReason(event.target.value);
+        }}
+      />
+      {error === undefined ? null : (
+        <p role="alert" className="console-notice console-notice--danger">
+          {error}
+        </p>
       )}
-    </li>
+    </ConfirmDialog>
   );
 }

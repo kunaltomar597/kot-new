@@ -4,6 +4,7 @@ import type { ReactNode } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { AlertBanner } from './alerts.js';
 import { useSessionState, useT } from './context.js';
+import { LicenceBanner } from './licence.js';
 
 /** Says so when the server cannot be reached; nothing while connected (NFR-A01). */
 export function ConnectionBanner() {
@@ -30,7 +31,8 @@ export function ConnectionBanner() {
 }
 
 /**
- * A full screen with the connection banner, the alert banner (P2-06a), a title and scrolling
+ * A full screen with the connection banner, the licence's banner (LIC-005), the alert banner
+ * (P2-06a), a title and scrolling
  * content; `footer` stays at the bottom while the content scrolls (e.g. the order's Send button).
  */
 export function Screen({
@@ -48,6 +50,7 @@ export function Screen({
   return (
     <View style={[styles.screen, { backgroundColor: colors.background }]}>
       <ConnectionBanner />
+      <LicenceBanner />
       <AlertBanner />
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         {title !== undefined && (

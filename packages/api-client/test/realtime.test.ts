@@ -253,6 +253,22 @@ describe('[NFR-P11] [NTF-006] the live connection', () => {
     expect(socket.connects).toBe(3);
   });
 
+  it('[SEC-009] retries a device refused for too many connections, without touching credentials', async () => {
+    vi.useFakeTimers();
+    const { socket, authority, connection } = setup({ retryMs: 100 });
+    authority.decision = 'stop';
+    socket.fire(
+      'connect_error',
+      Object.assign(new Error('x'), { data: { code: 'TOO_MANY_CONNECTIONS' } }),
+    );
+    await vi.advanceTimersByTimeAsync(99);
+    expect(socket.connects).toBe(1);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(socket.connects).toBe(2);
+    expect(authority.recovered).toEqual([]);
+    expect(connection.status).not.toBe('stopped');
+  });
+
   it('retries when its own handshake failed (offline while renewing)', async () => {
     vi.useFakeTimers();
     const { socket, authority } = setup();

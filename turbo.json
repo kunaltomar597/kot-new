@@ -12,9 +12,10 @@
         "tsconfig*.json",
         "index.html",
         "public/**",
-        "vite.config.*"
+        "vite.config.*",
+        "next.config.*"
       ],
-      "outputs": ["dist/**"]
+      "outputs": ["dist/**", ".next/**", "!.next/cache/**"]
     },
     "typecheck": {
       "dependsOn": ["^build", "generate"],
@@ -27,7 +28,8 @@
         "package.json",
         "tsconfig*.json",
         "e2e/**",
-        "*.config.ts"
+        "*.config.ts",
+        "functions/**"
       ]
     },
     "test": {
@@ -40,9 +42,12 @@
         "package.json",
         "vitest.config.*",
         "jest.config.*",
-        "babel.config.*"
+        "babel.config.*",
+        "migrations/**",
+        "functions/**",
+        "config.toml"
       ],
-      "env": ["TEST_DATABASE_URL", "PG_BIN"]
+      "env": ["TEST_DATABASE_URL", "PG_BIN", "RELAY_DATABASE_URL"]
     },
     "test:coverage": {
       "dependsOn": ["^build", "generate"],
@@ -54,10 +59,13 @@
         "package.json",
         "vitest.config.*",
         "jest.config.*",
-        "babel.config.*"
+        "babel.config.*",
+        "migrations/**",
+        "functions/**",
+        "config.toml"
       ],
       "outputs": ["coverage/**"],
-      "env": ["TEST_DATABASE_URL", "PG_BIN"]
+      "env": ["TEST_DATABASE_URL", "PG_BIN", "RELAY_DATABASE_URL"]
     },
     "clean": {
       "cache": false

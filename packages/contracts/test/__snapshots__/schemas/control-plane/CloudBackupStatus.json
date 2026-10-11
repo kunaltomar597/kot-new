@@ -1,0 +1,4 @@
+{
+  "input": { "type": "string", "enum": ["UPLOADING", "COMPLETE", "ABORTED", "DELETED"] },
+  "output": { "type": "string", "enum": ["UPLOADING", "COMPLETE", "ABORTED", "DELETED"] }
+}

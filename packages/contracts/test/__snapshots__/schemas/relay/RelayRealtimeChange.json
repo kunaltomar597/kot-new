@@ -1,0 +1,23 @@
+{
+  "input": {
+    "type": "object",
+    "properties": {
+      "event": { "type": "string", "const": "INSERT" },
+      "schema": { "type": "string", "const": "relay" },
+      "table": { "type": "string", "enum": ["qr_orders", "qr_service_requests"] },
+      "filter": { "type": "string" }
+    },
+    "required": ["event", "schema", "table", "filter"]
+  },
+  "output": {
+    "type": "object",
+    "properties": {
+      "event": { "type": "string", "const": "INSERT" },
+      "schema": { "type": "string", "const": "relay" },
+      "table": { "type": "string", "enum": ["qr_orders", "qr_service_requests"] },
+      "filter": { "type": "string" }
+    },
+    "required": ["event", "schema", "table", "filter"],
+    "additionalProperties": false
+  }
+}

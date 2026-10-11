@@ -1,0 +1,4 @@
+{
+  "input": { "type": "string", "pattern": "^[A-Za-z0-9-]{4,32}$" },
+  "output": { "type": "string", "pattern": "^[A-Za-z0-9-]{4,32}$" }
+}

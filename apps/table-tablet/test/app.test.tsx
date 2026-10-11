@@ -1,12 +1,100 @@
-import type { MenuSnapshot } from '@rp/contracts';
+import {
+  CLIENT_API_VERSION,
+  type MenuSnapshot,
+  type ServiceRequestView,
+  type TabletTableView,
+} from '@rp/contracts';
 import { createTranslator } from '@rp/i18n';
-import { DeviceSession, MemoryStore } from '@rp/mobile-core';
-import { FakeKeys, fakeLocalServer, RESTAURANT_ID, SocketFactory } from '@rp/mobile-core/testing';
+import {
+  type ApkInstaller,
+  ApkUpdater,
+  type DeviceHealthReading,
+  DeviceSession,
+  type DownloadedApk,
+  type Kiosk,
+  type KioskMode,
+  MemoryStore,
+  OtaUpdater,
+  TABLET_GUEST_KEYS,
+} from '@rp/mobile-core';
+import {
+  DEVICE_ID,
+  FakeKeys,
+  fakeLocalServer,
+  RESTAURANT_ID,
+  SocketFactory,
+  STAFF,
+} from '@rp/mobile-core/testing';
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
+import { AppState } from 'react-native';
 import { App } from '../src/App';
-import { orderableCount } from '../src/TabletHome';
+import { accentColorsOf, STAFF_TAPS } from '../src/branding';
+import { locateRequest } from '../src/LocateOverlay';
+import { cancelPlan, requestButtonState } from '../src/service-view';
+import { orderableCount, type TabletDevice } from '../src/TabletHome';
 
 jest.mock('expo-status-bar', () => ({ StatusBar: () => null }));
+
+/** Android's PackageInstaller as the APK updater sees it (P7-04e2). */
+class FakeInstaller implements ApkInstaller {
+  readonly enabled = true;
+  readonly installedVersion = '0.1.0';
+  readonly calls: string[] = [];
+  constructor(private readonly owner: boolean) {}
+  silent(): boolean {
+    return this.owner;
+  }
+  mayRequestInstall(): Promise<boolean> {
+    return Promise.resolve(true);
+  }
+  openInstallSettings(): Promise<void> {
+    return Promise.resolve();
+  }
+  download(): Promise<DownloadedApk> {
+    this.calls.push('download');
+    return Promise.resolve({ path: '/cache/rp-apk/new.apk' });
+  }
+  install(): Promise<void> {
+    this.calls.push('install');
+    return Promise.resolve();
+  }
+  onResult(): () => void {
+    return () => undefined;
+  }
+}
+
+/** The PC's newer build of the app, and the client API its server speaks. */
+const appBuildRoutes = (kind: 'waiter-app' | 'table-tablet') =>
+  [
+    [
+      '/api/v1/devices/current/app-build',
+      {
+        status: 200,
+        body: {
+          build: {
+            kind,
+            version: '9.0.0',
+            clientApi: CLIENT_API_VERSION,
+            sha256: 'd'.repeat(64),
+            sizeBytes: 40_000_000,
+          },
+        },
+      },
+    ],
+    [
+      '/api/v1/version',
+      {
+        status: 200,
+        body: {
+          name: 'rp-server',
+          version: '2.3.0',
+          apiVersion: 'v1',
+          node: '24.12.0',
+          clientApi: { current: CLIENT_API_VERSION, oldest: CLIENT_API_VERSION },
+        },
+      },
+    ],
+  ] as const;
 
 const translator = createTranslator();
 const ID = '0199a0e0-0000-7000-8000-0000000071a1';
@@ -69,10 +157,78 @@ function frame(sequence: number, type: string, payload: object) {
   };
 }
 
-function setup() {
+const SESSION_ID = '0199a0e0-0000-7000-8000-0000000071c1';
+
+function tableView(open: boolean, covers = 2): TabletTableView {
+  return {
+    tableId: TABLE_ID,
+    label: 'T4',
+    state: open ? 'OCCUPIED' : 'FREE',
+    session: open ? { id: SESSION_ID, openedAt: '2026-09-26T08:30:00.000Z', covers } : null,
+    promotions: { show: true, itemIds: ['0199a0e0-0000-7000-8000-0000000081a2'] },
+    priceMode: 'TAX_EXCLUSIVE',
+  };
+}
+
+/** Lock-task mode as Android keeps it, and a battery that reads 64 %. */
+class FakeKiosk implements Kiosk {
+  mode: KioskMode = 'NONE';
+  readonly calls: string[] = [];
+  state() {
+    return { mode: this.mode, deviceOwner: true, permitted: true };
+  }
+  enter(): Promise<KioskMode> {
+    this.calls.push('enter');
+    this.mode = 'LOCKED';
+    return Promise.resolve(this.mode);
+  }
+  exit(): Promise<KioskMode> {
+    this.calls.push('exit');
+    this.mode = 'NONE';
+    return Promise.resolve(this.mode);
+  }
+  keepScreenOn(on: boolean): Promise<void> {
+    this.calls.push(`screen ${String(on)}`);
+    return Promise.resolve();
+  }
+  readonly tones: number[] = [];
+  locateTone(durationMs: number): Promise<void> {
+    this.tones.push(durationMs);
+    return Promise.resolve();
+  }
+  readHealth(): DeviceHealthReading {
+    return { batteryPercent: 64, charging: true, network: 'WIFI', rssi: -55 };
+  }
+}
+
+function setup(open = true) {
   let version = 1;
+  let tableOpen = open;
   const server = fakeLocalServer({ type: 'TABLE_TABLET', name: 'Table T4', tableId: TABLE_ID })
     .on('GET', '/api/v1/menu', () => ({ status: 200, body: menu(version) }))
+    .on('GET', '/api/v1/devices/current/table', () => ({
+      status: 200,
+      body: tableView(tableOpen),
+    }))
+    .on('POST', '/api/v1/devices/current/health', () => ({ status: 204 }))
+    .on('POST', '/api/v1/devices/current/kiosk-exit', (call) =>
+      (call.body as { pin: string }).pin === '2222'
+        ? {
+            status: 200,
+            body: {
+              approver: { id: STAFF.MANAGER.staffId, displayName: STAFF.MANAGER.displayName },
+              exitedAt: '2026-09-26T09:00:00.000Z',
+            },
+          }
+        : {
+            status: 401,
+            body: {
+              code: 'INVALID_CREDENTIALS',
+              message: 'That PIN is not right.',
+              correlationId: 'c',
+            },
+          },
+    )
     .on('GET', '/api/v1/restaurant', () => ({
       status: 200,
       body: {
@@ -87,6 +243,7 @@ function setup() {
         contact: { phone: null, email: null },
         businessHours: [],
         logoPhotoId: null,
+        accentColor: null,
         timeZone: 'Asia/Kolkata',
         businessDayCutoff: '04:00',
         updatedAt: '2026-09-26T08:00:00.000Z',
@@ -101,34 +258,46 @@ function setup() {
     fetch: server.fetch,
     connect: sockets.connect,
   });
+  const kiosk = new FakeKiosk();
+  const device: TabletDevice = { store: plainStore, kiosk, health: kiosk, appVersion: '0.2.0' };
   return {
     session,
     sockets,
     server,
+    plainStore,
+    kiosk,
+    device,
     publish: () => {
       version = 2;
+    },
+    setOpen: (value: boolean) => {
+      tableOpen = value;
     },
   };
 }
 
+async function online(sockets: SocketFactory) {
+  await act(async () => {
+    sockets.sync(0);
+    await Promise.resolve();
+  });
+}
+
 describe('[MENU-013] [MENU-006] table tablet smoke flow', () => {
   it('pairs to its table and shows the live menu with no staff login', async () => {
-    const { session, sockets, publish } = setup();
+    const { session, sockets, publish, device } = setup();
     await session.start();
-    await render(<App session={session} translator={translator} />);
+    await render(<App session={session} translator={translator} device={device} />);
 
     await fireEvent.changeText(screen.getByLabelText('Server address'), 'http://pos.test:3000');
     await fireEvent.changeText(screen.getByLabelText('Pairing code'), 'ABCDEFGH');
     await fireEvent.press(screen.getByTestId('pairing-submit'));
 
-    expect(await screen.findByText('Table T4')).toBeOnTheScreen();
-    expect(screen.getByText(translator('mobile.tablet.menuWaiting'))).toBeOnTheScreen();
+    expect(await screen.findByText(translator('mobile.tablet.loading'))).toBeOnTheScreen();
 
-    await act(async () => {
-      sockets.sync(0);
-      await Promise.resolve();
-    });
+    await online(sockets);
     expect(await screen.findByText('Welcome to Spice Garden')).toBeOnTheScreen();
+    expect(screen.getByText('Table T4 · 2 guests')).toBeOnTheScreen();
     expect(await screen.findByText('2 dishes on the menu today')).toBeOnTheScreen();
 
     publish();
@@ -153,11 +322,14 @@ describe('[MENU-013] [MENU-006] table tablet smoke flow', () => {
   });
 
   it('shows the cached menu straight away after a restart, before the server answers', async () => {
-    const { session } = setup();
+    const { session, device, plainStore } = setup();
     await session.start();
     await session.pair('http://pos.test:3000', 'ABCD-EFGH');
     await session.menu.refresh(() => Promise.resolve(menu(2)));
-    await render(<App session={session} translator={translator} />);
+    // The table as it was last read, before the restart (P3-01b).
+    await plainStore.setItem('rp.tablet.table.v1', JSON.stringify(tableView(true)));
+    await plainStore.setItem('rp.tablet.session.v1', SESSION_ID);
+    await render(<App session={session} translator={translator} device={device} />);
     expect(await screen.findByText('3 dishes on the menu today')).toBeOnTheScreen();
   });
 
@@ -172,5 +344,402 @@ describe('[MENU-013] [MENU-006] table tablet smoke flow', () => {
         ),
       }),
     ).toBe(1);
+  });
+});
+
+describe('[TAB-001] [TAB-003] [TAB-015] the tablet at its table', () => {
+  async function paired(open: boolean) {
+    const context = setup(open);
+    await context.session.start();
+    await context.session.pair('http://pos.test:3000', 'ABCD-EFGH');
+    await render(<App session={context.session} translator={translator} device={context.device} />);
+    await online(context.sockets);
+    return context;
+  }
+
+  it('[TAB-003] waits for guests with the restaurant and a pinned dish, locked as a kiosk', async () => {
+    const { kiosk, server } = await paired(false);
+    expect(await screen.findByText(translator('mobile.tablet.waitToBeSeated'))).toBeOnTheScreen();
+    expect(await screen.findByTestId('promotion')).toBeOnTheScreen();
+    expect(screen.getByText(translator('mobile.tablet.todaysSpecial'))).toBeOnTheScreen();
+    expect(kiosk.calls).toEqual(expect.arrayContaining(['screen true', 'enter']));
+    expect(kiosk.mode).toBe('LOCKED');
+    // TAB-015: the battery and connection went to the server.
+    expect(server.callsTo('POST', '/api/v1/devices/current/health')[0]?.body).toEqual({
+      batteryPercent: 64,
+      charging: true,
+      network: 'WIFI',
+      rssi: -55,
+      appVersion: '0.2.0',
+    });
+  });
+
+  it('[TAB-003] unlocks when the table opens and wipes what guests left when it closes', async () => {
+    const { sockets, setOpen, plainStore } = await paired(false);
+    expect(await screen.findByTestId('idle-screen')).toBeOnTheScreen();
+    setOpen(true);
+    await act(async () => {
+      sockets.last.fire(
+        'event',
+        frame(1, 'TableOpened', {
+          tableId: TABLE_ID,
+          tableSessionId: SESSION_ID,
+          covers: 2,
+          waiterId: STAFF.WAITER.staffId,
+        }),
+      );
+      await Promise.resolve();
+    });
+    expect(await screen.findByTestId('open-table')).toBeOnTheScreen();
+    for (const key of TABLET_GUEST_KEYS) await plainStore.setItem(key, '{"cart":["Lassi"]}');
+
+    setOpen(false);
+    await act(async () => {
+      sockets.last.fire(
+        'event',
+        frame(2, 'TableClosed', { tableId: TABLE_ID, tableSessionId: SESSION_ID }),
+      );
+      await Promise.resolve();
+    });
+    expect(await screen.findByTestId('idle-screen')).toBeOnTheScreen();
+    for (const key of TABLET_GUEST_KEYS) expect(await plainStore.getItem(key)).toBeNull();
+  });
+
+  it('[TAB-001] lets staff out with a manager’s PIN from the hidden corner, and locks again', async () => {
+    const { kiosk, server } = await paired(true);
+    expect(await screen.findByTestId('open-table')).toBeOnTheScreen();
+    for (let tap = 0; tap < STAFF_TAPS - 1; tap += 1) {
+      await fireEvent.press(screen.getByTestId('staff-corner', { includeHiddenElements: true }));
+    }
+    expect(screen.queryByTestId('staff-panel')).toBeNull();
+    await fireEvent.press(screen.getByTestId('staff-corner', { includeHiddenElements: true }));
+    expect(
+      await screen.findByText(translator('mobile.tablet.staff.chooseManager')),
+    ).toBeOnTheScreen();
+    // Only managers and the Owner can let staff out.
+    expect(screen.queryByTestId(`manager-${STAFF.WAITER.staffId}`)).toBeNull();
+    await fireEvent.press(screen.getByTestId(`manager-${STAFF.MANAGER.staffId}`));
+    for (const digit of ['1', '1', '1', '1']) await fireEvent.press(screen.getByText(digit));
+    expect(await screen.findByText('That PIN is not right.')).toBeOnTheScreen();
+    expect(kiosk.mode).toBe('LOCKED');
+    for (const digit of ['2', '2', '2', '2']) await fireEvent.press(screen.getByText(digit));
+    expect(await screen.findByText(translator('mobile.tablet.staff.open'))).toBeOnTheScreen();
+    expect(kiosk.mode).toBe('NONE');
+    expect(screen.getByText('Table: T4')).toBeOnTheScreen();
+    expect(screen.getByText('Battery: 64%, charging')).toBeOnTheScreen();
+    expect(server.callsTo('POST', '/api/v1/devices/current/kiosk-exit')).toHaveLength(2);
+    await fireEvent.press(screen.getByText(translator('mobile.tablet.staff.lockAgain')));
+    expect(screen.queryByTestId('staff-panel')).toBeNull();
+    expect(kiosk.mode).toBe('LOCKED');
+  });
+
+  it('[AUTH-009] says when no manager has chosen the tablet’s table', async () => {
+    const context = setup(false);
+    context.server.on('GET', '/api/v1/devices/current/table', () => ({
+      status: 409,
+      body: { code: 'TABLET_NOT_BOUND', message: 'Not bound', correlationId: 'c' },
+    }));
+    await context.session.start();
+    await context.session.pair('http://pos.test:3000', 'ABCD-EFGH');
+    await render(<App session={context.session} translator={translator} device={context.device} />);
+    await online(context.sockets);
+    expect(await screen.findByText(translator('mobile.tablet.unbound'))).toBeOnTheScreen();
+    expect(screen.getByText(translator('mobile.tablet.unboundHint'))).toBeOnTheScreen();
+  });
+
+  it('[TAB-003] uses the restaurant’s colour with text that reads on it', () => {
+    expect(accentColorsOf('#B4232A')).toEqual({ accent: '#B4232A', onAccent: '#ffffff' });
+    expect(accentColorsOf('#F2C94C')).toEqual({ accent: '#F2C94C', onAccent: '#000000' });
+    expect(accentColorsOf(null)).toBeUndefined();
+    expect(accentColorsOf('red')).toBeUndefined();
+  });
+});
+
+describe('[UPD-001] over-the-air updates on a table tablet', () => {
+  it('restart the app on a downloaded update only between guests', async () => {
+    const context = setup(true);
+    await context.session.start();
+    await context.session.pair('http://pos.test:3000', 'ABCD-EFGH');
+    const reload = jest.fn(() => Promise.resolve());
+    // The vendor's rollback to the APK's JavaScript: nothing to ask the server first.
+    const updater = new OtaUpdater({
+      session: context.session,
+      source: {
+        enabled: true,
+        emergencyLaunchReason: null,
+        check: () => Promise.resolve({ kind: 'rollback' }),
+        fetch: () => Promise.resolve({ kind: 'rollback' }),
+        reload,
+      },
+    });
+    Object.assign(AppState, { currentState: 'active' });
+    await render(
+      <App
+        session={context.session}
+        translator={translator}
+        device={context.device}
+        updater={updater}
+      />,
+    );
+    await online(context.sockets);
+    expect(await screen.findByTestId('open-table')).toBeOnTheScreen();
+    await act(() => updater.check());
+    expect(updater.getSnapshot().status).toBe('ready');
+    expect(reload).not.toHaveBeenCalled();
+
+    // The guests pay and leave: the tablet restarts on the update before the next ones sit down.
+    context.setOpen(false);
+    await act(async () => {
+      context.sockets.last.fire(
+        'event',
+        frame(1, 'TableClosed', { tableId: TABLE_ID, tableSessionId: SESSION_ID }),
+      );
+      await Promise.resolve();
+    });
+    expect(await screen.findByTestId('idle-screen')).toBeOnTheScreen();
+    expect(reload).toHaveBeenCalledTimes(1);
+    Object.assign(AppState, { currentState: undefined });
+  });
+});
+
+describe('[TAB-001] [WTR-001] a new APK from the restaurant PC on a kiosk tablet (P7-04e2)', () => {
+  it('installs by itself as device owner, only once the guests have left', async () => {
+    const context = setup(true);
+    for (const [path, answer] of appBuildRoutes('table-tablet')) {
+      context.server.on('GET', path, () => answer);
+    }
+    await context.session.start();
+    await context.session.pair('http://pos.test:3000', 'ABCD-EFGH');
+    const installer = new FakeInstaller(true);
+    const apkUpdater = new ApkUpdater({ session: context.session, installer });
+    Object.assign(AppState, { currentState: 'active' });
+    await render(
+      <App
+        session={context.session}
+        translator={translator}
+        device={context.device}
+        apkUpdater={apkUpdater}
+      />,
+    );
+    await online(context.sockets);
+    expect(await screen.findByTestId('open-table')).toBeOnTheScreen();
+    await act(() => apkUpdater.check());
+    expect(apkUpdater.getSnapshot().status).toBe('available');
+    expect(installer.calls).toEqual([]);
+
+    context.setOpen(false);
+    await act(async () => {
+      context.sockets.last.fire(
+        'event',
+        frame(1, 'TableClosed', { tableId: TABLE_ID, tableSessionId: SESSION_ID }),
+      );
+      await Promise.resolve();
+    });
+    expect(await screen.findByTestId('idle-screen')).toBeOnTheScreen();
+    expect(installer.calls).toEqual(['download', 'install']);
+    Object.assign(AppState, { currentState: undefined });
+  });
+});
+
+describe('[MGR-006] locate', () => {
+  it('flashes its name and sounds when the manager locates this tablet', async () => {
+    const context = setup(false);
+    await context.session.start();
+    await context.session.pair('http://pos.test:3000', 'ABCD-EFGH');
+    await render(<App session={context.session} translator={translator} device={context.device} />);
+    await online(context.sockets);
+    expect(await screen.findByTestId('idle-screen')).toBeOnTheScreen();
+    await act(async () => {
+      context.sockets.last.fire('event', {
+        ...frame(1, 'DeviceLocateRequested', { deviceId: DEVICE_ID, seconds: 15 }),
+        event: {
+          ...frame(1, 'DeviceLocateRequested', { deviceId: DEVICE_ID, seconds: 15 }).event,
+          occurredAt: new Date().toISOString(),
+        },
+      });
+      await Promise.resolve();
+    });
+    expect(await screen.findByTestId('locate-overlay')).toBeOnTheScreen();
+    expect(screen.getByText('Here I am: Table T4')).toBeOnTheScreen();
+    expect(context.kiosk.tones).toEqual([3_000]);
+  });
+
+  it('ignores a request for another tablet, or one replayed long after', () => {
+    const now = Date.parse('2026-09-26T08:41:00.000Z');
+    const event = {
+      eventId: '0199a0e0-0000-7000-8000-000000000091',
+      type: 'DeviceLocateRequested' as const,
+      version: 1 as const,
+      occurredAt: '2026-09-26T08:40:30.000Z',
+      restaurantId: RESTAURANT_ID,
+      businessDate: '2026-09-26',
+      payload: { deviceId: DEVICE_ID, seconds: 15 },
+    };
+    expect(locateRequest(event, DEVICE_ID, now)).toEqual({ seconds: 15 });
+    expect(locateRequest(event, '0199a0e0-0000-7000-8000-000000000092', now)).toBeUndefined();
+    expect(locateRequest(event, DEVICE_ID, now + 120_000)).toBeUndefined();
+  });
+});
+
+describe('[TAB-004] [BILL-015] calling the waiter from the table', () => {
+  const REQUEST_IDS = {
+    WATER: '0199a0e0-0000-7000-8000-0000000072a1',
+    WAITER: '0199a0e0-0000-7000-8000-0000000072a2',
+    BILL: '0199a0e0-0000-7000-8000-0000000072a3',
+  } as const;
+
+  function request(
+    type: keyof typeof REQUEST_IDS,
+    overrides: Partial<ServiceRequestView> = {},
+  ): ServiceRequestView {
+    return {
+      id: REQUEST_IDS[type],
+      type,
+      state: 'ACTIVE',
+      source: 'TABLE_TABLET',
+      tableId: TABLE_ID,
+      tableLabel: 'T4',
+      tableSessionId: SESSION_ID,
+      createdAt: new Date().toISOString(),
+      escalatedAt: null,
+      acknowledgedAt: null,
+      acknowledgedById: null,
+      acknowledgedByName: null,
+      closedAt: null,
+      ...overrides,
+    };
+  }
+
+  async function atTable(open: ServiceRequestView[] = []) {
+    const context = setup(true);
+    let requests = open;
+    context.server
+      .on('GET', '/api/v1/devices/current/service-requests', () => ({
+        status: 200,
+        body: { tableSessionId: SESSION_ID, requests },
+      }))
+      .on('POST', '/api/v1/devices/current/service-requests', (call) => {
+        const { type } = call.body as { type: keyof typeof REQUEST_IDS };
+        if (requests.some((existing) => existing.type === type)) {
+          return {
+            status: 409,
+            body: {
+              code: 'SERVICE_REQUEST_OPEN',
+              message: 'Already asked; the waiter is coming.',
+              correlationId: 'c',
+            },
+          };
+        }
+        const raised = request(type);
+        requests = [...requests, raised];
+        return { status: 201, body: raised };
+      })
+      .on('POST', '/api/v1/devices/current/service-requests/:requestId/cancel', (call) => {
+        const id = call.path.split('/').at(-2);
+        const found = requests.find((existing) => existing.id === id);
+        requests = requests.filter((existing) => existing.id !== id);
+        return {
+          status: 200,
+          body: {
+            ...(found ?? request('WATER')),
+            state: 'CANCELLED',
+            closedAt: new Date().toISOString(),
+          },
+        };
+      });
+    await context.session.start();
+    await context.session.pair('http://pos.test:3000', 'ABCD-EFGH');
+    await render(<App session={context.session} translator={translator} device={context.device} />);
+    await online(context.sockets);
+    expect(await screen.findByTestId('service-buttons')).toBeOnTheScreen();
+    return {
+      ...context,
+      acknowledge: (type: keyof typeof REQUEST_IDS, name: string) => {
+        requests = requests.map((existing) =>
+          existing.type === type
+            ? { ...existing, state: 'ACKNOWLEDGED', acknowledgedByName: name }
+            : existing,
+        );
+      },
+    };
+  }
+
+  it('lights a button until the waiter comes, then Cancel clears it', async () => {
+    const { server, sockets, acknowledge } = await atTable();
+    await fireEvent.press(screen.getByTestId('request-WATER'));
+    expect(await screen.findByText('Requested, waiter notified · just now')).toBeOnTheScreen();
+    expect(server.callsTo('POST', '/api/v1/devices/current/service-requests')[0]?.body).toEqual({
+      type: 'WATER',
+    });
+    acknowledge('WATER', 'Ravi');
+    await act(async () => {
+      sockets.last.fire(
+        'event',
+        frame(3, 'ServiceRequestAcknowledged', {
+          serviceRequestId: REQUEST_IDS.WATER,
+          tableId: TABLE_ID,
+          tableSessionId: SESSION_ID,
+          type: 'WATER',
+          acknowledgedBy: STAFF.WAITER.staffId,
+        }),
+      );
+      await Promise.resolve();
+    });
+    expect(await screen.findByText('Ravi is on the way')).toBeOnTheScreen();
+    await fireEvent.press(screen.getByTestId('request-cancel'));
+    await waitForIdle();
+    expect(
+      server.callsTo(
+        'POST',
+        `/api/v1/devices/current/service-requests/${REQUEST_IDS.WATER}/cancel`,
+      ),
+    ).toHaveLength(1);
+  });
+
+  async function waitForIdle() {
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(await screen.findByTestId('request-WATER')).toBeOnTheScreen();
+    expect(screen.queryByTestId('request-WATER-state')).toBeNull();
+  }
+
+  it('asks which request to cancel when several are open', async () => {
+    const { server } = await atTable([request('WATER'), request('BILL')]);
+    expect(await screen.findByTestId('request-BILL-state')).toBeOnTheScreen();
+    await fireEvent.press(screen.getByTestId('request-cancel'));
+    expect(
+      await screen.findByText(translator('mobile.tablet.requests.chooseCancel')),
+    ).toBeOnTheScreen();
+    await fireEvent.press(screen.getByTestId('cancel-BILL'));
+    expect(
+      server.callsTo('POST', `/api/v1/devices/current/service-requests/${REQUEST_IDS.BILL}/cancel`),
+    ).toHaveLength(1);
+    expect(
+      server.callsTo(
+        'POST',
+        `/api/v1/devices/current/service-requests/${REQUEST_IDS.WATER}/cancel`,
+      ),
+    ).toHaveLength(0);
+  });
+
+  it('works out each button and what Cancel does', () => {
+    const now = Date.parse('2026-09-26T09:00:00.000Z');
+    const water = request('WATER', { createdAt: '2026-09-26T08:57:10.000Z' });
+    expect(requestButtonState('WATER', [water], now)).toEqual({ kind: 'requested', minutes: 2 });
+    expect(requestButtonState('BILL', [water], now)).toEqual({ kind: 'idle' });
+    expect(
+      requestButtonState(
+        'WATER',
+        [{ ...water, state: 'ACKNOWLEDGED', acknowledgedByName: null }],
+        now,
+      ),
+    ).toEqual({ kind: 'onTheWay', name: null });
+    expect(requestButtonState('WATER', [{ ...water, state: 'RESOLVED' }], now)).toEqual({
+      kind: 'idle',
+    });
+    expect(cancelPlan([]).kind).toBe('none');
+    expect(cancelPlan([water]).kind).toBe('one');
+    expect(cancelPlan([water, request('WAITER')]).kind).toBe('choose');
   });
 });

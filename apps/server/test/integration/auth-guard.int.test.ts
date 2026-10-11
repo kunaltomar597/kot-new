@@ -1,18 +1,17 @@
 import { Writable } from 'node:stream';
-import { type INestApplication, RequestMethod } from '@nestjs/common';
-import { ModulesContainer } from '@nestjs/core';
+import type { INestApplication } from '@nestjs/common';
 import { ApiError, OverrideResponse, ROUTES } from '@rp/contracts';
 import {
   CAPABILITIES,
   type Capability,
   DEFAULT_PERMISSION_MATRIX,
+  OVERRIDE_RECORD_TYPES,
   OWNER_SECOND_FACTOR_CAPABILITIES,
   ROLES,
   type Role,
 } from '@rp/domain';
 import request from 'supertest';
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
-import { ROUTE_ACCESS, type RouteAccess } from '../../src/auth/decorators.js';
 import { newId } from '../../src/common/ids.js';
 import { PrismaService } from '../../src/database/prisma.service.js';
 import {
@@ -25,6 +24,7 @@ import {
   TEST_PINS,
 } from '../helpers/auth-kit.js';
 import { AuthProbeController, MatrixProbeController } from '../helpers/auth-probe.js';
+import { accessName, servedRoutes } from '../helpers/served-routes.js';
 import { createTestApp, httpServer } from '../helpers/test-app.js';
 import { createTestDatabase, type TestDatabase } from '../helpers/test-database.js';
 
@@ -72,13 +72,19 @@ function override(role: Role, body: Record<string, unknown>) {
   return server().post('/api/v1/auth/override').set(as(role)).send(body);
 }
 
+/** The probe of `capability`, on the record `id` when its approval is for one record. */
+const probe = (capability: Capability, id: string = newId()) =>
+  OVERRIDE_RECORD_TYPES[capability] === undefined
+    ? `/api/v1/probe-matrix/${capability}`
+    : `/api/v1/probe-matrix/${capability}/${id}`;
+
 describe('[AUTH-010] [SEC-003] every capability row of the permission matrix', () => {
   const cases = ROLES.flatMap((role) =>
     CAPABILITIES.map((capability) => [role, capability] as const),
   );
 
   it.each(cases)('%s → %s', async (role: Role, capability: Capability) => {
-    const response = await server().post(`/api/v1/probe-matrix/${capability}`).set(as(role));
+    const response = await server().post(probe(capability)).set(as(role));
     const grant = DEFAULT_PERMISSION_MATRIX[capability][role];
     if (grant === 'ALLOW' && OWNER_SECOND_FACTOR_CAPABILITIES.has(capability)) {
       expect(codeOf(response)).toBe('SECOND_FACTOR_REQUIRED');
@@ -108,13 +114,13 @@ describe('[AUTH-011] [AUTH-013] manager override', () => {
     expect(grant.approver).toMatchObject({ id: kit.staff.MANAGER, role: 'MANAGER' });
 
     const wrongCapability = await server()
-      .post('/api/v1/probe-matrix/DISCOUNT_ABOVE_LIMIT')
+      .post(probe('DISCOUNT_ABOVE_LIMIT', entityId))
       .set(as('CASHIER'))
       .set('x-override-token', grant.overrideToken);
     expect(codeOf(wrongCapability)).toBe('OVERRIDE_INVALID');
 
     const used = await server()
-      .post('/api/v1/probe-matrix/ITEM_VOID_AFTER_PREP')
+      .post(probe('ITEM_VOID_AFTER_PREP', entityId))
       .set(as('CASHIER'))
       .set('x-override-token', grant.overrideToken);
     expect(used.status).toBe(200);
@@ -123,7 +129,7 @@ describe('[AUTH-011] [AUTH-013] manager override', () => {
     });
 
     const again = await server()
-      .post('/api/v1/probe-matrix/ITEM_VOID_AFTER_PREP')
+      .post(probe('ITEM_VOID_AFTER_PREP', entityId))
       .set(as('CASHIER'))
       .set('x-override-token', grant.overrideToken);
     expect(codeOf(again)).toBe('OVERRIDE_INVALID');
@@ -138,6 +144,46 @@ describe('[AUTH-011] [AUTH-013] manager override', () => {
     });
   });
 
+  it('[PC-T2] works only on the record it names, refused and not spent on another', async () => {
+    const asked = await override('CASHIER', {
+      approverStaffId: kit.staff.MANAGER,
+      pin: TEST_PINS.MANAGER,
+      capability: 'INVOICE_VOID',
+      entityType: 'invoice',
+      entityId,
+    });
+    const grant = OverrideResponse.parse(asked.body);
+    const another = await server()
+      .post(probe('INVOICE_VOID', newId()))
+      .set(as('CASHIER'))
+      .set('x-override-token', grant.overrideToken);
+    expect(codeOf(another)).toBe('OVERRIDE_INVALID');
+    const asGiven = await server()
+      .post(probe('INVOICE_VOID', entityId))
+      .set(as('CASHIER'))
+      .set('x-override-token', grant.overrideToken);
+    expect(asGiven.status).toBe(200);
+    expect(asGiven.body).toMatchObject({ override: { entityType: 'invoice', entityId } });
+  });
+
+  it('[PC-T2] is refused without the record, or for another kind of record, before the PIN', async () => {
+    const before = await prisma.auditLog.count({ where: { action: 'OVERRIDE_DENIED' } });
+    for (const record of [{}, { entityType: 'bill', entityId }, { entityType: 'invoice' }]) {
+      const response = await override('CASHIER', {
+        approverStaffId: kit.staff.MANAGER,
+        pin: '0000',
+        capability: 'INVOICE_VOID',
+        ...record,
+      });
+      expect(response.status).toBe(422);
+      expect(ApiError.parse(response.body)).toMatchObject({
+        code: 'OVERRIDE_RECORD_REQUIRED',
+        details: { entityType: 'invoice' },
+      });
+    }
+    expect(await prisma.auditLog.count({ where: { action: 'OVERRIDE_DENIED' } })).toBe(before);
+  });
+
   it('is bound to the requester session and expires after 2 minutes', async () => {
     vi.useFakeTimers({ toFake: ['Date'] });
     const grant = OverrideResponse.parse(
@@ -146,18 +192,20 @@ describe('[AUTH-011] [AUTH-013] manager override', () => {
           approverStaffId: kit.staff.OWNER,
           pin: TEST_PINS.OWNER,
           capability: 'ITEM_VOID_AFTER_PREP',
+          entityType: 'order_item',
+          entityId,
         })
       ).body,
     );
     const otherWaiterSession = await signIn(app, kit, 'WAITER');
     const stolen = await server()
-      .post('/api/v1/probe-matrix/ITEM_VOID_AFTER_PREP')
+      .post(probe('ITEM_VOID_AFTER_PREP', entityId))
       .set(authHeaders(kit.deviceId, otherWaiterSession.accessToken))
       .set('x-override-token', grant.overrideToken);
     expect(codeOf(stolen)).toBe('OVERRIDE_INVALID');
     vi.setSystemTime(Date.now() + 121_000);
     const late = await server()
-      .post('/api/v1/probe-matrix/ITEM_VOID_AFTER_PREP')
+      .post(probe('ITEM_VOID_AFTER_PREP', entityId))
       .set(as('WAITER'))
       .set('x-override-token', grant.overrideToken);
     expect(codeOf(late)).toBe('OVERRIDE_INVALID');
@@ -168,6 +216,8 @@ describe('[AUTH-011] [AUTH-013] manager override', () => {
       approverStaffId: kit.staff.WAITER,
       pin: TEST_PINS.WAITER,
       capability: 'ITEM_VOID_AFTER_PREP',
+      entityType: 'order_item',
+      entityId,
     });
     expect(codeOf(notManager)).toBe('APPROVER_NOT_ALLOWED');
 
@@ -175,6 +225,8 @@ describe('[AUTH-011] [AUTH-013] manager override', () => {
       approverStaffId: kit.staff.MANAGER,
       pin: '0000',
       capability: 'ITEM_VOID_AFTER_PREP',
+      entityType: 'order_item',
+      entityId,
     });
     expect(codeOf(wrongPin)).toBe('INVALID_CREDENTIALS');
     expect(
@@ -193,7 +245,13 @@ describe('[AUTH-011] [AUTH-013] manager override', () => {
       const response = await server()
         .post('/api/v1/auth/override')
         .set(authHeaders(deviceId, cashier.accessToken))
-        .send({ approverStaffId: manager, pin: '1357', capability: 'INVOICE_VOID' });
+        .send({
+          approverStaffId: manager,
+          pin: '1357',
+          capability: 'INVOICE_VOID',
+          entityType: 'invoice',
+          entityId,
+        });
       statuses.push(response.status);
     }
     expect(statuses).toEqual([401, 401, 401, 401, 423, 423]);
@@ -204,6 +262,8 @@ describe('[AUTH-011] [AUTH-013] manager override', () => {
       approverStaffId: kit.staff.OWNER,
       pin: TEST_PINS.OWNER,
       capability: 'ITEM_VOID_AFTER_PREP',
+      entityType: 'order_item',
+      entityId,
     });
     expect(codeOf(notNeeded)).toBe('OVERRIDE_NOT_NEEDED');
     const denied = await override('WAITER', {
@@ -226,11 +286,19 @@ describe('[SEC-015] [AUTH-002] logs', () => {
       .post('/api/v1/auth/refresh')
       .set(authHeaders(kit.deviceId))
       .send({ refreshToken: extra.refreshToken });
+    const invoiceId = newId();
     const grant = await override('CASHIER', {
       approverStaffId: kit.staff.MANAGER,
       pin: TEST_PINS.MANAGER,
       capability: 'BILL_EDIT_AFTER_PRINT',
+      entityType: 'invoice',
+      entityId: invoiceId,
     });
+    // The approval travels in a header, which the request log must not show either.
+    await server()
+      .post(probe('BILL_EDIT_AFTER_PRINT', invoiceId))
+      .set(as('CASHIER'))
+      .set('x-override-token', (grant.body as { overrideToken: string }).overrideToken);
     const logs = logLines.join('');
     expect(logs.length).toBeGreaterThan(1_000);
     const secrets = [
@@ -248,51 +316,16 @@ describe('[SEC-015] [AUTH-002] logs', () => {
 });
 
 describe('[AUTH-010] [INT-002] route registry', () => {
-  const methodName: Partial<Record<RequestMethod, string>> = {
-    [RequestMethod.GET]: 'GET',
-    [RequestMethod.POST]: 'POST',
-    [RequestMethod.PUT]: 'PUT',
-    [RequestMethod.PATCH]: 'PATCH',
-    [RequestMethod.DELETE]: 'DELETE',
-  };
-  const accessName = (access: RouteAccess | undefined): string =>
-    access === undefined
-      ? 'UNDECLARED'
-      : access.kind === 'CAPABILITY'
-        ? access.capability
-        : access.kind;
-  const join = (...parts: string[]) =>
-    `/${parts
-      .flatMap((part) => part.split('/'))
-      .filter((part) => part !== '')
-      .join('/')}`;
-
   it('matches the controllers: same routes, each with the declared access', () => {
-    const served: string[] = [];
-    const testControllers = new Set<unknown>([AuthProbeController, MatrixProbeController]);
-    for (const module of app.get(ModulesContainer).values()) {
-      for (const wrapper of module.controllers.values()) {
-        const controller = wrapper.metatype as (new (...args: never[]) => unknown) | null;
-        if (controller === null || testControllers.has(controller)) continue;
-        const base = (Reflect.getMetadata('path', controller) as string | undefined) ?? '';
-        const classAccess = Reflect.getMetadata(ROUTE_ACCESS, controller) as
-          RouteAccess | undefined;
-        const prototype = controller.prototype as Record<string, unknown>;
-        for (const name of Object.getOwnPropertyNames(prototype)) {
-          const handler = prototype[name];
-          if (typeof handler !== 'function' || name === 'constructor') continue;
-          const path = Reflect.getMetadata('path', handler) as string | undefined;
-          const method = Reflect.getMetadata('method', handler) as RequestMethod | undefined;
-          if (path === undefined || method === undefined) continue;
-          const access =
-            (Reflect.getMetadata(ROUTE_ACCESS, handler) as RouteAccess | undefined) ?? classAccess;
-          served.push(
-            `${methodName[method] ?? String(method)} ${join('api/v1', base, path)} ${accessName(access)}`,
-          );
-        }
-      }
-    }
-    const registered = ROUTES.map((route) => `${route.method} ${route.path} ${route.capability}`);
+    const served = servedRoutes(app, [AuthProbeController, MatrixProbeController]).map(
+      (route) => `${route.method} ${route.path} ${accessName(route.access)}`,
+    );
+    const registered = ROUTES.map(
+      (route) =>
+        `${route.method} ${route.path} ${route.capability}${
+          'devices' in route ? `(${[...route.devices].sort().join(',')})` : ''
+        }`,
+    );
     // Every served route is in the registry with the same access (so it is documented and guarded).
     expect(served.filter((route) => !registered.includes(route))).toEqual([]);
     // Registered ahead of their work package; remove each line when the route is implemented.

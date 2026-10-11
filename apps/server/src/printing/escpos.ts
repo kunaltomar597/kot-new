@@ -1,5 +1,5 @@
 import type { InvoiceView } from '@rp/contracts';
-import { formatRupees, toLocalDateTime } from '@rp/domain';
+import { amountInWords, formatRupees, toLocalDateTime } from '@rp/domain';
 
 /**
  * ESC/POS rendering for kitchen tickets and test pages (P1-07a, KDS-008). Pure: it turns a ticket
@@ -139,6 +139,8 @@ export function formatLocal(instant: Date, timeZone: string): string {
 
 class Receipt {
   private readonly bytes: number[] = [...INIT];
+  /** The text without printer commands (the archive's invoice books, P7-06b). */
+  readonly texts: string[] = [];
 
   command(sequence: readonly number[]): this {
     this.bytes.push(...sequence);
@@ -146,6 +148,7 @@ class Receipt {
   }
 
   line(text = ''): this {
+    this.texts.push(toPrintable(text));
     for (const char of toPrintable(text)) this.bytes.push(char.charCodeAt(0));
     this.bytes.push(LF);
     return this;
@@ -318,8 +321,8 @@ const money = (paise: number): string => formatRupees(paise, { symbol: false });
 /**
  * The printed bill: a GST tax invoice (BILL-002, BILL-014). The seller's particulars and header,
  * the invoice number, date and place of supply, the customer's GSTIN for B2B, the lines with any
- * discount, the tax per component and rate, the round-off and the total, the SAC codes and the
- * footer. A reprint says DUPLICATE in large letters (BILL-009). The logo is added when menu photos
+ * discount, the tax per component and rate, the round-off and the total (in words too, BILL-001),
+ * the SAC codes and the footer. A reprint says DUPLICATE in large letters (BILL-009). The logo is added when menu photos
  * exist (P1-04).
  */
 export function renderBill(
@@ -330,6 +333,22 @@ export function renderBill(
     readonly timeZone: string;
   },
 ): Uint8Array {
+  return buildBill(invoice, options).finish();
+}
+
+/** The bill as plain text lines, as printed on 80 mm paper (the archive's invoice books). */
+export function billTextLines(invoice: InvoiceView, timeZone: string): string[] {
+  return buildBill(invoice, { paperWidthMm: 80, duplicate: false, timeZone }).texts;
+}
+
+function buildBill(
+  invoice: InvoiceView,
+  options: {
+    readonly paperWidthMm: PaperWidthMm;
+    readonly duplicate: boolean;
+    readonly timeZone: string;
+  },
+): Receipt {
   const width = charactersPerLine(options.paperWidthMm);
   const half = Math.floor(width / 2);
   const { particulars } = invoice;
@@ -416,6 +435,7 @@ export function renderBill(
   receipt.command(SIZE_TALL).command(BOLD_ON);
   receipt.line(spread('TOTAL Rs', money(invoice.grandTotal), width));
   receipt.command(SIZE_NORMAL).command(BOLD_OFF);
+  if (particulars.amountInWords) receipt.lines(wrap(amountInWords(invoice.grandTotal), width));
   receipt.line('-'.repeat(width));
   const sacCodes = [
     ...new Set(invoice.lines.flatMap((line) => (line.sacCode === null ? [] : [line.sacCode]))),
@@ -423,5 +443,14 @@ export function renderBill(
   if (sacCodes.length > 0) receipt.lines(wrap(`SAC: ${sacCodes.join(', ')}`, width));
   receipt.command(ALIGN_CENTRE);
   for (const text of particulars.footerLines) receipt.lines(wrap(text, width));
-  return receipt.finish();
+  return receipt;
+}
+
+/**
+ * Opens the cash drawer wired to the receipt printer (BILL-016): a 50 ms pulse on drawer pin 2
+ * (`ESC p 0`), the connector almost every drawer uses. Nothing prints and no paper moves; a
+ * printer without a drawer ignores it.
+ */
+export function renderDrawerKick(): Uint8Array {
+  return Uint8Array.from([ESC, 0x70, 0x00, 0x19, 0xfa]);
 }

@@ -75,6 +75,10 @@ export const MenuItem = z.object({
   tags: z.array(z.string().min(1).max(30)).max(20),
   stationId: Id,
   prepTimeMinutes: z.int().nonnegative().max(240).optional(),
+  /** MENU-007: served only between these local times 'HH:MM' each day. */
+  timeWindow: z
+    .object({ start: z.iso.time({ precision: -1 }), end: z.iso.time({ precision: -1 }) })
+    .optional(),
   available: z.boolean(),
   /** Remaining quantity when stock counting is on (MENU-006). */
   stockCount: z.int().nonnegative().nullable(),
@@ -124,5 +128,10 @@ export const MenuSnapshot = z.object({
   combos: z.array(Combo),
   taxGroups: z.array(TaxGroup),
   stations: z.array(Station),
+  /**
+   * The restaurant's IANA time zone, on the menu as served (combo hours, MENU-005); stored
+   * versions leave it out.
+   */
+  timeZone: z.string().min(1).max(64).optional(),
 });
 export type MenuSnapshot = z.infer<typeof MenuSnapshot>;

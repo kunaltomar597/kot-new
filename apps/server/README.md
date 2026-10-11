@@ -135,32 +135,10 @@ backup, updates and diagnostics.
 - Unpairing (AUTH-008): `POST /api/v1/devices/:deviceId/revoke` marks the device REVOKED, revokes
   every staff session on it and appends a `DeviceRevoked` event to the outbox; the real-time
   gateway closes the device's live connections when it publishes that event (P0-12). A manager
-  cannot unpair the device they are using. An unpaired pager is disconnected from the broker at
-  once, its heartbeats and acknowledgements are ignored and its device alerts are cleared
-  (P4-02c).
+  cannot unpair the device they are using.
 - Table tablets (AUTH-009): `PUT /api/v1/devices/:deviceId/table` (manager) moves a tablet to
   another table; `assertTableAccess(device, tableId)` (`src/devices/device-scope.ts`) is the
   object-level check every table-scoped endpoint must call.
-- Device management (P4-02c, MGR-006): `GET /api/v1/devices` lists every device with whether it
-  is connected now (a live connection in its device room, or a pager's heartbeats), its battery
-  against the low level of its type (`lowBatteryLevelFor` in `@rp/domain`), firmware and serial.
-  `PATCH /api/v1/devices/:deviceId` renames it (audited `DEVICE_RENAMED`). `POST
-/api/v1/devices/:deviceId/locate` appends `DeviceLocateRequested` (6 a minute per device, only
-  while connected): the gateway sends it to that device's room only and never replays it
-  (`isLiveOnly`), and the broker publishes it to a pager on `.../locate`. Pairing, renaming,
-  moving and unpairing are announced as `RestaurantChanged` `DEVICES`. `last_seen_at` is written
-  by device authentication (at most once a minute) and when a live connection closes.
-- Kitchen screens and table tablets offline (P4-04a, NTF-003): `DeviceLiveness`
-  (`src/devices/device-liveness.ts`) keeps their `online` from the gateway's connection changes
-  (`RealtimeGateway.onConnectionChange`, fired when a device's first connection opens and its last
-  one closes). Connecting is announced at once as `DeviceStatusChanged` `online: true`; a device
-  whose last connection closed is announced `online: false` only after
-  `devices.offlineAfterSeconds` (60 s by default), so a reload raises nothing. A check every 5 s
-  (`DEVICE_LIVENESS_OPTIONS`, 0 in tests that call `check(now)` themselves) applies the grace and
-  puts right a connection the stored state missed. After a restart the grace counts from the
-  start, so a device stored online has time to reconnect. Only the change that flips `online`
-  announces it, so racing checks never announce twice. The notification triggers turn the events
-  into one alert per state, cleared when the device is back.
 - Tests: `test/helpers/auth-kit.ts` registers devices with an Ed25519 key and gets real device
   tokens through the challenge flow; `authHeaders(deviceId, accessToken)` sends both.
 
@@ -205,13 +183,21 @@ backup, updates and diagnostics.
 
 ## Web console and client support (P0-14b)
 
+- `RP_APPS_DIR` (`appsDir`, P7-04e2): the release's phone and tablet APKs and their `apps.json`
+  (`<install>\apps`, written by `package:stage --apk`). `src/updates/app-builds.*` checks each
+  APK's size and SHA-256 before offering it and serves a phone or tablet its own app
+  (`GET /api/v1/devices/current/app-build`, `…/apk`), also when the app is too old (N-1).
+
 - `RP_CONSOLE_DIR` (`consoleDir`): the built console (`apps/console/dist`) is served at `/` from
   the server's own origin, so the console, the API and the socket share one origin (no CORS) and
   one certificate (P0-15). `src/http/console-static.ts` answers every other page request with
   `index.html` (the console's routes), never answers `/api` or `/socket.io`, returns 404 for a
   missing file, caches hashed `/assets` for a year and sends a strict Content-Security-Policy
-  (same-origin scripts, styles and connections only; no framing) with `nosniff` and
-  `no-referrer`. A missing build stops the server at start-up.
+  (same-origin scripts, styles and connections only; no framing; Trusted Types with no policy,
+  P8-03c1) with `nosniff` and `no-referrer`. A missing build stops the server at start-up.
+  Every other answer carries `src/http/security-headers.ts`'s headers (`default-src 'none'`, no
+  framing, sniffing, caching or other sites; no HSTS on the LAN), and a path outside `/api/v1`
+  that nothing served is the API's JSON 404 (P8-03c1).
 - `GET /api/v1/auth/session` (signed in): the person and session without tokens; apps check a
   restored session with it, and it counts as activity (keep-alive for AUTH-005).
 - `GET /api/v1/devices/current` (paired device): the device's own type, name and binding.
@@ -328,18 +314,6 @@ backup, updates and diagnostics.
   - live availability and stock, with `decrementStock` for the order engine;
   - publishing `menu_versions`, with a checksum so an unchanged draft is not published again;
   - the device-facing menu with live availability.
-- The editor's draft (P4-02d, `GET /api/v1/menu/draft`) also carries every combo, the stock count
-  of counted items, the published version and `unpublished`: whether publishing would show
-  something new. `differsFromPublished` in `src/menu/menu-content.ts` compares the draft with the
-  published snapshot through the same parse, leaving out availability and stock counts, which are
-  live (MENU-006) and never wait for publishing.
-- Every draft edit appends `MenuDraftChanged` (`src/menu/menu-draft-events.ts`) in its own
-  transaction, with the part that changed (categories, modifier groups or items, combos included).
-  Only roles that manage the menu hear it (`rooms.ts`), so a second manager's editor keeps up;
-  ordering surfaces wait for `MenuPublished`. The import publishes at once, so it announces nothing
-  of its own, and a refused edit announces nothing.
-- An item that is a fixed part of a combo or one of a choice's items cannot become a combo itself
-  (`COMBO_COMPONENT_INVALID`); before P4-02d only fixed parts were checked.
 
 ## Menu import (P1-05)
 
@@ -472,7 +446,7 @@ To try a real printer on a PC: add it under Printers with its IP address and por
   `devices.lowBatteryAlertPercent` for the others; one alert per change of state) and printer
   alerts from `PrinterStatusChanged`, open until the printer is back.
 - `system-alerts.ts` (`SystemAlerts.checkDisk`) checks the data drive every hour and raises
-  `DISK_OR_BACKUP` at `storage.warnPercent` until space is freed. Backup and licence
+  `DISK_OR_BACKUP` at `notifications.diskAlertPercent` until space is freed. Backup and licence
   alerts will use the same engine (P7).
 
 ## Alerts on the waiter phone (P2-06a)
@@ -515,23 +489,14 @@ To try a real printer on a PC: add it under Printers with its IP address and por
   POS (`GET /api/v1/recommendations`, ORDER_CREATE, a table session or a takeaway cart) and the
   table tablet (`GET /api/v1/devices/current/recommendations`, its own open table). It loads the
   published menu with live availability (a combo outside its hours counts as unavailable), the
-  active rules, the pinned, boosted and blocked dishes, the table's sent and pending lines plus
-  the cart, and calls `@rp/domain` `recommend` at the restaurant's local time
-  (`RECOMMENDATION_CLOCK`, replaced in tests).
+  active rules, the table's sent and pending lines plus the cart, and calls `@rp/domain`
+  `recommend` at the restaurant's local time (`RECOMMENDATION_CLOCK`, replaced in tests).
 - `best-sellers.ts` ranks quantities over `reco.bestSellerDays` business dates in the daypart's
   hours (`reco.dayparts`), counting top-level lines that reached the kitchen; each ranking is
   cached for ten minutes and refreshed in the background. Tests that add orders and need them
   counted at once call `BestSellers.invalidate()`.
 - `recommendation-rules.service.ts`: the rules API (`/api/v1/recommendation-rules`,
-  OPERATIONS_CONFIGURE), audited; rules are archived, never deleted. A change that only reorders
-  a rule's channels is no change.
-- `recommendation-preferences.service.ts` (P4-03c, REC-009): the dishes pinned, boosted or blocked
-  (`GET /api/v1/recommendation-preferences`, `PUT /api/v1/recommendation-preferences/:itemId`,
-  OPERATIONS_CONFIGURE). One row per dish in `recommendation_preferences`, changed in place and
-  back to NORMAL rather than deleted, locked while it changes; each change is audited on the dish
-  (`RECOMMENDATION_PREFERENCE_CHANGED`, before, after, reason) and applies to the next suggestions
-  without publishing the menu. Only an active dish can be set (404 `ITEM_NOT_FOUND`); the list
-  leaves out archived dishes and NORMAL ones.
+  OPERATIONS_CONFIGURE), audited; rules are archived, never deleted.
 - Tracking: `POST .../recommendations/events` records IMPRESSION, TAP and ADD_TO_CART (at most 50
   a call); `recommendation-orders.ts` is the durable consumer that records ORDERED for each order
   line sent with its `recommendation`, once per line.
@@ -561,42 +526,12 @@ To try a real printer on a PC: add it under Printers with its IP address and por
 - `GET /api/v1/auth/owner/security` tells the Owner what of password, authenticator and recovery
   codes is set up, never a secret. See `test/integration/staff.int.test.ts`.
 
-## Custom roles (P4-02e)
-
-- A custom role (AUTH-012) is a row of `roles` with `built_in = false`: a base role (never the
-  Owner's), the capabilities it adds (`capabilities`, then allowed outright) and the ones it takes
-  away (`removed_capabilities`). `@rp/domain` `grantOf` applies it and `checkCustomRole` says what
-  may be added or taken away (never what only the Owner may do).
-- `src/staff/roles.service.ts` serves `/api/v1/roles`: everyone who manages staff lists them
-  (archived ones included, with how many active people have each); creating, changing, archiving
-  (with a reason, only when no active person has it) and restoring need the Owner with a fresh
-  second factor, since a role decides who manages staff and who counts as a manager. Names are
-  unique, ignoring case, among active custom roles and the built-in roles. Each change is audited
-  (ROLE_CREATED, ROLE_CHANGED with before and after, ROLE_ARCHIVED, ROLE_RESTORED) and announced
-  as `RestaurantChanged` `STAFF`. Roles are archived, never deleted.
-- People get a custom role like its base role: `customRoleId` with `role` on the staff routes
-  (422 `ROLE_MISMATCH` when it is built on another role, 404 `ROLE_NOT_FOUND` when it is archived).
-  Someone whose role manages staff counts as a manager (`isManagerRole`), so only the Owner with a
-  fresh second factor gives it or changes theirs. The role row is locked while it is given, and
-  locked for update while it changes, so nobody gets a role mid-change.
-- The principal is read again on every request with its custom role (`src/auth/custom-roles.ts`),
-  so a change applies from each person's next call. The permission key of a session includes the
-  role's grants, so the realtime sweep closes their sockets (`SESSION_ENDED`) and their screens
-  sign in again; people whose role stops taking orders leave today's sections
-  (`src/staff/sections.ts`). Socket rooms per capability (`r:<restaurant>:can:<capability>`)
-  carry events to whoever may use it, custom roles included. A manager's approval (AUTH-011)
-  still needs an Owner or Manager base role whose grant allows the action.
-- Sign-in, the current session and staff records carry the custom role (id, name, added,
-  removed); the sign-in tiles show its name. See `test/integration/roles.int.test.ts`.
-
 ## Pagers (P2-04a)
 
 - `src/pagers/pager-broker.ts` embeds the MQTT broker (Aedes) on `RP_MQTT_PORT` (8883), over TLS
   when `RP_TLS` is on.
 - Each pager signs in with its device id and its own secret, and the ACL keeps it to its own
-  topics: `rp/<restaurant>/pagers/<device>/alerts|locate|ack|heartbeat` (it reads `alerts` and
-  `locate`, and writes `ack` and `heartbeat`). "Locate" (P4-02c) is published at QoS 0: a pager
-  that is not connected is not asked later.
+  topics: `rp/<restaurant>/pagers/<device>/alerts|ota|ack|heartbeat`.
 - Alert events reach the recipients' pagers at QoS 1 (only the alerts `reachesPagerAndApp` lets
   through), and a pager that connects is sent its wearer's open alerts again. Heartbeats feed
   battery, signal and offline detection.
@@ -605,6 +540,20 @@ To try a real printer on a PC: add it under Printers with its IP address and por
   Pagers page and the wearer's own pager card follow; the list carries `pager.lowBatteryPercent`.
 - Tests start the broker with `config: { mqtt: 'on', mqttPort: 0 }`. See
   `test/integration/pagers.int.test.ts`.
+
+## Pager firmware (P2-04b1, ADR-0018)
+
+- `src/pager-firmware/pager-firmware.service.ts` fetches the `PAGER_FIRMWARE` release the Control
+  Plane offers (heartbeat answer, kept in `system_meta`), checks it (`firmware-image.ts`: the
+  ESP-IDF image and its secure boot v2 signature against `firmware-keys.ts` plus
+  `RP_PAGER_FIRMWARE_KEYS` outside production) and keeps it in `<data>/firmware/pager`.
+- It offers it on each free pager's `ota` topic (`pagerFirmwareVerdict`), with a 15-minute token
+  for `GET /api/v1/pager-firmware/:token`, and follows each pager's `ota` reports in
+  `pager_firmware_updates`. `GET /api/v1/pagers/firmware` and
+  `POST /api/v1/pagers/:deviceId/firmware-update` serve the Pagers page.
+- Signed test images come from `test/helpers/pager-firmware.ts`; the espsecure-signed fixture is
+  in `test/fixtures/pager-firmware/`. See `test/integration/pager-firmware.int.test.ts` and
+  `docs/runbooks/pager-firmware.md`.
 
 ## Phase 1 exit scenario (P1-14)
 
@@ -615,6 +564,110 @@ To try a real printer on a PC: add it under Printers with its IP address and por
 - In CI it runs as `test/integration/service-day.int.test.ts`. Against a real install:
   `RP_SCENARIO_URL=... pnpm --filter @rp/server scenario:service-day`. See
   `test/scenario/real-install.scenario.test.ts` for the variables.
+
+## Phase 7 exit scenarios (P7-10)
+
+In the integration suite, on every build; the PC and a real Control Plane share the process's
+clock, which the scenarios move from day to day:
+
+- `test/integration/licence-exit.int.test.ts` (S8): overdue, grace, restricted from the next
+  business day, reactivation offline (a code) and online (paid), exports while restricted;
+- `test/integration/update-exit.int.test.ts` (S9): an update that fails its health check, the
+  updater's way back, the rollout halted, service the next morning;
+- `test/integration/data-exit.int.test.ts` (S10): archive-then-purge with its read-back, the
+  archive viewer, a backup restored on a new PC that still opens the old PC's archive
+  (`src/backups/backup-keys.ts`).
+
+`test/helpers/small-restaurant.ts` sets up their menu and floor and serves a table through the API.
+
+## Load test at design capacity (P8-01a, P8-01b)
+
+`test/load/` simulates the restaurant of BRD §7.2 against the server (ADR-0020): 200 live
+connections (tablets, waiter phones, kitchen screens, POS, dashboards and console screens, each
+re-reading its screen after events as the apps do), 30 pagers on MQTTS and 8 printers on raw TCP.
+Orders arrive open-loop at the peak rate; the kitchen cooks, waiters approve, pick up and serve,
+diners call, cashiers bill and print, managers change availability and run reports. Diners at the
+tables without a tablet order on their QR page through the QR relay, which runs in the harness
+(`@rp/relay/testing`, with its Realtime stand-in) behind simulated internet lines; the server syncs
+with it as on the restaurant PC (NFR-P05, NFR-P06). At the end the server is killed and every
+client must come back.
+
+- `plan.ts`: the shape (`DESIGN_CAPACITY`, `SMOKE_SHAPE`) and the seeded schedule;
+- `restaurant.ts`: the restaurant, its devices and pagers, and a year of history in steady state;
+- `device.ts`, `pager.ts`, `printer.ts`, `tls-fetch.ts`: the simulated devices;
+- `server.ts`: the built server in its own process, or the server in this process;
+- `qr.ts`, `slow-line.ts`: the relay, the server's connection to it, diners' QR pages, and an
+  internet line that delays each way;
+- `rush.ts`: the run, its figures per NFR-P target and the checks (nothing lost or duplicated);
+- `report.ts`: the Markdown that `docs/build/performance.md` records.
+
+The full run: `pnpm build`, then `RP_PERF=1 pnpm --filter @rp/server test:perf load`
+(`RP_LOAD_MINUTES`, `RP_LOAD_ORDERS_PER_HOUR`, `RP_LOAD_HISTORY_DAYS`; the report in
+`RP_LOAD_REPORT`, by default `$TMPDIR/rp-load-report.md`, with the raw figures next to it as JSON).
+It takes the rush's 25 minutes plus 10 to 60 for the year of history. To set the history up once
+and reuse it, point `RP_LOAD_ADMIN_URL` at a PostgreSQL of your own and `RP_LOAD_BASE` at a folder:
+later runs copy the restaurant in about 30 s. With `pg_stat_statements` loaded in that PostgreSQL,
+the busiest statements of a rush are a query away. The server's log is in the run's data folder. A
+short version runs in the integration suite on every build (`test/integration/load-rush.int.test.ts`).
+
+## Floods from the LAN (P8-03c2a, PC-D3)
+
+A host on the staff network must not be able to hold the server's connections, keep it busy, or
+stall another device's screen. `src/http/flood-limits.ts` (`limitFloods`, applied by `configureApp`;
+the mechanisms in `src/common/flood-limits.ts`, shared with the pager broker) sets, per
+`DEFAULT_SERVER_LIMITS`:
+
+- every TCP connection counted before its TLS handshake: 256 open per address, 4,096 in all, and
+  an address opens 120 at once then 20 a second; past that the connection is closed at once;
+- requests: 400 at once then 100 a second per address; past that 429 `RATE_LIMITED` with
+  `Retry-After: 1` and `Connection: close`;
+- Node's timers: the TLS handshake and a request's headers within 10 s (checked every second;
+  HTTPS only, since Node takes the interval when it creates the server), a whole request within
+  300 s, 5 s idle between requests; and every connection closed when the server stops
+  (`forceCloseConnections`), since Node stops timing out the others once it begins closing.
+
+The PC's own address is never limited (the POS window, the set-up checks, the load test, the DAST
+scan). On the socket (`RealtimeOptions`): 16 live connections and 60 handshakes a minute per device,
+counted after the token's signature is checked and before the database is asked, refused with
+`TOO_MANY_CONNECTIONS` (the apps retry); a connection with over 1,000 messages waiting at two
+sweeps in a row (every 3 s) and no bytes taken by the operating system in between, or over 10,000,
+has its TCP connection destroyed. Refusals are logged once a minute per kind and address or
+device, with their count.
+
+`test/integration/flood.int.test.ts` floods the server over HTTPS from two addresses of the machine
+(127.0.0.1 and ::1; the server listens on `::` and does not trust its own address there), with
+small limits per test, and once with the production limits from a worker thread while another
+device's screen and requests are timed.
+
+## Windows services (P0-16b)
+
+On the restaurant PC the server runs under the **service host** (`src/service/service-host.ts`,
+started by the `RPServer` Windows service with `dist/service/service-host-main.js --installation
+<file>`). It reads the installation file and the database passwords from the secret store, waits for
+PostgreSQL, runs a restore requested on the System page (`restore-cli pending`, with the
+administrator's login, which the server never gets), applies pending migrations, then forks
+`dist/main.js` and keeps it running (NFR-A04): started again within 5 s when it ends, ended and
+started again after 20 s without answering `/api/v1/health` (60 s after a start; 2 minutes of
+503), prepared again on
+exit code 75. It stops the server over IPC (`rp:shutdown`), which `main.ts` handles; the server also
+stops when the channel closes. Its state file is `<data>/run/service-host.json`.
+
+The **watchdog** (`src/service/watchdog.ts`, the `RPWatchdog` service) starts the database and
+server services when they stop, and restarts the server service when its host stopped writing its
+heartbeat and the server does not answer, except while the maintenance flag is set.
+
+`src/installation/setup-cli.ts` is what the installer runs (each step can run again for repair):
+`write-installation`, `secrets`, `postgres-init`, `postgres-register`, `database` (the logins
+`rp_migrator`, `rp_server`, `rp_purger`, `rp_backup`), `migrate` (Prisma's migration files and its
+`_prisma_migrations` table, without the Prisma CLI), `service-files` (WinSW XML), `maintenance` and
+`status`.
+
+`RP_SECRET_STORE=dpapi` (required in production on Windows) keeps every local secret protected with
+Windows DPAPI under `<data>/secrets/<name>.dpapi`, unprotected in one PowerShell call per start;
+plain `.key` files from the development store are protected and removed. The store also holds the
+database logins' passwords, which backups leave out.
+
+See `docs/runbooks/windows-services.md`.
 
 ## Commands
 
@@ -631,6 +684,7 @@ pnpm --filter @rp/server db:migrate:deploy   apply pending migrations (what the 
 pnpm --filter @rp/server db:seed       load the development seed (build first)
 pnpm --filter @rp/server menu:template write the vendor menu import template (build first)
 pnpm --filter @rp/server scenario:service-day   Phase 1 exit scenario against RP_SCENARIO_URL
+RP_PERF=1 pnpm --filter @rp/server test:perf load   the load test at design capacity (build first)
 pnpm --filter @rp/server control-plane:enrol <code>   enrol this PC with the Control Plane
 pnpm --filter @rp/server clean         remove dist, coverage and the generated Prisma client
 ```

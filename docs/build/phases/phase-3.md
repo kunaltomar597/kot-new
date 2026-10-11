@@ -18,14 +18,29 @@ low-battery alert at 20 %; restaurant branding (logo, accent colour).
 Acceptance: Maestro test for open → use → close → wiped; server rejects the tablet acting on
 another table.
 
-Built for it in P4-02c: the manager's Devices page lists tablets with their table, connection,
-battery (low at `devices.lowBatteryAlertPercent`), app version and last seen, moves a tablet to
-another table and unpairs it. The tablet still needs to: report battery and charging (a route for
-device health that stores them on the device, adds `charging` to `DeviceView` and emits
-`DeviceStatusChanged` on a change of state, so the low-battery alert fires); answer
-`DeviceLocateRequested` for itself (it arrives in the device's room) by beeping and showing its
-name for a few seconds; and follow `RestaurantChanged` `DEVICES` to show a new name, and restart
-in its new table's rooms after a move (the gateway ends its connection with `DEVICE_CHANGED`).
+Built in two parts:
+
+- P3-01a Server side (done):
+  - `GET /api/v1/devices/current/table` returns the tablet's own table, its open session and the
+    idle screen's promotions (the pinned dishes).
+  - `POST /api/v1/devices/current/health` records battery, charging, connection and version for
+    any app, and raises low-battery alerts for tablets and kitchen screens.
+  - `DevicePresenceMonitor` marks tablets and kitchen screens offline after
+    `devices.offlineAlertSeconds` and alerts the managers.
+  - `POST /api/v1/devices/current/kiosk-exit` checks a manager's PIN and audits the exit.
+  - The restaurant's accent colour in the profile and on the Restaurant page; charging and the
+    connection on the Devices page.
+- P3-01b The tablet app (done):
+  - `RpKioskModule.kt` and `RpDeviceAdminReceiver.kt` in `@rp/mobile-native`: lock-task mode,
+    keep-screen-on, health and a locate tone;
+  - `TabletSession` and `HealthReporter` in `@rp/mobile-core`;
+  - the idle screen with logo, accent colour and promotions, and the open table's screen;
+  - the wipe of `TABLET_GUEST_KEYS` on close;
+  - the hidden corner with manager tiles and a PIN pad;
+  - the Maestro flows and manual task 12 (P0-H3).
+- P3-01c "Locate" a tablet from the Devices page (MGR-006, a Should deferred from P4-02c) (done):
+  `POST /api/v1/devices/:deviceId/locate` and `DeviceLocateRequested` to the device's own room;
+  the tablet flashes its name and plays its kiosk module's tone.
 
 ## P3-02 Service requests end to end
 
@@ -45,6 +60,15 @@ are built. The tablet's routes are `GET` and `POST /api/v1/devices/current/servi
 `POST /api/v1/devices/current/service-requests/:requestId/cancel` (its own table only; at most
 `tablet.serviceRequestsPerMinute` raises a minute), and the tablet hears the request events in its
 table's room. P3-02 builds the tablet's buttons on them and the Maestro test.
+
+As built (P3-02):
+
+- `apps/table-tablet/src/ServiceButtons.tsx` on the open table's screen, with `service-view.ts`.
+- Water, Waiter and Bill light up with "Requested, waiter notified" and the minutes since, then
+  "… is on the way" once acknowledged.
+- Cancel clears the only open request, or asks which of several.
+- The repeats, escalation and anti-spam are the server's (P2-06d, tested there).
+- Maestro: `service-requests.yaml`, with a person acknowledging on the waiter app.
 
 ## P3-03 Customer ordering and waiter approval workflow
 
@@ -67,6 +91,33 @@ For the bestseller badge and filter, the server's P3-04 `BestSellers` ranking (q
 `reco.bestSellerDays`, cached) is there to reuse; P3-03 adds the route and how many count as
 bestsellers. Approving an order changes nothing for recommendation tracking: ORDERED is counted
 when the order is submitted, and the report reads each line's final state (RPT-012).
+
+Built in three parts:
+
+- P3-03a Server (done), `apps/server/src/orders/order-approvals.service.ts`:
+  - `POST` and `GET /api/v1/devices/current/orders`: the tablet's order for its own open table,
+    waiting for approval, and the session's orders with the running and pending totals.
+  - `GET /api/v1/orders/pending-approval`, `POST /api/v1/orders/:orderId/approve` (quantities
+    changed or lines removed with `dinerAgreed`) and `/reject` (with a reason).
+  - `POST /api/v1/devices/current/orders/:orderId/approve`: "Approve at table" with the waiter's
+    PIN (`AuthService.tableApprover`).
+  - `GET /api/v1/menu/bestsellers` (`menu.bestSellerCount`).
+  - The pending-approval alert and its escalation already existed (P2-03).
+- P3-03b The waiter app's approvals inbox and the POS's approvals: view, edit with the diner's
+  agreement, approve in at most 2 taps, reject with a reason (done):
+  - `apps/waiter-app/src/Approvals.tsx`, on the tables screen and on each table's screen;
+  - `apps/console/src/pos/Approvals.tsx`, above the POS floor;
+  - `@rp/ordering` `approval-view.ts`, shared by both.
+- P3-03c The tablet's ordering: menu (categories, cards, filters, sorting, tax note), fuzzy search
+  (fuse.js), item options, cart with review and estimated taxes, submit and "Waiting for waiter
+  confirmation", live item statuses, "My order", out of stock live, "Please call a waiter"
+  offline, and "Approve at table" (done):
+  - `@rp/ordering` `tablet-menu.ts`: search with its own small matcher instead of fuse.js, filters,
+    sorting and the estimate (`computeBill`);
+  - the tablet's `MenuView`, `DishCard`, `CartView`, `MyOrders` and `use-cart.ts`, on
+    `OpenTableScreen` with the service buttons;
+  - `ItemSheet` moved to `@rp/mobile-shell` and shared with the waiter app;
+  - `TabletTableView.priceMode` and each order line's `endReason`.
 
 ## P3-04 Recommendation engine v1 (done)
 
@@ -148,6 +199,23 @@ and put in the cart to their `.../recommendations/events` route in batches. A di
 suggestion goes into the cart with `recommendation` (`addLine`), which the order line carries so
 the server counts it as ordered. `describeRecommendation` gives the reason label.
 
+Built in two parts:
+
+- P3-05a Suggestion rows and tracking (done):
+  - `@rp/mobile-shell` `SuggestionRow` with `useSuggestions` and `sourceOf`;
+  - `@rp/mobile-core` `SuggestionTracker`;
+  - on the tablet: rows on the menu ("You may like"), in the item sheet ("Goes well with this")
+    and in the cart ("Add to your order");
+  - on the waiter app: "Suggest to the table" on a table's order view (WTR-011).
+- P3-05b Feedback after the bill (TAB-014, S): food and service ratings, a comment, and an
+  optional phone with explicit consent recorded with its purpose and time (BILL-011, SEC-019),
+  erasable (DATA-011 hook); and where managers read it (done):
+  - the `feedback` and `diner_contacts` tables (migration `20261002120000_feedback`);
+  - `apps/server/src/feedback/` with `POST /api/v1/devices/current/feedback`,
+    `POST /api/v1/diner-contacts/erase` and `GET /api/v1/reports/feedback` (RPT-013, exported as
+    `FEEDBACK`);
+  - the tablet's `FeedbackCard` and the console's Feedback report.
+
 ## P3-06 Phase 3 exit test: tablet session (S6)
 
 Goal: prove S6: open → order → approval (app and at-table PIN) → status → Water/Cancel → bill →
@@ -156,3 +224,9 @@ Depends on: P3-01 to P3-05.
 Deliverables: automated end-to-end test (API + Maestro where possible) and a manual checklist for
 the lab rig.
 Acceptance: passes; results recorded in PROGRESS.md.
+
+As built: `apps/server/test/integration/tablet-session.int.test.ts` runs S6 over the real API and
+live connection in every check: open, order, approval in the waiter app, kitchen status, approval at
+the table with the waiter's PIN, Water and Cancel, bill and feedback, payment and close, and the
+next guests with nothing carried over. The tablet's own wipe is tested in `apps/table-tablet`. The
+lab-rig checklist is in manual task 12, "S6 on the lab rig".

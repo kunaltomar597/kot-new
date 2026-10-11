@@ -21,9 +21,23 @@ import {
   SERVICE_REQUEST_ALERTS,
   serviceRequestMachine,
   type ServiceRequestState,
+  tableAfterGuestsLeft,
   tableMachine,
   transition,
 } from '../src/index.js';
+
+describe('[ORD-016] hold and fire', () => {
+  it('keeps a held item from the kitchen until it is fired, and lets it be cancelled', () => {
+    expect(transition(orderItemMachine, 'HELD', 'FIRE').to).toBe('SENT');
+    const cancel = transition(orderItemMachine, 'HELD', 'CANCEL');
+    expect(cancel.to).toBe('CANCELLED');
+    expect(cancel.requiresReason).toBe(true);
+    expect(() => transition(orderItemMachine, 'HELD', 'START_PREPARING')).toThrow();
+    expect(() => transition(orderItemMachine, 'SENT', 'FIRE')).toThrow();
+    expect(isBillable('HELD')).toBe(false);
+    expect(isKitchenActive('HELD')).toBe(false);
+  });
+});
 
 describe('[ORD-002] order item state machine (Appendix B)', () => {
   it('[ORD-003] starts customer orders in approval and staff orders as sent', () => {
@@ -128,6 +142,15 @@ describe('[TBL-004] table state machine', () => {
     expect(canTransition(tableMachine, 'FREE', 'PRINT_BILL')).toBe(false);
     expect(canTransition(tableMachine, 'OCCUPIED', 'SETTLE_AND_CLOSE')).toBe(false);
     expect(transition(tableMachine, 'OCCUPIED', 'CLOSE_WITHOUT_BILL').requiresReason).toBe(true);
+  });
+
+  it('"Needs cleaning", when on, comes after the guests leave and before the next ones', () => {
+    expect(tableAfterGuestsLeft(false)).toBe('FREE');
+    expect(tableAfterGuestsLeft(true)).toBe('NEEDS_CLEANING');
+    expect(transition(tableMachine, 'FREE', 'GUESTS_LEFT').to).toBe('NEEDS_CLEANING');
+    expect(transition(tableMachine, 'NEEDS_CLEANING', 'CLEANED').to).toBe('FREE');
+    expect(canTransition(tableMachine, 'NEEDS_CLEANING', 'OPEN')).toBe(false);
+    expect(canTransition(tableMachine, 'OCCUPIED', 'CLEANED')).toBe(false);
   });
 });
 

@@ -40,6 +40,8 @@ export interface BillContext {
   readonly items: readonly BillableItem[];
   /** Items still waiting for a manager's approval (TAB/QR orders), which block printing. */
   readonly awaitingApproval: number;
+  /** Items held back from the kitchen (ORD-016): fire or cancel them before the invoice. */
+  readonly held: number;
   readonly discounts: readonly (ActiveDiscount & {
     reason: string;
     appliedById: string;
@@ -48,6 +50,8 @@ export interface BillContext {
   readonly settings: BillSettings & {
     readonly serviceChargeEnabled: boolean;
     readonly rateBp: number;
+    /** BILL-001: show the total in words. */
+    readonly amountInWords: boolean;
   };
   readonly taxGroups: ReadonlyMap<string, { name: string; sacCode: string | null }>;
   readonly calculated: CalculatedBill;
@@ -379,9 +383,11 @@ export class BillsService {
           : null,
       serviceChargeEnabled,
       rateBp,
+      amountInWords: snapshot.get('bills.amountInWords'),
     };
     const items: BillableItem[] = billable.map((item) => ({
       id: item.id,
+      itemId: item.itemId,
       name: item.name,
       variantName: item.variantName,
       modifiers: item.modifiers.map(({ name, quantity }) => ({ name, quantity })),
@@ -416,6 +422,8 @@ export class BillsService {
       tableLabel: bill.tableSession?.table.label ?? null,
       items,
       awaitingApproval: orderItems.filter((item) => item.state === 'PENDING_APPROVAL').length,
+      held: orderItems.filter((item) => item.state === 'HELD' && item.parentOrderItemId === null)
+        .length,
       discounts,
       settings,
       taxGroups,
@@ -496,6 +504,7 @@ export class BillsService {
       },
       invoiceIds: [...invoiceIds],
       editingInvoiceId: bill.editingInvoiceId,
+      amountInWords: settings.amountInWords,
     };
   }
 
@@ -519,8 +528,8 @@ export class BillsService {
 
   /**
    * BILL-005: Owner and Manager may give any discount; a cashier up to their limit, and above it
-   * or complimentary with a manager's override token for DISCOUNT_ABOVE_LIMIT; a custom role as
-   * its discount permissions say (AUTH-012). Returns the approver, if one was needed.
+   * or complimentary with a manager's override token for DISCOUNT_ABOVE_LIMIT. Returns the
+   * approver, if one was needed.
    */
   private async approve(
     principal: Principal,
@@ -529,7 +538,7 @@ export class BillsService {
     overrideToken: string | undefined,
   ): Promise<string | null> {
     const snapshot = await this.settings.snapshot(principal.restaurantId);
-    const decision = decideDiscount(principal, rateBp, {
+    const decision = decideDiscount(principal.role, rateBp, {
       CASHIER: snapshot.get('billing.cashierDiscountLimitBp'),
     });
     if (decision === 'ALLOWED') return null;
@@ -537,16 +546,14 @@ export class BillsService {
     if (overrideToken === undefined || overrideToken === '') {
       throw authErrors.overrideRequired('DISCOUNT_ABOVE_LIMIT');
     }
+    // An approval is for one bill only; on another it is refused and not spent (PC-T2).
     const override = await this.auth.consumeOverride(
       principal,
       'DISCOUNT_ABOVE_LIMIT',
       overrideToken,
+      { entityType: 'bill', entityId: billId },
     );
     if (override === null) throw authErrors.overrideInvalid();
-    // An approval given for a particular bill is good for that bill only.
-    if (override.entityId !== null && override.entityId !== billId) {
-      throw authErrors.overrideInvalid();
-    }
     return override.approverId;
   }
 }
