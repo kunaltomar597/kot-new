@@ -67,11 +67,16 @@ export function builderConfig(options: BuilderOptions): Configuration {
     beforeBuild: () => Promise.resolve(false),
     nodeGypRebuild: false,
     electronFuses: ELECTRON_FUSES,
-    // The server's programs go beside the app, where installationPaths expects them.
-    extraFiles: Object.values(INSTALL_FOLDERS).map((folder) => ({
-      from: join(staging.payload, folder),
-      to: folder,
-    })),
+    // The server's programs go beside the app, where installationPaths expects them. One set from
+    // the payload's root: electron-builder drops a node_modules at the root of a copied set (its
+    // createFilter), which per-folder sets made of the server's own (server/node_modules).
+    extraFiles: [
+      {
+        from: staging.payload,
+        to: '.',
+        filter: Object.values(INSTALL_FOLDERS).map((folder) => `${folder}/**/*`),
+      },
+    ],
     publish: null,
     win: {
       target: [{ target: 'nsis', arch: ['x64'] }],

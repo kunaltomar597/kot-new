@@ -519,12 +519,15 @@ describe('[SEC-011] [ONB-001] the installer', () => {
   });
 
   it('puts the server’s programs beside the POS window, where the services look for them', async () => {
-    expect(config.extraFiles).toEqual(
-      Object.values(INSTALL_FOLDERS).map((folder) => ({
-        from: join('/repo/apps/desktop/staging/payload', folder),
-        to: folder,
-      })),
-    );
+    // One set from the payload's root, so the server's node_modules is not that set's root (which
+    // electron-builder drops).
+    expect(config.extraFiles).toEqual([
+      {
+        from: '/repo/apps/desktop/staging/payload',
+        to: '.',
+        filter: Object.values(INSTALL_FOLDERS).map((folder) => `${folder}/**/*`),
+      },
+    ]);
     expect(config.directories?.app).toBe(join('/repo/apps/desktop/staging', 'app'));
     expect(config.files).toEqual(['main.js', 'package.json']);
     // node_modules are handled outside electron-builder: the app is one bundled file.

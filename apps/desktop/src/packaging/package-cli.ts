@@ -4,7 +4,8 @@ import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 import { Arch, build, Platform } from 'electron-builder';
 import { builderConfig } from './builder-config.js';
-import { stagingLayout } from './payload.js';
+import { missingFromBuild } from './copied.js';
+import { INSTALL_FOLDERS, stagingLayout } from './payload.js';
 import { releaseRefusals, signedBuild, stagedKeys, stagedUpdateSettings } from './release-guard.js';
 import { readManifest } from './stage.js';
 
@@ -39,17 +40,30 @@ const electronVersion = (
   ) as { version: string }
 ).version;
 
+const outputDir = join(projectDir, 'release');
 const artifacts = await build({
   projectDir,
   targets: Platform.WINDOWS.createTarget('nsis', Arch.x64),
   config: builderConfig({
     projectDir,
     staging,
-    outputDir: join(projectDir, 'release'),
+    outputDir,
     // `--product-version`: the same payload as another version (the CI job's update test, P7-04c).
     version: values['product-version'] ?? manifest.productVersion,
     electronVersion,
     editExecutable: process.platform === 'win32',
   }),
 });
+// Everything staged reached the app the installer was made from (an installed server missing a
+// package cannot start).
+const missing = await missingFromBuild(
+  staging.payload,
+  join(outputDir, 'win-unpacked'),
+  Object.values(INSTALL_FOLDERS),
+);
+if (missing.length > 0) {
+  throw new Error(
+    `The installer leaves out ${String(missing.length)} staged files, for example:\n${missing.slice(0, 20).join('\n')}`,
+  );
+}
 process.stdout.write(`${artifacts.join('\n')}\n`);
