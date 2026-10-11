@@ -51,8 +51,9 @@ What exists:
   routes and the custom role on sign-in, staff records and tiles (P4-02e); a settings catalogue
   with one pager heartbeat (set by the vendor) and one disk warning level (P4-03a); notification
   rules with each alert's pager vibration, and a rule change that cannot work refused (P4-03b);
-  the dishes' suggestion preferences, their routes and the PINNED and BOOSTED layers (P4-03c).
-  558 tests.
+  the dishes' suggestion preferences, their routes and the PINNED and BOOSTED layers (P4-03c);
+  the grace before a kitchen screen or table tablet is reported offline (P4-04a).
+  559 tests.
 - `apps/server`: NestJS 12 skeleton with config, request pipeline, JSON logging with correlation
   IDs, error mapping, validation pipe, health/version, Prisma 7 + PostgreSQL, integration-test
   harness; core data model (64 tables after the later migrations), least-privilege roles,
@@ -101,7 +102,9 @@ What exists:
   with their screens signed in again, and people who stop taking orders taken off today's
   sections (P4-02e); the disk alert at `storage.warnPercent` (P4-03a); the pager's vibration
   from each notification rule (P4-03b); pinned, boosted and blocked dishes, audited and applied
-  to the next suggestions at once (P4-03c). 752 tests (4 skipped without a real install).
+  to the next suggestions at once (P4-03c); kitchen screens and table tablets reported offline
+  once away longer than a grace and online as soon as they connect, also after a restart
+  (P4-04a). 758 tests (4 skipped without a real install).
 - `apps/control-plane`: the Vendor Control Plane service (P0-17a, ADR-0012): installation
   enrolment with one-time codes, Ed25519-signed requests with replay protection, heartbeat ingest,
   release channels and update offers, audited admin CLI. 34 tests. Not deployed yet (hosting
@@ -148,7 +151,9 @@ What exists:
   line and dishes ready on the tiles (P2-02c); what an alert says on a screen (P2-06a); the
   reason shown with a suggestion and the suggestion a cart line came from (P3-04); "my tables"
   from the domain's planning helper (P4-02b); a sent line's actions with the person's custom role
-  (P4-02e); "Our pick" for a pinned or boosted dish (P4-03c). 40 tests.
+  (P4-02e); "Our pick" for a pinned or boosted dish (P4-03c); a printer's error and the tickets
+  waiting for it, and how full the data drive is, with sizes as Windows writes them (P4-04a).
+  43 tests.
 - `packages/test-postgres`: the throwaway PostgreSQL harness for integration tests, shared by the
   server and the Control Plane.
 - `apps/console`: the web console shell (pairing with a WebCrypto key, staff tiles and PIN login,
@@ -187,7 +192,8 @@ What exists:
   contact and logo, opening hours, when the business day ends) and the Tax and invoice page
   (invoice particulars with the GSTIN checked, tax groups with rates as percentages, invoice
   series with their first number as it is typed), changed by the Owner after the second factor
-  and read only for managers (P4-03e). 412 tests, and 24 Playwright steps.
+  and read only for managers (P4-03e); the alert centre with a kitchen screen gone offline,
+  printer and disk alerts in words (P4-04a). 412 tests, and 25 Playwright steps.
 - `packages/i18n` (typed English catalogue, `t()` with ICU plural/select, lint rule against JSX text
   literals) and `packages/api-client` (REST client typed from the contracts with token renewal and
   error mapping, and the resuming Socket.io connection) (P0-14a).
@@ -202,7 +208,8 @@ What exists:
 
 Recommended next WPs (dependencies met):
 
-- P4-04 Alert centre and system screen (P4-01 done; its data sources arrive in P7).
+- P4-04b System screen (P4-04a done; backups, the licence and the update agent arrive in P7 and
+  show placeholders until then).
 - P4-05 Full report suite (P1-13, P2-03 and P3-04 done).
 - P3-01 Table tablet app (P2-01 done; its kiosk check needs P0-H3 on the chosen tablet, the rest can
   be built).
@@ -311,7 +318,8 @@ Recommended next WPs (dependencies met):
 - [x] P4-03c Recommendation rules with boost, pin and block
 - [x] P4-03d Floor, stations and printers
 - [x] P4-03e Tax and invoice
-- [ ] P4-04 Alert centre and system screen
+- [x] P4-04a Device and system alerts
+- [ ] P4-04b System screen
 - [ ] P4-05 Full report suite
 - [ ] P4-06 Report exports
 - [ ] P4-07 Audit viewer, verification, suspicious-activity report
@@ -637,6 +645,33 @@ Decided 2026-10-05 (P4-03b):
      too.
 261. The page's heading is "Notification rules" (its link says "Notifications"), because the
      toasts' landmark is already called "Notifications".
+
+Decided 2026-10-10 (P4-04a):
+
+289. Kitchen screens and table tablets are reported offline once they have been away for
+     `devices.offlineAfterSeconds`, 60 s by default (10 s to an hour, managers change it; NTF-003
+     gives no time). A minute lets a reload, a browser update or a moment out of Wi-Fi pass
+     without an alert, and still tells the managers quickly about a screen the kitchen needs. A
+     device is online again as soon as it connects.
+290. Only kitchen screens and table tablets are watched this way: pagers already report through
+     their heartbeats, waiter phones sleep and wake all day and are not in NTF-003's list, and the
+     POS and manager browsers are where the alert is read.
+291. When a device's last connection closed is kept in memory, not taken from `last_seen_at`
+     (written at most once a minute). After a restart, a device stored online gets the whole
+     grace from the server's start, when it can first reconnect; one that does not come back is
+     then reported, so a screen switched off while the server was down still raises its alert.
+292. The stored state is held against the live connections every 5 s, so a connection whose
+     announcement was missed (stored offline but connected) is put right and announced like any
+     other change.
+293. Sizes are written in units of 1,024 with Windows' names (KB, MB, GB, TB) and one decimal below
+     100 of a unit ("12.4 GB"), as Explorer shows the drive on the server PC, so the alert matches
+     what the Owner sees when freeing space.
+294. A printer alert gives the printer's own error when it reported one, otherwise says that it is
+     not printing, then how many tickets wait for it; the disk alert says how full the drive is
+     and how much is free. An alert without those details still shows its type, as before.
+295. The 90 % disk alert (`storage.criticalPercent`) stays with storage by category in P7-06, and
+     the update alerts with the update agent (P7-04): P4-04a adds the publisher NTF-003 lacked for
+     screens and tablets, as planned.
 
 Decided 2026-10-10 (P4-03e):
 
@@ -1460,6 +1495,49 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-10-10: P4-04a Device and system alerts
+
+Merged #82 (P4-03e) once CI, CodeQL and e2e were green, and split P4-04 into P4-04a (device and
+system alerts) and P4-04b (the System page).
+
+Built:
+
+- Server: `DeviceLiveness` (`src/devices/device-liveness.ts`) keeps `online` for kitchen screens
+  and table tablets from the gateway's connection changes (`RealtimeGateway.onConnectionChange`,
+  new): online and announced at once on connecting, offline once the last connection has been
+  closed for `devices.offlineAfterSeconds`, with the grace counted from the server's start after a
+  restart and a check every 5 s. The announcements are `DeviceStatusChanged`, which the P2-03b
+  triggers already turn into one alert per state, cleared when the device is back.
+- Contracts and i18n: the new setting with its label and hint; `ui.size`; the printer and disk
+  alert words.
+- Ordering: `describeAlert` gives a printer alert the printer's error and the tickets waiting for
+  it, and the disk alert how full the drive is and what is free; `sizeText` writes sizes as
+  Windows does.
+- Tests: 6 server integration tests (online at once; offline only after the grace, with its
+  alert, cleared on reconnect; a reload raises nothing; a second connection keeps a device online;
+  the restaurant's own grace; the grace after a restart and a missed connection put right; pagers,
+  phones and unpaired devices untouched), 3 ordering tests, and a Playwright step (a kitchen screen
+  switched off and on again, then three seeded alerts, each acknowledged).
+
+Deferred:
+
+- The 90 % disk alert and storage by category (P7-06), the update alerts (P7-04), and the System
+  page (P4-04b, next).
+
+Gotchas for the next session:
+
+- At a socket's `disconnect` it has already left its rooms, so `isDeviceConnected` there says
+  whether another connection of the same device is still open.
+- An outbox row's `payload` is the whole event (the event's own payload is `payload.payload`);
+  order rows by `writeOrder`, since `sequence` is set only when the event is published.
+- Integration tests that close their clients in `afterEach` leave earlier devices disconnected,
+  so the liveness tests assert per device, never on counts across the restaurant.
+- The e2e finds an alert group by its region name with any count (`^Kitchen \(\d+\)$`): earlier
+  steps can leave other alerts open. The e2e's seeded alerts are inserted with SQL
+  (`seedAlerts`), so the page is opened again to read them.
+
+Decisions: 289 to 295.
 
 ### 2026-10-10: P4-03e Tax and invoice (P4-03 done)
 
