@@ -132,12 +132,14 @@ describe.skipIf(asRoot)('[ONB-001] [DATA-001] [AUD-004] the installer sets up Po
       admin,
       `SELECT name, setting FROM pg_settings
        WHERE name IN ('data_checksums', 'TimeZone', 'wal_level', 'archive_mode',
-                      'listen_addresses', 'password_encryption', 'server_encoding')`,
+                      'listen_addresses', 'unix_socket_directories', 'password_encryption',
+                      'server_encoding')`,
     );
     expect(Object.fromEntries(settings.map((row) => [row.name, row.setting]))).toEqual({
       archive_mode: 'on',
       data_checksums: 'on',
       listen_addresses: 'localhost',
+      unix_socket_directories: '',
       password_encryption: 'scram-sha-256',
       server_encoding: 'UTF8',
       TimeZone: 'UTC',

@@ -154,6 +154,7 @@ describe('[DATA-001] [DATA-002] PostgreSQL on the data drive', () => {
     const settings = managedPostgresSettings(installation);
     expect(settings).toMatchObject({
       listen_addresses: 'localhost',
+      unix_socket_directories: '',
       port: '5432',
       timezone: 'UTC',
       wal_level: 'replica',

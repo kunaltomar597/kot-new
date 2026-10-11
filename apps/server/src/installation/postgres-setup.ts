@@ -36,7 +36,7 @@ function quoted(path: string): string {
 
 /**
  * The settings the installer owns, appended to `postgresql.conf` (later lines win):
- * - localhost only (DATA-001, SEC-007);
+ * - localhost only, over TCP (DATA-001, SEC-007);
  * - UTC, like every session the server opens (decision 219);
  * - WAL archiving into the server's staging folder for the continuous backup (DATA-002, P7-05c);
  * - its own log, a week of daily files.
@@ -52,6 +52,9 @@ export function managedPostgresSettings(installation: InstallationFile): Record<
   ].join(' ');
   return {
     listen_addresses: 'localhost',
+    // TCP on this PC only, no socket file: Windows' own default, said here so that a Linux build
+    // of PostgreSQL (the CI runner) does not try its distribution's /var/run/postgresql.
+    unix_socket_directories: '',
     port: String(installation.postgres.port),
     timezone: 'UTC',
     log_timezone: 'UTC',
