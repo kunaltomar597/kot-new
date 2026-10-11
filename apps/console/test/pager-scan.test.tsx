@@ -108,7 +108,11 @@ describe('[PGR-012] registering a pager by its QR code (P2-04b2)', () => {
     const read = await form.findByText(t('pagers.scan.read', { serial: 'WP-0002' }));
     expect(read).toHaveAttribute('role', 'status');
     expect(form.queryByRole('img', { name: t('pagers.scan.camera') })).toBeNull();
-    expect(camera.track.stop).toHaveBeenCalled();
+    // The scanner turns the camera off in its effect's clean-up, which React runs after the read
+    // is on screen (the read came from the scanner's timer, not from an event).
+    await waitFor(() => {
+      expect(camera.track.stop).toHaveBeenCalled();
+    });
     const serial = serialIn(dialog);
     expect(serial).toHaveValue('WP-0002');
     expect(serial).toHaveFocus();
