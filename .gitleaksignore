@@ -4,3 +4,18 @@
 # P4-02b: a made-up pager password in a console test fixture (commit cf9052e), never used as a
 # credential anywhere. The fixture now uses a value that does not look like a secret.
 cf9052ef3815894024990a2ebcdb43ce1ed74768:apps/console/test/sections-fixture.ts:generic-api-key:141
+
+# P2-04b1: the digest of the test firmware image's public signing key (espsecure
+# digest-sbv2-public-key); a public value, and the private key was thrown away.
+56041039bfe45fe07a9ed2d39170ecda02ce97ea:apps/server/test/unit/pager-firmware-image.test.ts:generic-api-key:24
+
+# P7-05b: a placeholder recovery key (RPK1-AAAAA-BBBBB-...) in a console test's fake server.
+4630fb6a54c8f099ee18685874af27e9e48e2c35:apps/console/test/system.test.tsx:generic-api-key:166
+
+# P7-08a (UPD-008, SEC-015): made-up tokens and keys planted in logs so the tests can
+# prove the diagnostics bundle removes them (the JWTs' signatures are plain words).
+9d303598ab5ccfa42475c26a7d6927bc6db54e32:packages/domain/test/scrub.test.ts:jwt:6
+9d303598ab5ccfa42475c26a7d6927bc6db54e32:apps/server/test/integration/diagnostics.int.test.ts:jwt:31
+9d303598ab5ccfa42475c26a7d6927bc6db54e32:apps/server/test/integration/diagnostics.int.test.ts:generic-api-key:29
+9d303598ab5ccfa42475c26a7d6927bc6db54e32:apps/server/test/integration/diagnostics.int.test.ts:generic-api-key:36
+9d303598ab5ccfa42475c26a7d6927bc6db54e32:apps/server/test/integration/diagnostics.int.test.ts:private-key:55
