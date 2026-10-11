@@ -36,6 +36,8 @@ export const RULES_OFF: Readonly<Record<string, string>> = {
   '40026':
     'Cross-site scripting (DOM based) drives a browser inside ZAP; the console and the QR site are checked in Playwright under their CSP and Trusted Types instead',
   '40043': 'Log4Shell: no Java, and it needs callbacks over the internet',
+  '40045':
+    'Spring4Shell: no Java; it takes the 400 that every API answers to an unknown parameter for the flaw',
   '10104': 'User agent fuzzer: reports differences only, no vulnerability',
 };
 

@@ -4490,7 +4490,12 @@ Mac code, and it failed in these places, all fixed in code:
 - **DAST on `main`** (it runs only there, so the merge was its first run): the plan turned off
   rule 40024 (SQL injection, SQLite), which left ZAP's release rules in ascanrules 79; the CI
   image does not have it, so every plan ended with a warning (exit 2). The Mac's ZAP has
-  ascanrules 78 and still had it. The rule is no longer named.
+  ascanrules 78 and still had it. The rule is no longer named. The next run reported "Spring4Shell"
+  (40045) on the relay and the Control Plane: the rule adds
+  `class.module.classLoader.DefaultAssertionStatus=nonsense` and takes the 400 for it (every API
+  refuses unknown parameters) for the flaw. Neither runs Java, so it is off like Log4Shell (40043).
+  Still open: during the Control Plane scan the run's vendor session renewals are rate-limited
+  (429), so later authenticated requests may go out with an expired token.
 
 Gotchas: makensis, icacls, Windows PowerShell 5.1, Supabase's reserved roles, Linux socket
 buffers and a busier CPU all behave differently from the Mac. Only the `windows-latest`, Supabase
