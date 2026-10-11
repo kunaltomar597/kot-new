@@ -238,13 +238,17 @@ describe.runIf(hasDeno)('[QR-006] the bundled functions under Deno', () => {
     const announced = await call('submit-order', { method: 'POST', body: tooLarge });
     expect(announced.status, denoLog.join('')).toBe(413);
     expect(((await announced.json()) as ApiError).code).toBe('PAYLOAD_TOO_LARGE');
-    // Chunked, without a length: refused once the cap is passed, before the rest is sent.
+    // Chunked, without a length: refused once the cap is passed, before the rest is sent. The
+    // stream is far larger than the operating system's socket buffers can hold (Linux's grow to
+    // about 10 MB on the loopback; macOS's to about 2 MB), so it is the server stopping to read,
+    // not the buffers, that keeps most of it unsent. A server that read it all would take it all.
+    const streamed = 64 * 1024 * 1024;
     const chunk = new Uint8Array(64 * 1024).fill(0x20);
     let sent = 0;
     const body = new ReadableStream<Uint8Array>(
       {
         pull(controller) {
-          if (sent >= 8 * 1024 * 1024) controller.close();
+          if (sent >= streamed) controller.close();
           else {
             sent += chunk.length;
             controller.enqueue(chunk);
@@ -265,7 +269,7 @@ describe.runIf(hasDeno)('[QR-006] the bundled functions under Deno', () => {
       throw error;
     });
     if (chunked !== null) expect(chunked.status).toBe(413);
-    expect(sent).toBeLessThan(8 * 1024 * 1024);
+    expect(sent).toBeLessThan(streamed);
 
     const server = await call('server', {
       path: 'server/orders',
