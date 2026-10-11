@@ -24,6 +24,7 @@ import { planOf } from '../manage/floor/floor-view.js';
 import { floorSections, tileAlert, tileDetails } from '@rp/ordering';
 import { Approvals } from './Approvals.js';
 import { MergeTablesDialog } from './MergeTablesDialog.js';
+import { FreeTableDialog } from './FreeTableDialog.js';
 import { MoveTableDialog } from './MoveTableDialog.js';
 import { OpenTableDialog } from './OpenTableDialog.js';
 import { TransferItemsDialog } from './TransferItemsDialog.js';
@@ -33,6 +34,7 @@ type Panel =
   | { readonly kind: 'open'; readonly tableId: string }
   | { readonly kind: 'details'; readonly tableId: string }
   | { readonly kind: 'move'; readonly tableId: string }
+  | { readonly kind: 'free'; readonly tableId: string }
   | { readonly kind: 'merge'; readonly tableId: string }
   | { readonly kind: 'transfer'; readonly tableId: string };
 
@@ -73,6 +75,7 @@ export function TableOverview() {
       table.tableId !== selected?.tableId,
   );
   const canMove = person !== undefined && grantOf(person, 'TABLE_MOVE_MERGE') !== 'DENY';
+  const canFree = person !== undefined && grantOf(person, 'ORDER_CREATE') !== 'DENY';
   const canCloseDay = person !== undefined && grantOf(person, 'DAY_END_CLOSE') !== 'DENY';
   const close = () => {
     setPanel(undefined);
@@ -220,7 +223,11 @@ export function TableOverview() {
           table={selected}
           now={now}
           canMove={canMove}
+          canFree={canFree}
           onClose={close}
+          onFree={() => {
+            setPanel({ kind: 'free', tableId: selected.tableId });
+          }}
           onMove={() => {
             setPanel({ kind: 'move', tableId: selected.tableId });
           }}
@@ -239,6 +246,14 @@ export function TableOverview() {
       {selected !== undefined && panel?.kind === 'move' ? (
         <MoveTableDialog table={selected} freeTables={free} onClose={close} onMoved={done} />
       ) : null}
+      {selected !== undefined && selected.session !== null && panel?.kind === 'free' ? (
+        <FreeTableDialog
+          table={selected}
+          sessionId={selected.session.id}
+          onClose={close}
+          onFreed={done}
+        />
+      ) : null}
       {selected !== undefined && panel?.kind === 'merge' ? (
         <MergeTablesDialog table={selected} openTables={others} onClose={close} onMerged={done} />
       ) : null}
@@ -253,7 +268,9 @@ function TableDetails({
   table,
   now,
   canMove,
+  canFree,
   onClose,
+  onFree,
   onMove,
   onMerge,
   onTransfer,
@@ -263,7 +280,9 @@ function TableDetails({
   table: TableOverviewEntry;
   now: number;
   canMove: boolean;
+  canFree: boolean;
   onClose: () => void;
+  onFree: () => void;
   onMove: () => void;
   onMerge: () => void;
   onTransfer: () => void;
@@ -275,6 +294,13 @@ function TableDetails({
   const toast = useToast();
   const session = table.session;
   const { openBill, opening } = useOpenBill();
+  // Opened by mistake: nothing billable ordered and nothing waiting for approval (the server checks).
+  const freeable =
+    canFree &&
+    session !== null &&
+    table.state === 'OCCUPIED' &&
+    session.amountSoFar === 0 &&
+    session.pendingApprovals === 0;
   const [cleaning, setCleaning] = useState(false);
   const [error, setError] = useState<string | undefined>();
 
@@ -306,6 +332,11 @@ function TableDetails({
   } else if (session !== null) {
     footer = (
       <>
+        {freeable ? (
+          <Button variant="secondary" onClick={onFree}>
+            {t('pos.table.free')}
+          </Button>
+        ) : null}
         {canMove ? (
           <>
             <Button variant="secondary" onClick={onMove}>

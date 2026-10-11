@@ -412,10 +412,9 @@ S1 on the lab rig with real devices is P8-01c [H].
 
 Recommended next WPs (dependencies met):
 
-- Port from GitHub's main, dropped in the 2026-10-11 sync (see the session log): "free a table
-  opened by mistake" on the POS (GitHub commit `9dc5680`, PR #84), and the on-screen words for the
-  `PRINTER_OFFLINE` and `DISK_OR_BACKUP` alerts in `@rp/ordering` alert text (GitHub commit
-  `1b7c380`; device-offline alerts themselves already exist here).
+- Port from GitHub's main, dropped in the 2026-10-11 sync (see the session log): the on-screen
+  words for the `PRINTER_OFFLINE` and `DISK_OR_BACKUP` alerts in `@rp/ordering` alert text (GitHub
+  commit `1b7c380`; device-offline alerts themselves already exist here).
 - P0-H1 Pager battery prototype firmware (Claude can write it, a person must run it).
 
 ## Work packages
@@ -466,6 +465,7 @@ Recommended next WPs (dependencies met):
 - [x] P1-07b Print queue, offline alert, redirect and reprint
 - [x] P1-08a POS floor: live table overview, open and move table
 - [x] P1-08b POS order entry, send KOT, takeaway, live item status
+- [x] P1-08c Free a table opened by mistake (POS)
 - [x] P1-09a KDS server support (station mode, tickets, bump, recall, notify manager)
 - [x] P1-09b KDS screen
 - [x] P1-10a Bill preview, discounts and invoice issue
@@ -4438,6 +4438,15 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-10-11: P1-08c, free a table opened by mistake
+
+Ported GitHub commit `9dc5680` by hand (the code had moved on: merge and transfer buttons exist
+here). An occupied table's details offer "Free the table" while the amount so far is zero and
+nothing awaits approval; `FreeTableDialog` reuses `ReasonDialog` and the existing
+`closeTableWithoutBill` route. 3 new console tests (17 in `pos.test.tsx`). Gotcha: console tests
+read `@rp/i18n` from `dist`, so run `pnpm --filter @rp/i18n build` after adding strings. Still to
+port: the printer and disk alert words (`1b7c380`).
 
 ### 2026-10-11: PR #85, the Mac build's first CI runs on GitHub
 

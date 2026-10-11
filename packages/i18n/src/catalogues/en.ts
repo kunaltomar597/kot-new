@@ -3847,6 +3847,7 @@ export const en = {
       merge: 'Merge into…',
       transfer: 'Move dishes…',
       takeOrder: 'Take order',
+      free: 'Free the table',
       clean: 'Mark clean',
       cleaned: '{table} is clean',
       needsCleaning:
@@ -3946,6 +3947,15 @@ export const en = {
       takeaway: 'Token {token}: order {number} sent to the kitchen',
       rejected: 'Nothing was sent. Fix the marked items and send again.',
       notSent: 'Not sent: {message} Your items are kept; send again.',
+    },
+    /** A table opened by mistake, freed before anything is ordered (TBL-004, ADR-0006). */
+    free: {
+      title: 'Free table {table}',
+      description:
+        'For a table opened by mistake. Nothing has been ordered, so there is no bill, and the table shows as free again.',
+      reason: 'Why it was opened by mistake',
+      confirm: 'Free the table',
+      freed: 'Table {table} is free again.',
     },
     move: {
       title: 'Move {table} to another table',
