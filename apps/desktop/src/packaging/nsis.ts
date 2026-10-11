@@ -99,7 +99,9 @@ export function nsisDefines(options: NsisDefinesOptions): string {
   }
   const lines = [
     '; Written by the stage step (apps/desktop/src/packaging); do not edit.',
-    `!define RP_SETUP_DIR "${nsisString(options.setupDir.replaceAll('\\', '/'))}"`,
+    // Windows separators: makensis on Windows does not take "/" in File paths, and makensis on
+    // macOS and Linux turns "\\" into "/" itself.
+    `!define RP_SETUP_DIR "${nsisString(options.setupDir.replaceAll('/', '\\'))}"`,
     `!define RP_MIN_FREE_GB ${options.minFreeGb}`,
   ];
   // The script's defines carry the same names as the variables.

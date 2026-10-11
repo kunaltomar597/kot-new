@@ -27,7 +27,9 @@
 !include FileFunc.nsh
 
 ; Written by the stage step: RP_SETUP_DIR, RP_MIN_FREE_GB and the vendor's addresses.
-!include "${PROJECT_DIR}/staging/installer-defines.nsh"
+; Backslashes: makensis on Windows does not resolve "/" in !include and File paths, and makensis on
+; macOS and Linux turns "\" into "/" itself.
+!include "${PROJECT_DIR}\staging\installer-defines.nsh"
 
 !define RP_SETUP_LOGS "%ProgramData%\RestaurantPlatform\setup-logs"
 
@@ -199,10 +201,10 @@
   ; The scripts needed before the files are copied: the drive page and stopping the services.
   InitPluginsDir
   SetOutPath "$PLUGINSDIR\setup"
-  File "${RP_SETUP_DIR}/RestaurantPlatform.Setup.psm1"
-  File "${RP_SETUP_DIR}/Get-DataDriveChoice.ps1"
-  File "${RP_SETUP_DIR}/Stop-RestaurantPlatform.ps1"
-  File "${RP_SETUP_DIR}/Start-RestaurantPlatform.ps1"
+  File "${RP_SETUP_DIR}\RestaurantPlatform.Setup.psm1"
+  File "${RP_SETUP_DIR}\Get-DataDriveChoice.ps1"
+  File "${RP_SETUP_DIR}\Stop-RestaurantPlatform.ps1"
+  File "${RP_SETUP_DIR}\Start-RestaurantPlatform.ps1"
 
   ${GetParameters} $R0
   StrCpy $RPDataDirGiven "0"

@@ -415,7 +415,7 @@ describe('[ONB-002] the installer script’s settings', () => {
     ).toBe(
       [
         '; Written by the stage step (apps/desktop/src/packaging); do not edit.',
-        '!define RP_SETUP_DIR "D:/a/staging/payload/setup"',
+        '!define RP_SETUP_DIR "D:\\a\\staging\\payload\\setup"',
         '!define RP_MIN_FREE_GB 20',
         '!define RP_CONTROL_PLANE_URL "https://cp.example.in"',
         '',
@@ -470,7 +470,9 @@ describe('[ONB-002] the installer script’s settings', () => {
     for (const name of tested) expect(defined, name).toContain(name);
     // P7-04c: the install step keeps this installer to go back to after a failed update.
     expect(script).toContain('-InstallerPath "$EXEPATH"');
-    expect(script).toContain('staging/installer-defines.nsh');
+    expect(script).toContain('!include "${PROJECT_DIR}\\staging\\installer-defines.nsh"');
+    // No "/" in the paths makensis reads on Windows.
+    expect(script).not.toMatch(/^\s*(!include|File) "[^"]*\//m);
     expect(stagingLayout('/s').nsisDefines).toBe(join('/s', 'installer-defines.nsh'));
   });
 });
@@ -637,7 +639,7 @@ describe('[UPD-007] [LIC-003] [PGR-011] the release guard (P8-03b3b)', () => {
   const licenceKey = generateKeyPairSync('ed25519')
     .publicKey.export({ type: 'spki', format: 'der' })
     .toString('base64');
-  const rsaKey = generateKeyPairSync('rsa', { modulusLength: 1024 })
+  const rsaKey = generateKeyPairSync('rsa', { modulusLength: 2048 })
     .publicKey.export({ type: 'spki', format: 'der' })
     .toString('base64');
   const release: ReleaseFacts = {
