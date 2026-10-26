@@ -21,8 +21,8 @@
   "devDependencies": {
     "@rp/contracts": "workspace:*",
     "@rp/domain": "workspace:*",
-    "electron": "44.5.1",
-    "electron-builder": "26.15.3",
+    "electron": "44.9.2",
+    "electron-builder": "26.18.0",
     "esbuild": "0.28.2"
   }
 }
